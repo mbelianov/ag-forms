@@ -82,4 +82,21 @@ Thumbs.db
 ~$*.xls*
 ~$*.ppt*
 
+# Azure Functions
+local.settings.json
+__blobstorage__/
+__queuestorage__/
+__azurite_db*__.json
+.python_packages/
+.funcignore
+
+# Azure Storage Emulator (Azurite)
+__azurite_db_*.json
+azurite/
+
+# TypeScript
+*.tsbuildinfo
+dist/
+out/
+
 # Made with Bob
