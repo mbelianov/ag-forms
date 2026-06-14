@@ -38,8 +38,36 @@ This script will:
 .\start-functions.ps1
 ```
 
+**Terminal 3 - Start Frontend (React):**
+```powershell
+.\start-frontend.ps1
+```
+
 **Test your setup:**
-Visit http://localhost:7071/api/HealthCheck
+- Backend: http://localhost:7071/api/HealthCheck
+- Frontend: http://localhost:3000
+
+### Initialize Database (First Time Only)
+
+Before you can log in to the application, initialize the database with a default admin user:
+
+```powershell
+.\init-database.ps1
+```
+
+This creates a default admin user:
+- **Username**: `admin`
+- **Password**: `Admin123!`
+- **Email**: `admin@example.com`
+- **Role**: Administrator
+
+**Important**: Change the default password after first login!
+
+### Access the Application
+
+1. Open your browser: http://localhost:3000
+2. Log in with the admin credentials above
+3. Start managing patients and examinations!
 
 ## 📚 Documentation
 
@@ -95,13 +123,48 @@ This project follows IBM security standards:
 
 See [Security Architecture](docs/03-security-architecture.md) for details.
 
+## 👥 User Management
+
+### Create Additional Users
+
+After logging in as admin, you can create more users via the API:
+
+```bash
+# Example: Create a doctor user
+curl -X POST http://localhost:7071/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "doctor1",
+    "password": "Doctor123!",
+    "email": "doctor1@example.com",
+    "role": "doctor"
+  }'
+
+# Example: Create a viewer user
+curl -X POST http://localhost:7071/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "viewer1",
+    "password": "Viewer123!",
+    "email": "viewer1@example.com",
+    "role": "viewer"
+  }'
+```
+
+### User Roles
+
+- **admin**: Full system access, user management
+- **doctor**: Create/edit patients and examinations
+- **viewer**: Read-only access
+
 ## 🧪 Development Workflow
 
 ### Daily Development
 1. Start Azurite: `.\start-azurite.ps1`
 2. Start Functions: `.\start-functions.ps1`
-3. Make changes to code
-4. Functions auto-reload on save
+3. Start Frontend: `.\start-frontend.ps1`
+4. Make changes to code
+5. Functions and frontend auto-reload on save
 
 ### Testing
 ```bash
@@ -145,6 +208,43 @@ func start --verbose  # Start with detailed logging
 
 ## 🐛 Troubleshooting
 
+### Cannot Log In / "Invalid credentials"
+
+1. **Verify all services are running**:
+   - Terminal 1: Azurite (`.\start-azurite.ps1`)
+   - Terminal 2: Azure Functions backend (`.\start-functions.ps1`)
+   - Terminal 3: Frontend dev server (`.\start-frontend.ps1`)
+
+2. **Initialize the database**:
+   ```powershell
+   .\init-database.ps1
+   ```
+
+3. **Check backend health**:
+   ```bash
+   curl http://localhost:7071/api/HealthCheck
+   ```
+
+4. **Verify credentials**: Use `admin` / `Admin123!`
+
+### Reset Everything
+
+To start completely fresh:
+
+1. Stop all services (Ctrl+C in all terminals)
+2. Delete Azurite data directory:
+   ```powershell
+   Remove-Item -Recurse -Force C:\azurite
+   ```
+3. Restart services in order:
+   - Terminal 1: `.\start-azurite.ps1`
+   - Terminal 2: `.\start-functions.ps1`
+   - Terminal 3: `.\start-frontend.ps1`
+4. Re-initialize database:
+   ```powershell
+   .\init-database.ps1
+   ```
+
 ### "func: command not found"
 Run the setup script: `.\setup-dev-environment.ps1`
 
@@ -155,6 +255,13 @@ Ensure Azurite is running: `.\start-azurite.ps1`
 ```powershell
 # Find and kill the process
 netstat -ano | findstr :7071
+taskkill /PID <PID> /F
+```
+
+### "Port 3000 already in use"
+```powershell
+# Find and kill the process
+netstat -ano | findstr :3000
 taskkill /PID <PID> /F
 ```
 

@@ -37,8 +37,10 @@ Push-Location "api"
 Write-Host "Azure Functions will be available at:" -ForegroundColor Green
 Write-Host "  http://localhost:7071" -ForegroundColor White
 Write-Host ""
+Write-Host "CORS enabled for: http://localhost:3000, http://localhost:5173" -ForegroundColor Green
+Write-Host ""
 
-func start
+func start --cors "http://localhost:3000,http://localhost:5173"
 
 Pop-Location
 

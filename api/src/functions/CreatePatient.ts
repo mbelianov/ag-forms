@@ -1,0 +1,118 @@
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
+import { v4 as uuidv4 } from 'uuid';
+import { requireAuth, requireRole } from '../utils/authMiddleware';
+import { handleError } from '../utils/errorHandler';
+import { successResponse, unauthorizedResponse, forbiddenResponse, errorResponse } from '../utils/responseHelpers';
+import { createEntity, ensureTableExists } from '../utils/tableClient';
+import { generateMRN } from '../utils/mrnGenerator';
+import { validatePatient } from '../utils/validation';
+import { logPatientCreated } from '../utils/auditService';
+import { Patient, MRNLookup, BaseEntity } from '../types';
+
+const PATIENTS_TABLE = 'Patients';
+
+interface PatientSearchEntity extends BaseEntity {
+    patientId: string;
+    name: string;
+    normalizedName: string;
+    mrn: string;
+    createdAt: string;
+}
+
+const normalizePatientName = (name: string): string => {
+    return name.trim().toLowerCase().replace(/\s+/g, ' ');
+};
+
+const getSearchPartitionKey = (normalizedName: string): string => {
+    const firstLetter = normalizedName.charAt(0) || 'unknown';
+    return `PATIENT_SEARCH_${firstLetter}`;
+};
+
+export async function createPatient(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    try {
+        const user = await requireAuth(request);
+        if (!user) {
+            return unauthorizedResponse('Authentication required');
+        }
+
+        const hasRole = requireRole(user, ['doctor', 'admin']);
+        if (!hasRole) {
+            return forbiddenResponse('Doctor or admin role required');
+        }
+
+        const body = await request.json() as any;
+        const { name, age, phone, email, address } = body;
+
+        const validation = validatePatient({ name, age, phone, email, address });
+        if (!validation.valid) {
+            return errorResponse(validation.errors.join(', '), 400);
+        }
+
+        await ensureTableExists(PATIENTS_TABLE);
+
+        const patientId = uuidv4();
+        const mrn = await generateMRN();
+        const now = new Date().toISOString();
+        const normalizedName = normalizePatientName(name);
+
+        const patientEntity: Patient & { createdBy: string; updatedBy: string } = {
+            partitionKey: 'PATIENT',
+            rowKey: patientId,
+            patientId,
+            name: name.trim(),
+            age,
+            phone: phone.trim(),
+            email: email ? email.trim() : undefined,
+            address: address ? address.trim() : undefined,
+            mrn,
+            createdAt: now,
+            updatedAt: now,
+            isDeleted: false,
+            createdBy: user.userId,
+            updatedBy: user.userId
+        };
+
+        const mrnLookupEntity: MRNLookup & { createdAt: string } = {
+            partitionKey: 'MRN',
+            rowKey: mrn,
+            mrn,
+            patientId,
+            createdAt: now
+        };
+
+        const searchEntity: PatientSearchEntity = {
+            partitionKey: getSearchPartitionKey(normalizedName),
+            rowKey: `${normalizedName}_${patientId}`,
+            patientId,
+            name: name.trim(),
+            normalizedName,
+            mrn,
+            createdAt: now
+        };
+
+        await createEntity(PATIENTS_TABLE, patientEntity);
+        await createEntity(PATIENTS_TABLE, mrnLookupEntity);
+        await createEntity(PATIENTS_TABLE, searchEntity);
+
+        await logPatientCreated(user.userId, patientId, patientEntity);
+
+        context.log('Patient created:', { patientId, mrn, createdBy: user.userId });
+
+        return successResponse({
+            message: 'Patient created successfully',
+            patient: patientEntity
+        }, 201);
+    } catch (error) {
+        context.error('Error in createPatient:', error);
+        return handleError(error, context);
+    }
+}
+
+app.http('CreatePatient', {
+    methods: ['POST'],
+    authLevel: 'function',
+    route: 'v1/patients',
+    handler: createPatient
+});
+
+// Made with Bob
