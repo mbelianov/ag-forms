@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Breadcrumb,
@@ -12,21 +12,59 @@ import {
     TabPanels,
     TabPanel,
     Tag,
+    Modal,
 } from '@carbon/react';
-import { ArrowLeft, Edit, Download } from '@carbon/icons-react';
+import { ArrowLeft, Edit, Download, TrashCan, Email } from '@carbon/icons-react';
 import { useExaminations } from '../hooks/useExaminations';
+import { EmailReportModal } from '../components/Examinations/EmailReportModal';
+import { PDFPlaceholderModal } from '../components/Examinations/PDFPlaceholderModal';
+import { getPatient } from '../api/patients';
+import type { Patient } from '../types';
 import { format } from 'date-fns';
 
 const ExaminationDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { currentExamination, isLoading, error, fetchExamination } = useExaminations();
+    const { currentExamination, isLoading, error, fetchExamination, deleteExamination } = useExaminations();
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [emailModalOpen, setEmailModalOpen] = useState(false);
+    const [pdfModalOpen, setPdfModalOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [patient, setPatient] = useState<Patient | null>(null);
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (id) {
             fetchExamination(id);
         }
     }, [id, fetchExamination]);
+
+    useEffect(() => {
+        const fetchPatientData = async () => {
+            if (currentExamination?.patientId) {
+                try {
+                    const patientData = await getPatient(currentExamination.patientId);
+                    setPatient(patientData);
+                } catch (err) {
+                    console.error('Failed to fetch patient data:', err);
+                }
+            }
+        };
+
+        fetchPatientData();
+    }, [currentExamination?.patientId]);
+
+    const handleDelete = async () => {
+        if (!id || !currentExamination) return;
+
+        setIsDeleting(true);
+        try {
+            await deleteExamination(id, currentExamination.etag);
+            navigate('/examinations');
+        } catch (error) {
+            console.error('Delete failed:', error);
+            setIsDeleting(false);
+        }
+    };
 
     const getStatusTag = (status: string) => {
         const statusMap = {
@@ -87,10 +125,24 @@ const ExaminationDetail: React.FC = () => {
                     </Button>
                     <Button
                         kind="tertiary"
+                        renderIcon={Email}
+                        onClick={() => setEmailModalOpen(true)}
+                    >
+                        Email Report
+                    </Button>
+                    <Button
+                        kind="tertiary"
                         renderIcon={Download}
-                        onClick={() => alert('PDF generation coming soon')}
+                        onClick={() => setPdfModalOpen(true)}
                     >
                         Export PDF
+                    </Button>
+                    <Button
+                        kind="danger--tertiary"
+                        renderIcon={TrashCan}
+                        onClick={() => setDeleteModalOpen(true)}
+                    >
+                        Delete
                     </Button>
                     <Button
                         kind="primary"
@@ -193,6 +245,45 @@ const ExaminationDetail: React.FC = () => {
                     </TabPanel>
                 </TabPanels>
             </Tabs>
+
+            <EmailReportModal
+                open={emailModalOpen}
+                onClose={() => setEmailModalOpen(false)}
+                examinationId={id || ''}
+                patientEmail={patient?.email}
+                patientName={currentExamination.patientName}
+            />
+
+            <PDFPlaceholderModal
+                open={pdfModalOpen}
+                onClose={() => setPdfModalOpen(false)}
+            />
+
+            <Modal
+                open={deleteModalOpen}
+                onRequestClose={() => !isDeleting && setDeleteModalOpen(false)}
+                onRequestSubmit={handleDelete}
+                modalHeading="Delete Examination"
+                primaryButtonText="Delete"
+                secondaryButtonText="Cancel"
+                danger
+                primaryButtonDisabled={isDeleting}
+                preventCloseOnClickOutside
+            >
+                <p>
+                    Are you sure you want to delete this examination?
+                </p>
+                <div style={{ marginTop: '1rem', padding: '1rem', background: '#f4f4f4', borderRadius: '4px' }}>
+                    <strong>Patient:</strong> {currentExamination.patientName}
+                    <br />
+                    <strong>Date:</strong> {format(new Date(currentExamination.examDate), 'dd/MM/yyyy')}
+                    <br />
+                    <strong>Status:</strong> {currentExamination.status}
+                </div>
+                <p style={{ marginTop: '1rem', color: '#da1e28' }}>
+                    <strong>Warning:</strong> This action cannot be undone.
+                </p>
+            </Modal>
         </div>
     );
 };

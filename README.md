@@ -57,7 +57,7 @@ Before you can log in to the application, initialize the database with a default
 
 This creates a default admin user:
 - **Username**: `admin`
-- **Password**: `Admin123!`
+- **Password**: `Admin123!@#$`
 - **Email**: `admin@example.com`
 - **Role**: Administrator
 

@@ -9,7 +9,7 @@ import type { Examination, CreateExaminationRequest, UpdateExaminationRequest } 
 
 const Examinations: React.FC = () => {
     const navigate = useNavigate();
-    const { examinations, isLoading, error, createExamination, updateExamination, fetchExaminations } =
+    const { examinations, isLoading, error, createExamination, updateExamination, deleteExamination, fetchExaminations } =
         useExaminations();
     const { patients } = usePatients();
 
@@ -36,6 +36,22 @@ const Examinations: React.FC = () => {
 
     const handleView = (exam: Examination) => {
         navigate(`/examinations/${exam.examinationId}`);
+    };
+
+    const handleDelete = async (exam: Examination) => {
+        try {
+            await deleteExamination(exam.examinationId, exam.etag);
+            setNotification({
+                kind: 'success',
+                message: 'Examination deleted successfully',
+            });
+        } catch (err) {
+            setNotification({
+                kind: 'error',
+                message: 'Failed to delete examination',
+            });
+            throw err;
+        }
     };
 
     const handleSubmit = async (data: CreateExaminationRequest | UpdateExaminationRequest) => {
@@ -91,6 +107,7 @@ const Examinations: React.FC = () => {
                 onView={handleView}
                 onEdit={handleEdit}
                 onAdd={handleAdd}
+                onDelete={handleDelete}
             />
 
             <Modal

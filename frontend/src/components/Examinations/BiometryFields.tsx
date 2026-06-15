@@ -1,5 +1,5 @@
 import React from 'react';
-import { NumberInput, Stack } from '@carbon/react';
+import { NumberInput, Stack, Loading } from '@carbon/react';
 
 interface BiometryFieldsProps {
     biometry: {
@@ -11,16 +11,38 @@ interface BiometryFieldsProps {
     };
     onChange: (biometry: any) => void;
     disabled?: boolean;
+    calculations?: {
+        estimatedFetalWeight?: number;
+        percentiles?: {
+            bpd?: number;
+            hc?: number;
+            ac?: number;
+            fl?: number;
+            efw?: number;
+        };
+    } | null;
+    isCalculating?: boolean;
 }
 
 export const BiometryFields: React.FC<BiometryFieldsProps> = ({
     biometry,
     onChange,
     disabled = false,
+    calculations = null,
+    isCalculating = false,
 }) => {
     const handleChange = (field: string, value: string | number | undefined) => {
         const numValue = typeof value === 'string' ? parseFloat(value) : value;
         onChange({ ...biometry, [field]: numValue });
+    };
+
+    const renderPercentile = (value?: number) => {
+        if (value === undefined) return null;
+        return (
+            <span style={{ marginLeft: '0.5rem', color: '#0f62fe', fontWeight: 500 }}>
+                ({value.toFixed(1)}th percentile)
+            </span>
+        );
     };
 
     return (
@@ -36,7 +58,12 @@ export const BiometryFields: React.FC<BiometryFieldsProps> = ({
                 value={biometry.bpd || ''}
                 onChange={(e, { value }) => handleChange('bpd', value)}
                 disabled={disabled}
-                helperText="Biparietal diameter measurement"
+                helperText={
+                    <>
+                        Biparietal diameter measurement
+                        {calculations?.percentiles?.bpd && renderPercentile(calculations.percentiles.bpd)}
+                    </>
+                }
             />
 
             <NumberInput
@@ -48,7 +75,12 @@ export const BiometryFields: React.FC<BiometryFieldsProps> = ({
                 value={biometry.hc || ''}
                 onChange={(e, { value }) => handleChange('hc', value)}
                 disabled={disabled}
-                helperText="Head circumference measurement"
+                helperText={
+                    <>
+                        Head circumference measurement
+                        {calculations?.percentiles?.hc && renderPercentile(calculations.percentiles.hc)}
+                    </>
+                }
             />
 
             <NumberInput
@@ -60,7 +92,12 @@ export const BiometryFields: React.FC<BiometryFieldsProps> = ({
                 value={biometry.ac || ''}
                 onChange={(e, { value }) => handleChange('ac', value)}
                 disabled={disabled}
-                helperText="Abdominal circumference measurement"
+                helperText={
+                    <>
+                        Abdominal circumference measurement
+                        {calculations?.percentiles?.ac && renderPercentile(calculations.percentiles.ac)}
+                    </>
+                }
             />
 
             <NumberInput
@@ -72,14 +109,27 @@ export const BiometryFields: React.FC<BiometryFieldsProps> = ({
                 value={biometry.fl || ''}
                 onChange={(e, { value }) => handleChange('fl', value)}
                 disabled={disabled}
-                helperText="Femur length measurement"
+                helperText={
+                    <>
+                        Femur length measurement
+                        {calculations?.percentiles?.fl && renderPercentile(calculations.percentiles.fl)}
+                    </>
+                }
             />
 
-            {biometry.efw && (
-                <div style={{ padding: '1rem', background: '#f4f4f4', borderRadius: '4px' }}>
-                    <strong>Estimated Fetal Weight (EFW):</strong> {biometry.efw} grams
+            {isCalculating && (
+                <div style={{ padding: '1rem', background: '#f4f4f4', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Loading small withOverlay={false} />
+                    <span>Calculating...</span>
+                </div>
+            )}
+
+            {!isCalculating && calculations?.estimatedFetalWeight && (
+                <div style={{ padding: '1rem', background: '#e5f6ff', borderRadius: '4px', border: '1px solid #0f62fe' }}>
+                    <strong>Estimated Fetal Weight (EFW):</strong> {calculations.estimatedFetalWeight} grams
+                    {calculations.percentiles?.efw && renderPercentile(calculations.percentiles.efw)}
                     <br />
-                    <small>Calculated using Hadlock formula</small>
+                    <small style={{ color: '#525252' }}>Calculated using Hadlock formula</small>
                 </div>
             )}
         </Stack>

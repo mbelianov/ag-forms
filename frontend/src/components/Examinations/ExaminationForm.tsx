@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useCallback } from 'react';
 import {
     Form,
     TextInput,
@@ -15,10 +15,12 @@ import {
     Tab,
     TabPanels,
     TabPanel,
+    Loading,
 } from '@carbon/react';
-import type { Examination, Patient, CreateExaminationRequest, UpdateExaminationRequest } from '../../types';
+import type { Examination, Patient, CreateExaminationRequest, UpdateExaminationRequest, CalculateExaminationResponse } from '../../types';
 import { BiometryFields } from './BiometryFields';
 import { DopplerFields } from './DopplerFields';
+import { calculateExamination } from '../../api/examinations';
 
 interface ExaminationFormProps {
     examination?: Examination;
@@ -44,6 +46,42 @@ export const ExaminationForm: React.FC<ExaminationFormProps> = ({
     });
     const [error, setError] = React.useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = React.useState(false);
+    const [calculations, setCalculations] = React.useState<CalculateExaminationResponse['calculations'] | null>(null);
+    const [isCalculating, setIsCalculating] = React.useState(false);
+
+    // Debounced calculation function
+    const performCalculation = useCallback(async (biometry: any, gestationalAge?: string) => {
+        // Only calculate if we have at least one biometry value
+        const hasValues = biometry.bpd || biometry.hc || biometry.ac || biometry.fl;
+        if (!hasValues) {
+            setCalculations(null);
+            return;
+        }
+
+        setIsCalculating(true);
+        try {
+            const result = await calculateExamination({
+                biometry,
+                gestationalAge,
+            });
+            setCalculations(result.calculations);
+        } catch (err) {
+            console.error('Calculation error:', err);
+            // Don't show error to user, just clear calculations
+            setCalculations(null);
+        } finally {
+            setIsCalculating(false);
+        }
+    }, []);
+
+    // Trigger calculations when biometry or gestational age changes
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            performCalculation(formData.biometry, formData.gestationalAge);
+        }, 500); // Debounce for 500ms
+
+        return () => clearTimeout(timeoutId);
+    }, [formData.biometry, formData.gestationalAge, performCalculation]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -51,9 +89,19 @@ export const ExaminationForm: React.FC<ExaminationFormProps> = ({
         setIsSubmitting(true);
 
         try {
-            await onSubmit(formData);
+            // Include calculated EFW in biometry if available
+            const submissionData = {
+                ...formData,
+                biometry: {
+                    ...formData.biometry,
+                    ...(calculations?.estimatedFetalWeight && {
+                        efw: calculations.estimatedFetalWeight,
+                    }),
+                },
+            };
+            await onSubmit(submissionData);
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Failed to save examination');
+            setError(err.response?.data?.error?.message || err.message || 'Failed to save examination');
         } finally {
             setIsSubmitting(false);
         }
@@ -134,6 +182,8 @@ export const ExaminationForm: React.FC<ExaminationFormProps> = ({
                                 onChange={(biometry) =>
                                     setFormData({ ...formData, biometry })
                                 }
+                                calculations={calculations}
+                                isCalculating={isCalculating}
                             />
                         </TabPanel>
                         <TabPanel>

@@ -2,153 +2,84 @@
 
 This file provides guidance to agents when working with code in this repository.
 
-## Project Context
-
-This is an **Azure serverless prenatal ultrasound documentation system** with **partial implementation**. The repository contains architectural specifications, design documents, and initial Azure Functions backend code. Frontend is not yet implemented.
-
-## Critical Non-Obvious Information
-
-### Documentation Structure
-- **УЗДv2.dotm** is the source Word template being replaced by this system
-- **UZD.docx** is a related reference document
-- All technical specs are in `docs/` directory with numbered prefixes (01-05)
-- Documents are interdependent - read 01-architecture-overview.md first for context
+## Critical Non-Obvious Patterns
 
 ### Architecture Decisions (Non-Standard)
-- **Azure Table Storage instead of SQL** - All data modeling uses partition keys and row keys, not relational joins
-- **Client-side PDF generation** - PDFs are generated in the browser, not server-side (reduces Azure costs)
-- **Application-managed auth** - Custom user table in Azure Storage, not Microsoft Entra ID (Entra ID is future enhancement only)
+- **Azure Table Storage instead of SQL** - All data uses partition/row keys, not relational joins
+- **Client-side PDF generation** - Browser generates PDFs, not server (cost optimization)
+- **Application-managed auth** - Custom user table, NOT Microsoft Entra ID
 - **Reverse ticks for sorting** - Examination RowKeys use reverse ticks for descending chronological order
-- **Lookup entity duplication** - Username and MRN lookups require duplicate entities in different partitions
+- **Lookup entity duplication** - Username and MRN require duplicate entities in different partitions
 
-### Data Model Gotchas
-- **Partition keys are critical** - Wrong partition key = slow queries
-  - Users: `PartitionKey = USER`, lookup by `PartitionKey = USERNAME`
-  - Patients: `PartitionKey = PATIENT`, lookup by `PartitionKey = MRN`
-  - Examinations: `PartitionKey = PATIENT_{patientId}` for efficient patient queries
-  - Audit: `PartitionKey = AUDIT_{yyyyMM}` for time-based retention
-- **ETags required** - All updates must use optimistic concurrency with ETags
-- **Soft delete mandatory** - Set `is_deleted = true`, never hard delete patients/exams
-- **Denormalization allowed** - Patient name can be duplicated in examination entities for list views
-
-### Security Requirements (Non-Negotiable)
-- **No secrets in code** - All secrets in Azure Function App environment settings
-- **TLS 1.2+ only** - No HTTP in production, no certificate validation bypass
-- **Never bind to 0.0.0.0** - Use 127.0.0.1 or localhost for local services
-- **Password hashing** - Argon2id preferred, bcrypt acceptable (never plaintext)
-- **No sensitive data in logs** - Passwords, tokens, full medical payloads excluded
-- **Input validation server-side** - Never trust client validation
-
-### Medical Record Numbers (MRN)
-- Format: `MRN-{YYYY}-{NNNNNN}`
-- Generated using counter entity with optimistic concurrency
-- Counter entity: `PartitionKey = COUNTER`, `RowKey = MRN_{YYYY}`
+### Data Model (Critical Partition Keys)
+- Users: `PartitionKey = USER`, lookup by `PartitionKey = USERNAME` (normalized lowercase)
+- Patients: `PartitionKey = PATIENT`, lookup by `PartitionKey = MRN`
+- Examinations: `PartitionKey = PATIENT_{patientId}` (enables efficient patient queries)
+- Audit: `PartitionKey = AUDIT_{yyyyMM}` (time-based retention)
+- Counters: `PartitionKey = COUNTER`, `RowKey = MRN_{YYYY}`
 
 ### Validation Rules (Non-Standard Ranges)
-- Patient age: 2-99 years (not typical 0-120)
-- Biometry fields (BPD, HC, AC, FL, EFW): must be integers, not floats
-- Doppler PI/RI: numbers (floats allowed)
-- Exam date: cannot be future date
+- Patient age: **2-99 years** (NOT 0-120)
+- Biometry (BPD, HC, AC, FL, EFW): **MUST be integers** (use `parseInt`, NOT `parseFloat`)
+- Doppler PI/RI: floats allowed
+- Exam date: cannot be future
+- Gestational age format: `"28w 3d"` (regex: `^\d{1,2}w\s?\d{1}d$`)
 
-### Email Delivery Pattern
-- PDF generated client-side first
-- User optionally submits PDF to Azure Function endpoint
-- Function sends to patient's recorded email address
-- No server-side PDF persistence unless compliance requires it
+### MRN Generation (Optimistic Concurrency)
+- Format: `MRN-{YYYY}-{NNNNNN}`
+- Uses counter entity with ETag-based optimistic concurrency
+- Retries up to 5 times with exponential backoff on conflict
+- Counter resets yearly (separate counter per year)
 
-### Bulgarian Language Context
-- УЗД = Ultrasound examination (Bulgarian abbreviation)
-- Medical terminology may be in Bulgarian in source documents
-- UI will likely need Bulgarian localization
+### Authentication Implementation
+- JWT tokens with 24h expiration
+- Token extraction: checks `Authorization: Bearer` header THEN cookies
+- Account lockout: 5 failed attempts = 30 min lockout
+- Username normalization: ALWAYS lowercase before lookup
+- Password min length: **12 characters** (not 8)
 
-## Current Implementation State
+### Response Helpers (Standardized)
+- ALWAYS use `successResponse()` and `errorResponse()` from `utils/responseHelpers.ts`
+- NEVER expose error details to client (log server-side only)
+- Generic error messages for security (e.g., "Invalid credentials" not "User not found")
 
-### What Exists
-- ✅ Azure Functions v4 backend structure (`api/` directory)
-- ✅ TypeScript configuration with **strict mode disabled** (`"strict": false`)
-- ✅ HealthCheck function (sample HTTP trigger)
-- ✅ PowerShell automation scripts for local development
-- ✅ Azurite local storage emulator setup
-- ❌ Frontend not implemented yet
-- ❌ No actual business logic functions yet
-- ❌ No tests yet
+### Testing (Jest Configuration)
+- Tests in `src/tests/` directory (NOT `__tests__`)
+- Run single test: `npm test -- path/to/test.test.ts`
+- Coverage excludes `src/tests/**` directory
 
-### Tech Stack (Actual)
-- **Backend**: Azure Functions v4, Node.js (v24.13.1 in dev), TypeScript
-- **Storage**: Azure Table Storage via `@azure/data-tables` v13.3.2
-- **Local Dev**: Azurite emulator, Azure Functions Core Tools v4
-- **Frontend**: Not yet implemented (planned: React 18+, IBM Carbon Design System, Vite)
+### Build/Run Commands (PowerShell Scripts)
+- **3 terminals required** for local dev:
+  1. `powershell -ExecutionPolicy Bypass -File ./start-azurite.ps1`
+  2. `powershell -ExecutionPolicy Bypass -File ./start-functions.ps1`
+  3. Frontend (when implemented)
+- Azurite MUST bind to `127.0.0.1` (NOT `0.0.0.0`)
+- Connection string: `UseDevelopmentStorage=true`
 
-### Critical Build/Run Commands
-
-**IMPORTANT**: This project uses **PowerShell scripts** for local development, not standard npm scripts.
-
-```bash
-# Setup (one-time)
-powershell -ExecutionPolicy Bypass -File ./setup-dev-environment.ps1
-
-# Daily development (3 separate terminals required)
-# Terminal 1: Start Azurite
-powershell -ExecutionPolicy Bypass -File ./start-azurite.ps1
-
-# Terminal 2: Start Azure Functions
-powershell -ExecutionPolicy Bypass -File ./start-functions.ps1
-
-# Terminal 3: Test
-curl http://localhost:7071/api/HealthCheck
-
-# Alternative: Manual commands
-cd api
-npm run build        # Compiles TypeScript (runs tsc)
-npm run watch        # Watch mode (tsc -w)
-npm run clean        # Remove dist/ directory (uses rimraf)
-npm run prestart     # Clean + build (runs before start)
-npm start            # Runs 'func start'
-npm test             # Currently just echoes "No tests yet..."
-```
-
-### Non-Standard Patterns
-
-#### TypeScript Configuration Gotchas
-- **`strict: false`** - Strict mode is DISABLED in tsconfig.json
+### TypeScript Quirks
+- **`strict: false`** - Intentionally disabled (do NOT enable)
 - **`rootDir: "."`** - Root is project root, not `src/`
-- **`outDir: "dist"`** - Compiled output goes to `dist/`
-- **CommonJS modules** - Uses `"module": "commonjs"`, not ES modules
-- **ES6 target** - Compiles to ES6, not newer versions
+- CommonJS modules (NOT ES modules)
+- No top-level await support
 
-#### Azure Functions v4 Model
-- Uses **programming model v4** (not v3)
-- Function registration pattern: `app.http('FunctionName', { ... })`
-- Functions are in `src/functions/` directory
-- Each function exports handler and registers with `app.http()`
-- `authLevel: 'anonymous'` is used for HealthCheck (no auth required)
+### Azure Functions v4 Registration
+- MUST call `app.http()` to register function
+- Function name in `app.http()` becomes URL path
+- Route parameter: `route: 'v1/auth/login'` creates `/api/v1/auth/login`
+- Most endpoints should use `authLevel: 'function'` (NOT `anonymous`)
 
-#### Local Development Quirks
-- **Azurite must run on 127.0.0.1** (not 0.0.0.0) - security requirement
-- **Azurite data persists** in `C:\azurite` directory (Windows-specific path)
-- **Port 7071** is hardcoded for Azure Functions local runtime
-- **Connection string**: `UseDevelopmentStorage=true` for local Azurite
-- **local.settings.json** is gitignored and must be created locally
+### Frontend (Vite + React)
+- Vite proxy: `/api` → `http://localhost:7071`
+- Server binds to `127.0.0.1:3000` (NOT `0.0.0.0`)
+- API client auto-adds Bearer token from localStorage
+- 401 responses auto-redirect to `/login`
 
-#### PowerShell Script Dependencies
-- Scripts use `-ExecutionPolicy Bypass` to avoid policy restrictions
-- `start-functions.ps1` checks if Azurite is running before starting
-- `setup-dev-environment.ps1` installs global npm packages (azure-functions-core-tools@4, azurite)
-- All scripts have "Made with Bob" comment at end
+### Security (Non-Negotiable)
+- NEVER log passwords, tokens, or full medical payloads
+- ALWAYS use ETag for updates (optimistic concurrency)
+- Soft delete only: set `is_deleted = true`, never hard delete
+- Generic error messages to clients (detailed logs server-side)
 
-#### Package Management
-- **No package-lock.json** - Explicitly gitignored (unusual choice)
-- **rimraf** used for cross-platform directory deletion
-- **dotenv** included but not yet used in code
-- **@azure/identity** included for future managed identity support
-
-### Infrastructure as Code
-- Bicep preferred for Azure resources
-- Terraform acceptable if multi-cloud standardization needed
-- All infrastructure definitions should be in `infra/` directory (not yet created)
-
-### Windows-Specific Considerations
-- Development environment is **Windows 11** with PowerShell
-- Azurite path uses Windows-style paths (`C:\azurite`)
-- Scripts use PowerShell cmdlets (Test-Path, New-Item, Push-Location, etc.)
-- Port checking uses `netstat -ano | findstr :7071` pattern
+### Bulgarian Context
+- УЗД = Ultrasound examination
+- Medical terminology may be in Bulgarian
