@@ -38,19 +38,31 @@ export async function getCurrentUser(request: HttpRequest, context: InvocationCo
             return unauthorizedResponse('User not found');
         }
 
-        // Return user data (exclude sensitive fields)
-        const { 
-            passwordHash, 
-            failedLoginAttempts, 
-            lockedUntil, 
+        // Return user data (exclude sensitive fields and map to API spec format)
+        const {
+            passwordHash,
+            failedLoginAttempts,
+            lockedUntil,
             normalizedUsername,
             isDeleted,
-            ...safeUser 
+            partitionKey,
+            rowKey,
+            timestamp,
+            etag,
+            ...safeUser
         } = user;
 
-        return successResponse({
-            user: safeUser
-        });
+        // Map to API specification format
+        const userResponse = {
+            id: user.userId,
+            username: user.username,
+            full_name: user.fullName || user.username, // Fallback to username if fullName not set
+            email: user.email,
+            role: user.role,
+            last_login: user.lastLoginAt
+        };
+
+        return successResponse(userResponse);
     } catch (error) {
         context.error('Error in getCurrentUser:', error);
         return handleError(error, context);

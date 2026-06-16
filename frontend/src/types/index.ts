@@ -1,181 +1,122 @@
 // User types
 export interface User {
-    userId: string;
-    username: string;
-    email: string;
-    role: 'admin' | 'doctor' | 'viewer';
-    createdAt?: string;
-}
-
-// Authentication types
-export interface LoginRequest {
-    username: string;
-    password: string;
-}
-
-export interface LoginResponse {
-    token: string;
-    user: User;
-}
-
-export interface RegisterRequest {
-    username: string;
-    email: string;
-    password: string;
-    role?: 'admin' | 'doctor' | 'viewer';
-}
-
-export interface ChangePasswordRequest {
-    currentPassword: string;
-    newPassword: string;
+  id: string;
+  username: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: 'admin' | 'doctor' | 'nurse';
+  createdAt: string;
 }
 
 // Patient types
 export interface Patient {
-    patientId: string;
-    name: string;
-    age: number;
-    phone: string;
-    email?: string;
-    address?: string;
-    mrn: string;
-    createdAt: string;
-    updatedAt?: string;
-    etag?: string;
-    is_deleted?: boolean;
+  patientId: string;
+  name: string;
+  age: number;
+  phone: string;
+  email?: string;
+  address?: string;
+  mrn: string;
+  createdAt: string;
+  isDeleted: boolean;
+  etag?: string;
 }
 
 export interface CreatePatientRequest {
-    name: string;
-    age: number;
-    phone: string;
-    email?: string;
-    address?: string;
+  name: string;
+  age: number;
+  phone: string;
+  email?: string;
+  address?: string;
 }
 
 export interface UpdatePatientRequest {
-    name?: string;
-    age?: number;
-    phone?: string;
-    email?: string;
-    address?: string;
+  name: string;
+  age: number;
+  phone: string;
+  email?: string;
+  address?: string;
+}
+
+export interface PatientsListResponse {
+  patients: Patient[];
+  continuationToken?: string;
 }
 
 // Examination types
 export interface Biometry {
-    bpd?: number;
-    hc?: number;
-    ac?: number;
-    fl?: number;
-    efw?: number;
+  bpd?: number; // integer, mm
+  hc?: number; // integer, mm
+  ac?: number; // integer, mm
+  fl?: number; // integer, mm
+  efw?: number; // integer, grams
 }
 
 export interface Doppler {
-    umbilicalArteryPI?: number;
-    umbilicalArteryRI?: number;
-    middleCerebralArteryPI?: number;
-    middleCerebralArteryRI?: number;
+  pi?: number; // float
+  ri?: number; // float
+  vessel?: string;
 }
 
 export interface Examination {
-    examinationId: string;
-    patientId: string;
-    patientName: string;
-    examDate: string;
-    gestationalAge?: string;
-    biometry?: Biometry;
-    doppler?: Doppler;
-    findings?: string;
-    status: 'draft' | 'completed' | 'reviewed';
-    createdAt: string;
-    updatedAt?: string;
-    createdBy?: string;
-    etag?: string;
-    is_deleted?: boolean;
+  examinationId: string;
+  patientId: string;
+  patientName: string; // denormalized
+  examDate: string; // ISO 8601
+  gestationalAge?: string; // "28w 3d" format
+  status: 'draft' | 'completed' | 'reviewed';
+  biometry?: Biometry;
+  doppler?: Doppler;
+  notes?: string;
+  findings?: string;
+  createdBy: string;
+  createdAt: string;
+  isDeleted: boolean;
+  etag?: string;
 }
 
 export interface CreateExaminationRequest {
-    patientId: string;
-    examDate: string;
-    gestationalAge?: string;
-    biometry?: Biometry;
-    doppler?: Doppler;
-    findings?: string;
-    status?: 'draft' | 'completed' | 'reviewed';
+  patientId: string;
+  examDate: string;
+  gestationalAge?: string;
+  status: 'draft' | 'completed' | 'reviewed';
+  biometry?: Biometry;
+  doppler?: Doppler;
+  notes?: string;
+  findings?: string;
 }
 
 export interface UpdateExaminationRequest {
-    examDate?: string;
-    gestationalAge?: string;
-    biometry?: Biometry;
-    doppler?: Doppler;
-    findings?: string;
-    status?: 'draft' | 'completed' | 'reviewed';
+  examDate: string;
+  gestationalAge?: string;
+  status: 'draft' | 'completed' | 'reviewed';
+  biometry?: Biometry;
+  doppler?: Doppler;
+  notes?: string;
+  findings?: string;
 }
 
-export interface CalculateExaminationRequest {
-    biometry: Biometry;
-    gestationalAge?: string;
-}
-
-export interface CalculateExaminationResponse {
-    calculations: {
-        estimatedFetalWeight?: number;
-        percentiles?: {
-            bpd?: number;
-            hc?: number;
-            ac?: number;
-            fl?: number;
-            efw?: number;
-        };
-    };
+export interface ExaminationsListResponse {
+  examinations: Examination[];
 }
 
 // API Response types
-export interface ApiResponse<T = any> {
-    success: boolean;
-    data?: T;
-    error?: {
-        code: string;
-        message: string;
-        details?: any;
-    };
+export interface ApiResponse<T> {
+  data?: T;
+  error?: string;
+  message?: string;
 }
 
-export interface PaginatedResponse<T> {
-    items: T[];
-    total: number;
-    page: number;
-    pageSize: number;
-    hasMore: boolean;
+// Auth types
+export interface LoginRequest {
+  username: string;
+  password: string;
 }
 
-// Search and filter types
-export interface SearchPatientsParams {
-    query: string;
-    searchBy?: 'name' | 'mrn' | 'phone';
-}
-
-export interface GetPatientsParams {
-    page?: number;
-    pageSize?: number;
-    sortBy?: 'name' | 'createdAt' | 'mrn';
-    sortOrder?: 'asc' | 'desc';
-}
-
-export interface GetExaminationsParams {
-    patientId?: string;
-    page?: number;
-    pageSize?: number;
-    sortBy?: 'examDate' | 'createdAt';
-    sortOrder?: 'asc' | 'desc';
-    status?: 'draft' | 'completed' | 'reviewed';
-}
-
-// Email types
-export interface EmailExaminationRequest {
-    examinationId: string;
-    pdfBase64: string;
+export interface LoginResponse {
+  user: User;
+  token: string;
 }
 
 // Made with Bob

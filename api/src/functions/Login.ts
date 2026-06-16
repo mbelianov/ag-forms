@@ -18,6 +18,20 @@ const LOCKOUT_DURATION_MS = 30 * 60 * 1000; // 30 minutes
  * Implements brute force protection with account lockout
  */
 export async function login(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    // Handle CORS preflight
+    if (request.method === 'OPTIONS') {
+        return {
+            status: 204,
+            headers: {
+                'Access-Control-Allow-Origin': 'http://127.0.0.1:3000',
+                'Access-Control-Allow-Credentials': 'true',
+                'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+                'Access-Control-Max-Age': '86400',
+            }
+        };
+    }
+
     try {
         // Parse request body
         const body = await request.json() as any;
@@ -131,13 +145,28 @@ export async function login(request: HttpRequest, context: InvocationContext): P
         context.log('User logged in successfully:', userId);
         await logUserLogin(userId, user.username, true);
 
-        // Return token and user data (exclude sensitive fields)
-        const { passwordHash, failedLoginAttempts, lockedUntil, normalizedUsername: _, isDeleted, ...safeUser } = user;
+        // Return user data in spec-compliant format (exclude sensitive fields)
+        const { passwordHash, failedLoginAttempts, lockedUntil, normalizedUsername: _, isDeleted, partitionKey, rowKey, timestamp, etag, ...safeUser } = user;
+        
+        // Map to API specification format
+        const userResponse = {
+            id: user.userId,
+            username: user.username,
+            full_name: user.fullName || user.username, // Fallback to username if fullName not set
+            email: user.email,
+            role: user.role
+        };
 
-        return successResponse({
-            token,
-            user: safeUser
-        });
+        // Create response with Set-Cookie header for secure token delivery
+        const response = successResponse({ user: userResponse });
+        
+        return {
+            ...response,
+            headers: {
+                ...response.headers,
+                'Set-Cookie': `session_token=${token}; HttpOnly; Secure; SameSite=Strict; Max-Age=28800; Path=/`
+            }
+        };
     } catch (error) {
         context.error('Error in login:', error);
         return handleError(error, context);
@@ -145,7 +174,7 @@ export async function login(request: HttpRequest, context: InvocationContext): P
 }
 
 app.http('Login', {
-    methods: ['POST'],
+    methods: ['POST', 'OPTIONS'],
     authLevel: 'anonymous',
     route: 'v1/auth/login',
     handler: login

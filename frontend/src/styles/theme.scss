@@ -1,0 +1,18 @@
+// IBM Carbon Design System Theme Configuration
+// This file sets up the Carbon theme for the AG Forms application
+
+// Import Carbon styles with white theme
+@use '@carbon/styles/scss/themes';
+@use '@carbon/styles/scss/theme' with (
+  $theme: themes.$white
+);
+
+// Import Carbon reset and base styles
+@use '@carbon/styles/scss/reset';
+
+// Import all Carbon components
+@use '@carbon/styles';
+
+// Custom theme overrides can be added here if needed
+
+// Made with Bob

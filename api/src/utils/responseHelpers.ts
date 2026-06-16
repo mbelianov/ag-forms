@@ -7,6 +7,16 @@ import { HttpResponseInit } from "@azure/functions";
 import { ApiResponse } from "../types";
 
 /**
+ * Get CORS headers for responses
+ */
+const getCorsHeaders = () => ({
+    'Access-Control-Allow-Origin': 'http://127.0.0.1:3000',
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+});
+
+/**
  * Create a success response
  * @param data - Response data
  * @param statusCode - HTTP status code (default: 200)
@@ -18,13 +28,18 @@ export const successResponse = <T = any>(
 ): HttpResponseInit => {
     const response: ApiResponse<T> = {
         success: true,
-        data
+        data,
+        meta: {
+            timestamp: new Date().toISOString(),
+            request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        }
     };
 
     return {
         status: statusCode,
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            ...getCorsHeaders()
         },
         body: JSON.stringify(response)
     };
@@ -48,13 +63,18 @@ export const errorResponse = (
             code: 'ERROR',
             message,
             ...(details && { details })
+        },
+        meta: {
+            timestamp: new Date().toISOString(),
+            request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         }
     };
 
     return {
         status: statusCode,
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            ...getCorsHeaders()
         },
         body: JSON.stringify(response)
     };

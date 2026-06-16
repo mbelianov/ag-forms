@@ -24,6 +24,7 @@ Write-Host "(Tables will be created automatically on first user registration)" -
 $adminUser = @{
     username = "admin"
     password = "Admin123!@#$"
+    fullName = "System Administrator"
     email = "admin@example.com"
     role = "admin"
 } | ConvertTo-Json
@@ -94,7 +95,7 @@ try {
         Write-Host "3. Azurite connection issue - ensure Terminal 1 (Azurite) is running" -ForegroundColor White
         
         Write-Host "`nManual registration command (for debugging):" -ForegroundColor Cyan
-        Write-Host 'curl -v -X POST http://localhost:7071/api/v1/auth/register -H "Content-Type: application/json" -d "{\"username\":\"admin\",\"password\":\"Admin123!@#$\",\"email\":\"admin@example.com\",\"role\":\"admin\"}"' -ForegroundColor White
+        Write-Host 'curl -v -X POST http://localhost:7071/api/v1/auth/register -H "Content-Type: application/json" -d "{\"username\":\"admin\",\"password\":\"Admin123!@#$\",\"fullName\":\"System Administrator\",\"email\":\"admin@example.com\",\"role\":\"admin\"}"' -ForegroundColor White
         
         Write-Host "`nCheck the backend logs in Terminal 2 for the actual error." -ForegroundColor Yellow
         Write-Host "========================================`n" -ForegroundColor Red

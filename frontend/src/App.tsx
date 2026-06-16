@@ -1,49 +1,115 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import { ProtectedRoute } from './components/Auth/ProtectedRoute';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Patients from './pages/Patients';
-import PatientDetail from './pages/PatientDetail';
-import Examinations from './pages/Examinations';
-import ExaminationDetail from './pages/ExaminationDetail';
-import Users from './pages/Users';
-import Layout from './components/Layout/Layout';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import './App.css';
+import { AuthProvider } from './contexts/AuthContext';
+import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
+import PatientsPage from './pages/PatientsPage';
+import CreatePatientPage from './pages/CreatePatientPage';
+import PatientDetailPage from './pages/PatientDetailPage';
+import EditPatientPage from './pages/EditPatientPage';
+import ExaminationsPage from './pages/ExaminationsPage';
+import CreateExaminationPage from './pages/CreateExaminationPage';
+import ExaminationDetailPage from './pages/ExaminationDetailPage';
+import EditExaminationPage from './pages/EditExaminationPage';
 
 function App() {
-    return (
-        <AuthProvider>
-            <BrowserRouter>
-                <Routes>
-                    <Route path="/login" element={<Login />} />
-                    <Route
-                        path="/"
-                        element={
-                            <ProtectedRoute>
-                                <Layout />
-                            </ProtectedRoute>
-                        }
-                    >
-                        <Route index element={<Navigate to="/dashboard" replace />} />
-                        <Route path="dashboard" element={<Dashboard />} />
-                        <Route path="patients" element={<Patients />} />
-                        <Route path="patients/:id" element={<PatientDetail />} />
-                        <Route path="examinations" element={<Examinations />} />
-                        <Route path="examinations/:id" element={<ExaminationDetail />} />
-                        <Route
-                            path="users"
-                            element={
-                                <ProtectedRoute requiredRole="admin">
-                                    <Users />
-                                </ProtectedRoute>
-                            }
-                        />
-                    </Route>
-                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                </Routes>
-            </BrowserRouter>
-        </AuthProvider>
-    );
+  return (
+    <Router>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </Router>
+  );
+}
+
+function AppRoutes() {
+  return (
+    <Layout>
+      <Routes>
+        {/* Public route */}
+        <Route path="/login" element={<LoginPage />} />
+        
+        {/* Protected routes */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/patients"
+          element={
+            <ProtectedRoute>
+              <PatientsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/patients/new"
+          element={
+            <ProtectedRoute>
+              <CreatePatientPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/patients/:id"
+          element={
+            <ProtectedRoute>
+              <PatientDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/patients/:id/edit"
+          element={
+            <ProtectedRoute>
+              <EditPatientPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/examinations"
+          element={
+            <ProtectedRoute>
+              <ExaminationsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/examinations/new"
+          element={
+            <ProtectedRoute>
+              <CreateExaminationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/examinations/:id"
+          element={
+            <ProtectedRoute>
+              <ExaminationDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/examinations/:id/edit"
+          element={
+            <ProtectedRoute>
+              <EditExaminationPage />
+            </ProtectedRoute>
+          }
+        />
+        
+        {/* Default redirect */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </Layout>
+  );
 }
 
 export default App;

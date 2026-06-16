@@ -28,6 +28,15 @@ const userSchema = Joi.object({
             'string.min': 'Password must be at least 12 characters long',
             'any.required': 'Password is required'
         }),
+    fullName: Joi.string()
+        .min(2)
+        .max(255)
+        .required()
+        .messages({
+            'string.min': 'Full name must be at least 2 characters long',
+            'string.max': 'Full name must not exceed 255 characters',
+            'any.required': 'Full name is required'
+        }),
     email: Joi.string()
         .email()
         .required()

@@ -22,6 +22,7 @@ export interface User extends BaseEntity {
     userId: string;
     username: string;
     passwordHash: string;
+    fullName: string; // Added to match API spec
     email: string;
     role: 'admin' | 'doctor' | 'viewer';
     createdAt: string;
@@ -168,6 +169,10 @@ export interface ApiResponse<T = any> {
         code: string;
         message: string;
         details?: any;
+    };
+    meta?: {
+        timestamp: string;
+        request_id: string;
     };
 }
 

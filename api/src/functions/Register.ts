@@ -18,10 +18,10 @@ export async function register(request: HttpRequest, context: InvocationContext)
     try {
         // Parse request body
         const body = await request.json() as any;
-        const { username, password, email, role } = body;
+        const { username, password, fullName, email, role } = body;
 
         // Validate input
-        const validation = validateUser({ username, password, email, role });
+        const validation = validateUser({ username, password, fullName, email, role });
         if (!validation.valid) {
             return errorResponse(validation.errors.join(', '), 400);
         }
@@ -106,6 +106,7 @@ export async function register(request: HttpRequest, context: InvocationContext)
             username,
             normalizedUsername,
             passwordHash,
+            fullName,
             email,
             role: isFirstUser ? 'admin' : role, // First user is always admin
             isActive: true,
@@ -133,12 +134,21 @@ export async function register(request: HttpRequest, context: InvocationContext)
         // Log audit event
         await logUserCreated(userId, userId, username, userEntity.role);
 
-        // Return success (exclude sensitive data)
-        const { passwordHash: _, failedLoginAttempts, lockedUntil, ...safeUser } = userEntity;
+        // Return success (exclude sensitive data and map to API spec format)
+        const { passwordHash: _, failedLoginAttempts, lockedUntil, normalizedUsername: __, isDeleted, partitionKey, rowKey, timestamp, etag, ...safeUser } = userEntity;
+        
+        // Map to API specification format
+        const userResponse = {
+            id: userEntity.userId,
+            username: userEntity.username,
+            full_name: userEntity.fullName,
+            email: userEntity.email,
+            role: userEntity.role
+        };
         
         return successResponse({
             message: 'User registered successfully',
-            user: safeUser
+            user: userResponse
         }, 201);
     } catch (error) {
         context.error('Error in register:', error);
