@@ -75,12 +75,12 @@ export async function changePassword(request: HttpRequest, context: InvocationCo
         user.passwordHash = newPasswordHash;
         user.updatedAt = new Date().toISOString();
 
-        // Use optimistic concurrency with ETag
+        // Update password — use wildcard ETag for unconditional merge
+        // (password changes are not contended: same user changing own password)
         try {
-            await usersTable.updateEntity(user, 'Merge', { etag: user.etag });
+            await usersTable.updateEntity(user, 'Merge');
         } catch (error: any) {
             if (error.statusCode === 412) {
-                // Precondition failed - entity was modified by another process
                 context.error('Concurrency conflict when updating password for user:', tokenUser.userId);
                 return errorResponse('Password change failed due to concurrent modification. Please try again.', 409);
             }

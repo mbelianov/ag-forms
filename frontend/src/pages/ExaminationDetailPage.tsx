@@ -46,8 +46,14 @@ export default function ExaminationDetailPage() {
     navigate(`/examinations/${id}/edit`);
   };
 
-  const handleBack = () => {
+  const handleBackToExaminations = () => {
     navigate('/examinations');
+  };
+
+  const handleBackToPatient = () => {
+    if (examination) {
+      navigate(`/patients/${examination.patientId}`);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -69,10 +75,11 @@ export default function ExaminationDetailPage() {
   };
 
   const getStatusTag = (status: string) => {
+    // Plan: draft=gray, completed=green, reviewed=blue
     const statusConfig = {
       draft: { type: 'gray' as const, label: 'Draft' },
-      completed: { type: 'blue' as const, label: 'Completed' },
-      reviewed: { type: 'green' as const, label: 'Reviewed' },
+      completed: { type: 'green' as const, label: 'Completed' },
+      reviewed: { type: 'blue' as const, label: 'Reviewed' },
     };
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
     return <Tag type={config.type}>{config.label}</Tag>;
@@ -98,7 +105,7 @@ export default function ExaminationDetailPage() {
         <Button
           kind="tertiary"
           renderIcon={ArrowLeft}
-          onClick={handleBack}
+          onClick={handleBackToExaminations}
           style={{ marginTop: '1rem' }}
         >
           Back to Examinations
@@ -107,24 +114,37 @@ export default function ExaminationDetailPage() {
     );
   }
 
+  const hasBiometry = examination.biometry && Object.values(examination.biometry).some((v) => v !== undefined);
+  const hasDoppler = examination.doppler && Object.values(examination.doppler).some((v) => v !== undefined && v !== '');
+
   return (
     <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
       <Stack gap={6}>
         {/* Header with actions */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <h1>Examination Details</h1>
-          <Stack orientation="horizontal" gap={4}>
+          <Stack orientation="horizontal" gap={4} style={{ flexWrap: 'wrap' }}>
             <Button
               kind="tertiary"
               renderIcon={ArrowLeft}
-              onClick={handleBack}
+              onClick={handleBackToExaminations}
+              aria-label="Back to examinations list"
             >
-              Back to Examinations
+              All Examinations
+            </Button>
+            <Button
+              kind="secondary"
+              renderIcon={ArrowLeft}
+              onClick={handleBackToPatient}
+              aria-label={`Back to patient ${examination.patientName}`}
+            >
+              Back to Patient
             </Button>
             <Button
               kind="primary"
               renderIcon={Edit}
               onClick={handleEdit}
+              aria-label="Edit this examination"
             >
               Edit Examination
             </Button>
@@ -133,7 +153,7 @@ export default function ExaminationDetailPage() {
 
         {/* Status and Date */}
         <Tile style={{ backgroundColor: '#f4f4f4', padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.5rem' }}>
                 Examination Date
@@ -142,13 +162,14 @@ export default function ExaminationDetailPage() {
                 {formatDate(examination.examDate)}
               </div>
             </div>
-            <div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+              <div style={{ fontSize: '0.875rem', color: '#525252' }}>Status</div>
               {getStatusTag(examination.status)}
             </div>
           </div>
         </Tile>
 
-        {/* Patient Information */}
+        {/* Patient Header — name (clickable), MRN, link back to patient */}
         <Tile>
           <h3 style={{ marginBottom: '1.5rem' }}>Patient Information</h3>
           <Stack gap={4}>
@@ -157,12 +178,22 @@ export default function ExaminationDetailPage() {
                 Patient Name
               </div>
               <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                <Link 
+                <Link
                   to={`/patients/${examination.patientId}`}
                   style={{ color: '#0f62fe', textDecoration: 'none' }}
+                  aria-label={`View patient ${examination.patientName}`}
                 >
                   {examination.patientName}
                 </Link>
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
+                MRN
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 500 }}>
+                {examination.mrn}
               </div>
             </div>
 
@@ -180,133 +211,142 @@ export default function ExaminationDetailPage() {
         </Tile>
 
         {/* Biometry */}
-        {examination.biometry && Object.keys(examination.biometry).length > 0 && (
-          <Tile>
-            <h3 style={{ marginBottom: '1.5rem' }}>Biometry</h3>
+        <Tile>
+          <h3 style={{ marginBottom: '1.5rem' }}>Biometry Measurements</h3>
+          {hasBiometry ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-              {examination.biometry.bpd !== undefined && (
+              {examination.biometry!.bpd !== undefined && (
                 <div>
                   <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
                     BPD (Biparietal Diameter)
                   </div>
                   <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                    {examination.biometry.bpd} mm
+                    {examination.biometry!.bpd} mm
                   </div>
                 </div>
               )}
-
-              {examination.biometry.hc !== undefined && (
+              {examination.biometry!.hc !== undefined && (
                 <div>
                   <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
                     HC (Head Circumference)
                   </div>
                   <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                    {examination.biometry.hc} mm
+                    {examination.biometry!.hc} mm
                   </div>
                 </div>
               )}
-
-              {examination.biometry.ac !== undefined && (
+              {examination.biometry!.ac !== undefined && (
                 <div>
                   <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
                     AC (Abdominal Circumference)
                   </div>
                   <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                    {examination.biometry.ac} mm
+                    {examination.biometry!.ac} mm
                   </div>
                 </div>
               )}
-
-              {examination.biometry.fl !== undefined && (
+              {examination.biometry!.fl !== undefined && (
                 <div>
                   <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
                     FL (Femur Length)
                   </div>
                   <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                    {examination.biometry.fl} mm
+                    {examination.biometry!.fl} mm
                   </div>
                 </div>
               )}
-
-              {examination.biometry.efw !== undefined && (
+              {examination.biometry!.efw !== undefined && (
                 <div>
                   <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
                     EFW (Estimated Fetal Weight)
                   </div>
                   <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                    {examination.biometry.efw} grams
+                    {examination.biometry!.efw} g
                   </div>
                 </div>
               )}
             </div>
-          </Tile>
-        )}
+          ) : (
+            <div style={{ color: '#525252', fontStyle: 'italic' }}>No biometry measurements recorded.</div>
+          )}
+        </Tile>
 
         {/* Doppler */}
-        {examination.doppler && Object.keys(examination.doppler).length > 0 && (
-          <Tile>
-            <h3 style={{ marginBottom: '1.5rem' }}>Doppler</h3>
+        <Tile>
+          <h3 style={{ marginBottom: '1.5rem' }}>Doppler Measurements</h3>
+          {hasDoppler ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-              {examination.doppler.pi !== undefined && (
+              {examination.doppler!.pi !== undefined && (
                 <div>
                   <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
                     PI (Pulsatility Index)
                   </div>
                   <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                    {examination.doppler.pi}
+                    {examination.doppler!.pi}
                   </div>
                 </div>
               )}
-
-              {examination.doppler.ri !== undefined && (
+              {examination.doppler!.ri !== undefined && (
                 <div>
                   <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
                     RI (Resistance Index)
                   </div>
                   <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                    {examination.doppler.ri}
+                    {examination.doppler!.ri}
                   </div>
                 </div>
               )}
-
-              {examination.doppler.vessel && (
+              {examination.doppler!.vessel && (
                 <div>
                   <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
                     Vessel
                   </div>
                   <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                    {examination.doppler.vessel}
+                    {examination.doppler!.vessel}
                   </div>
                 </div>
               )}
             </div>
-          </Tile>
-        )}
+          ) : (
+            <div style={{ color: '#525252', fontStyle: 'italic' }}>No Doppler measurements recorded.</div>
+          )}
+        </Tile>
 
-        {/* Findings */}
-        {examination.findings && (
-          <Tile>
-            <h3 style={{ marginBottom: '1.5rem' }}>Findings</h3>
-            <div style={{ fontSize: '1rem', whiteSpace: 'pre-wrap' }}>
-              {examination.findings}
+        {/* Clinical Information */}
+        <Tile>
+          <h3 style={{ marginBottom: '1.5rem' }}>Clinical Information</h3>
+          <Stack gap={5}>
+            <div>
+              <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.5rem', fontWeight: 600 }}>
+                Findings
+              </div>
+              {examination.findings ? (
+                <div style={{ fontSize: '1rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+                  {examination.findings}
+                </div>
+              ) : (
+                <div style={{ color: '#525252', fontStyle: 'italic' }}>No findings recorded.</div>
+              )}
             </div>
-          </Tile>
-        )}
-
-        {/* Notes */}
-        {examination.notes && (
-          <Tile>
-            <h3 style={{ marginBottom: '1.5rem' }}>Notes</h3>
-            <div style={{ fontSize: '1rem', whiteSpace: 'pre-wrap' }}>
-              {examination.notes}
+            <div>
+              <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.5rem', fontWeight: 600 }}>
+                Notes
+              </div>
+              {examination.notes ? (
+                <div style={{ fontSize: '1rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+                  {examination.notes}
+                </div>
+              ) : (
+                <div style={{ color: '#525252', fontStyle: 'italic' }}>No notes recorded.</div>
+              )}
             </div>
-          </Tile>
-        )}
+          </Stack>
+        </Tile>
 
         {/* Metadata */}
         <Tile>
           <h3 style={{ marginBottom: '1.5rem' }}>Metadata</h3>
-          <Stack gap={4}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             <div>
               <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
                 Created By
@@ -315,7 +355,6 @@ export default function ExaminationDetailPage() {
                 {examination.createdBy}
               </div>
             </div>
-
             <div>
               <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
                 Created At
@@ -324,8 +363,33 @@ export default function ExaminationDetailPage() {
                 {formatDateTime(examination.createdAt)}
               </div>
             </div>
-          </Stack>
+          </div>
         </Tile>
+
+        {/* Bottom action bar */}
+        <Stack orientation="horizontal" gap={4}>
+          <Button
+            kind="tertiary"
+            renderIcon={ArrowLeft}
+            onClick={handleBackToExaminations}
+          >
+            All Examinations
+          </Button>
+          <Button
+            kind="secondary"
+            renderIcon={ArrowLeft}
+            onClick={handleBackToPatient}
+          >
+            Back to Patient
+          </Button>
+          <Button
+            kind="primary"
+            renderIcon={Edit}
+            onClick={handleEdit}
+          >
+            Edit Examination
+          </Button>
+        </Stack>
       </Stack>
     </div>
   );

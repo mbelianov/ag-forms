@@ -20,9 +20,14 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for handling errors
+// Response interceptor — unwrap the backend's { success, data, meta } envelope
+// so every service reads response.data and gets the inner payload directly.
 api.interceptors.response.use(
   (response) => {
+    // All successResponse() calls wrap the payload as { success: true, data: <payload>, meta: {...} }
+    if (response.data && response.data.success === true && 'data' in response.data) {
+      response.data = response.data.data;
+    }
     return response;
   },
   (error) => {

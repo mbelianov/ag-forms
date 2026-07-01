@@ -1,6 +1,6 @@
 /**
  * MRN Generator
- * Generates Medical Record Numbers in format: MRN-{YYYY}-{NNNNNN}
+ * Generates Medical Record Numbers in format: MRN-{nameSegment}-{YYYY}-{NNNNNN}
  * Uses optimistic concurrency with counter entity in Azure Table Storage
  */
 
@@ -17,6 +17,125 @@ const COUNTER_PARTITION_KEY = 'COUNTER';
 const MAX_RETRIES = 5;
 
 /**
+ * Bulgarian Cyrillic → Latin transliteration map (BGN/PCGN 2013 simplified).
+ * Ordered longest-match first (multi-char Cyrillic like Щ before single chars).
+ */
+const CYRILLIC_MAP: [string, string][] = [
+    // Multi-char outputs — must appear first so longest match wins
+    ['Щ', 'sht'], ['щ', 'sht'],
+    ['Ж', 'zh'],  ['ж', 'zh'],
+    ['Ц', 'ts'],  ['ц', 'ts'],
+    ['Ч', 'ch'],  ['ч', 'ch'],
+    ['Ш', 'sh'],  ['ш', 'sh'],
+    ['Ю', 'yu'],  ['ю', 'yu'],
+    ['Я', 'ya'],  ['я', 'ya'],
+    // Single-char outputs
+    ['А', 'a'], ['а', 'a'],
+    ['Б', 'b'], ['б', 'b'],
+    ['В', 'v'], ['в', 'v'],
+    ['Г', 'g'], ['г', 'g'],
+    ['Д', 'd'], ['д', 'd'],
+    ['Е', 'e'], ['е', 'e'],
+    ['З', 'z'], ['з', 'z'],
+    ['И', 'i'], ['и', 'i'],
+    ['Й', 'y'], ['й', 'y'],
+    ['К', 'k'], ['к', 'k'],
+    ['Л', 'l'], ['л', 'l'],
+    ['М', 'm'], ['м', 'm'],
+    ['Н', 'n'], ['н', 'n'],
+    ['О', 'o'], ['о', 'o'],
+    ['П', 'p'], ['п', 'p'],
+    ['Р', 'r'], ['р', 'r'],
+    ['С', 's'], ['с', 's'],
+    ['Т', 't'], ['т', 't'],
+    ['У', 'u'], ['у', 'u'],
+    ['Ф', 'f'], ['ф', 'f'],
+    ['Х', 'h'], ['х', 'h'],
+    ['Ъ', 'a'], ['ъ', 'a'],
+    ['Ь', ''],  ['ь', ''],  // dropped
+];
+
+/**
+ * Transliterate Cyrillic characters in a string to their Latin equivalents
+ * using the Bulgarian standard mapping. Longest-match rule is applied.
+ */
+const transliterateCyrillic = (text: string): string => {
+    let result = '';
+    let i = 0;
+    while (i < text.length) {
+        let matched = false;
+        for (const [cyrillic, latin] of CYRILLIC_MAP) {
+            if (text.startsWith(cyrillic, i)) {
+                result += latin;
+                i += cyrillic.length;
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            result += text[i];
+            i++;
+        }
+    }
+    return result;
+};
+
+/**
+ * Normalize a patient name to a URL-safe, lowercase, hyphenated segment
+ * suitable for embedding in an MRN. Maximum 20 characters.
+ *
+ * Steps (per section 3.3 of the migration plan):
+ * 1. Trim
+ * 2. Transliterate Cyrillic → Latin
+ * 3. Lowercase
+ * 4. Replace whitespace sequences with a single hyphen
+ * 5. Strip characters that are not alphanumeric ASCII or hyphens
+ * 6. Collapse multiple consecutive hyphens
+ * 7. Truncate to 20 chars at a hyphen boundary where possible
+ * 8. Fallback to 'patient' if result is empty
+ */
+export const normalizeNameSegment = (name: string): string => {
+    // 1. Trim
+    let s = name.trim();
+
+    // 2. Transliterate Cyrillic → Latin
+    s = transliterateCyrillic(s);
+
+    // 3. Lowercase
+    s = s.toLowerCase();
+
+    // 4. Replace whitespace sequences with a single hyphen
+    s = s.replace(/\s+/g, '-');
+
+    // 5. Strip characters that are not a-z, 0-9, or hyphens
+    s = s.replace(/[^a-z0-9-]/g, '');
+
+    // 6. Collapse multiple consecutive hyphens
+    s = s.replace(/-{2,}/g, '-');
+
+    // 7. Truncate to 20 chars, preferring a hyphen boundary
+    if (s.length > 20) {
+        // Try to find the last hyphen at or before position 20
+        const cutAt = s.lastIndexOf('-', 19);
+        if (cutAt > 0) {
+            s = s.substring(0, cutAt);
+        } else {
+            s = s.substring(0, 20);
+        }
+    }
+
+    // Strip any trailing hyphens left by truncation
+    s = s.replace(/-+$/, '');
+
+    // 8. Fallback
+    if (!s) {
+        s = 'patient';
+    }
+
+    return s;
+};
+
+/**
  * Initialize counter table (should be called on application startup)
  */
 export const initializeCounterTable = async (): Promise<void> => {
@@ -25,17 +144,19 @@ export const initializeCounterTable = async (): Promise<void> => {
 
 /**
  * Generate a new Medical Record Number (MRN)
- * Format: MRN-{YYYY}-{NNNNNN}
- * 
- * Uses optimistic concurrency with ETag to handle concurrent requests
- * Retries up to MAX_RETRIES times if concurrency conflict occurs
- * 
+ * Format: MRN-{nameSegment}-{YYYY}-{NNNNNN}
+ *
+ * Uses optimistic concurrency with ETag to handle concurrent requests.
+ * Retries up to MAX_RETRIES times if concurrency conflict occurs.
+ *
+ * @param patientName - Patient name used to derive the name segment
  * @returns Promise<string> - Generated MRN
  * @throws Error if unable to generate MRN after max retries
  */
-export const generateMRN = async (): Promise<string> => {
+export const generateMRN = async (patientName: string): Promise<string> => {
     const currentYear = new Date().getFullYear();
     const counterRowKey = `MRN_${currentYear}`;
+    const nameSegment = normalizeNameSegment(patientName);
 
     // Ensure table exists
     await ensureTableExists(COUNTER_TABLE);
@@ -66,8 +187,8 @@ export const generateMRN = async (): Promise<string> => {
             // Update with optimistic concurrency (ETag check)
             await updateEntity(COUNTER_TABLE, updatedCounter);
 
-            // Format MRN with zero-padded 6-digit number
-            const mrn = formatMRN(currentYear, nextNumber);
+            // Format MRN with name segment and zero-padded 6-digit number
+            const mrn = formatMRN(currentYear, nextNumber, nameSegment);
             return mrn;
 
         } catch (error: any) {
@@ -107,41 +228,40 @@ const initializeCounter = async (year: number): Promise<Counter> => {
 
     try {
         await createEntity(COUNTER_TABLE, counter);
-        return counter;
     } catch (error: any) {
-        // If entity already exists (race condition), fetch it
-        if (error.message.includes('already exists')) {
-            const existingCounter = await getEntity<Counter>(
-                COUNTER_TABLE,
-                COUNTER_PARTITION_KEY,
-                counterRowKey
-            );
-            if (existingCounter) {
-                return existingCounter;
-            }
+        // Ignore "already exists" — fall through to the fetch below
+        if (!error.message.includes('already exists')) {
+            throw error;
         }
-        throw error;
     }
+
+    // Always fetch after create so the returned entity has an ETag for updateEntity
+    const fetched = await getEntity<Counter>(COUNTER_TABLE, COUNTER_PARTITION_KEY, counterRowKey);
+    if (fetched) {
+        return fetched;
+    }
+    throw new Error(`Failed to initialize MRN counter for year ${year}`);
 };
 
 /**
- * Format MRN with year and zero-padded number
+ * Format MRN with year, counter number, and name segment
  * @param year - Year
  * @param number - Counter number
- * @returns Formatted MRN string
+ * @param nameSegment - Normalized patient name segment
+ * @returns Formatted MRN string: MRN-{nameSegment}-{YYYY}-{NNNNNN}
  */
-const formatMRN = (year: number, number: number): string => {
+const formatMRN = (year: number, number: number, nameSegment: string): string => {
     const paddedNumber = String(number).padStart(6, '0');
-    return `MRN-${year}-${paddedNumber}`;
+    return `MRN-${nameSegment}-${year}-${paddedNumber}`;
 };
 
 /**
- * Parse MRN to extract year and number
+ * Parse MRN to extract name segment, year, and number
  * @param mrn - MRN string to parse
- * @returns Object with year and number, or null if invalid format
+ * @returns Object with nameSegment, year, and number, or null if invalid format
  */
-export const parseMRN = (mrn: string): { year: number; number: number } | null => {
-    const pattern = /^MRN-(\d{4})-(\d{6})$/;
+export const parseMRN = (mrn: string): { nameSegment: string; year: number; number: number } | null => {
+    const pattern = /^MRN-([a-z0-9-]{1,20})-(\d{4})-(\d{6})$/;
     const match = mrn.match(pattern);
 
     if (!match) {
@@ -149,8 +269,9 @@ export const parseMRN = (mrn: string): { year: number; number: number } | null =
     }
 
     return {
-        year: parseInt(match[1], 10),
-        number: parseInt(match[2], 10)
+        nameSegment: match[1],
+        year: parseInt(match[2], 10),
+        number: parseInt(match[3], 10)
     };
 };
 
@@ -184,7 +305,7 @@ export const getCurrentCounterValue = async (year?: number): Promise<number> => 
 /**
  * Reset counter for a specific year (ADMIN ONLY - use with caution)
  * This should only be used in development or for data migration
- * 
+ *
  * @param year - Year to reset counter for
  * @param value - Value to reset to (default: 0)
  * @returns Promise<void>

@@ -62,7 +62,7 @@ export async function getCurrentUser(request: HttpRequest, context: InvocationCo
             last_login: user.lastLoginAt
         };
 
-        return successResponse(userResponse);
+        return successResponse({ user: userResponse });
     } catch (error) {
         context.error('Error in getCurrentUser:', error);
         return handleError(error, context);

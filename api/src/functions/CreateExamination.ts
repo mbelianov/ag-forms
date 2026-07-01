@@ -6,7 +6,8 @@ import { successResponse, unauthorizedResponse, forbiddenResponse, errorResponse
 import { createEntity, ensureTableExists, getEntity } from '../utils/tableClient';
 import { validateExamination } from '../utils/validation';
 import { logExaminationCreated } from '../utils/auditService';
-import { Examination, Patient } from '../types';
+import { generateMRN } from '../utils/mrnGenerator';
+import { Examination, Patient, MRNLookup } from '../types';
 
 const EXAMINATIONS_TABLE = 'Examinations';
 const PATIENTS_TABLE = 'Patients';
@@ -57,22 +58,30 @@ export async function createExamination(request: HttpRequest, context: Invocatio
 
         const examinationId = uuidv4();
         const now = new Date().toISOString();
+
+        // Generate MRN using patient name at exam creation time
+        const mrn = await generateMRN(patient.name);
         
         // Calculate reverse ticks for descending chronological order
         const reverseTicks = 9999999999999 - Date.now();
+
+        // Serialize nested objects to JSON strings for Azure Table Storage
+        const biometryStr = biometry ? JSON.stringify(biometry) : undefined;
+        const dopplerStr = doppler ? JSON.stringify(doppler) : undefined;
 
         // Create primary examination entity (for patient's exam list)
         const primaryExamEntity: Examination & { updatedBy: string } = {
             partitionKey: `PATIENT_${patientId}`,
             rowKey: `${reverseTicks}_${examinationId}`,
             examinationId,
+            mrn,
             patientId,
             patientName: patient.name, // Denormalized for list views
             examDate,
             gestationalAge: gestationalAge || undefined,
             status,
-            biometry: biometry || undefined,
-            doppler: doppler || undefined,
+            biometry: biometryStr as any,
+            doppler: dopplerStr as any,
             findings: findings || undefined,
             notes: notes || undefined,
             createdAt: now,
@@ -87,13 +96,14 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             partitionKey: 'EXAM',
             rowKey: examinationId,
             examinationId,
+            mrn,
             patientId,
             patientName: patient.name,
             examDate,
             gestationalAge: gestationalAge || undefined,
             status,
-            biometry: biometry || undefined,
-            doppler: doppler || undefined,
+            biometry: biometryStr as any,
+            doppler: dopplerStr as any,
             findings: findings || undefined,
             notes: notes || undefined,
             createdAt: now,
@@ -103,12 +113,24 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             isDeleted: false
         };
 
+        // Create MRN lookup entity (for lookup by MRN)
+        const mrnLookupEntity: MRNLookup & { examDate: string; isDeleted: boolean } = {
+            partitionKey: 'MRN',
+            rowKey: mrn,
+            mrn,
+            examinationId,
+            patientId,
+            examDate,
+            isDeleted: false
+        };
+
         await createEntity(EXAMINATIONS_TABLE, primaryExamEntity);
         await createEntity(EXAMINATIONS_TABLE, lookupExamEntity);
+        await createEntity(EXAMINATIONS_TABLE, mrnLookupEntity);
 
         await logExaminationCreated(user.userId, examinationId, patientId);
 
-        context.log('Examination created:', { examinationId, patientId, createdBy: user.userId });
+        context.log('Examination created:', { examinationId, mrn, patientId, createdBy: user.userId });
 
         return successResponse({
             message: 'Examination created successfully',

@@ -31,11 +31,10 @@ const userSchema = Joi.object({
     fullName: Joi.string()
         .min(2)
         .max(255)
-        .required()
+        .optional()
         .messages({
             'string.min': 'Full name must be at least 2 characters long',
-            'string.max': 'Full name must not exceed 255 characters',
-            'any.required': 'Full name is required'
+            'string.max': 'Full name must not exceed 255 characters'
         }),
     email: Joi.string()
         .email()
@@ -151,6 +150,10 @@ const dopplerSchema = Joi.object({
  * Examination validation schema
  */
 const examinationSchema = Joi.object({
+    mrn: Joi.forbidden()
+        .messages({
+            'any.unknown': 'MRN is assigned by the system and cannot be provided'
+        }),
     patientId: Joi.string()
         .required()
         .messages({

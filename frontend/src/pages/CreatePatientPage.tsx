@@ -1,24 +1,21 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { InlineNotification } from '@carbon/react';
 import PatientForm from '../components/PatientForm';
 import { patientService } from '../services/patientService';
 import type { CreatePatientRequest } from '../types';
 
 export default function CreatePatientPage() {
   const navigate = useNavigate();
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handleSubmit = async (data: CreatePatientRequest) => {
-    try {
-      const patient = await patientService.createPatient(data);
-      
-      // Show success notification (Carbon toast would be ideal but using simple approach)
-      console.log('Patient created successfully:', patient);
-      
-      // Navigate to patient detail page
+    const patient = await patientService.createPatient(data);
+    setSuccessMessage(`Patient "${patient.name}" created successfully.`);
+    // Brief delay so user sees the success notification before redirect
+    setTimeout(() => {
       navigate(`/patients/${patient.patientId}`);
-    } catch (error) {
-      // Error is handled by PatientForm component
-      throw error;
-    }
+    }, 1200);
   };
 
   const handleCancel = () => {
@@ -28,6 +25,17 @@ export default function CreatePatientPage() {
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
       <h1 style={{ marginBottom: '2rem' }}>Create Patient</h1>
+
+      {successMessage && (
+        <InlineNotification
+          kind="success"
+          title="Patient Created"
+          subtitle={successMessage}
+          lowContrast
+          style={{ marginBottom: '1.5rem' }}
+        />
+      )}
+
       <PatientForm onSubmit={handleSubmit} onCancel={handleCancel} />
     </div>
   );

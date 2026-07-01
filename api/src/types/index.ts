@@ -53,7 +53,6 @@ export interface Patient extends BaseEntity {
     phone: string;
     email?: string;
     address?: string;
-    mrn: string; // Medical Record Number (MRN-YYYY-NNNNNN)
     createdAt: string;
     updatedAt: string;
     isDeleted: boolean;
@@ -62,12 +61,13 @@ export interface Patient extends BaseEntity {
 
 /**
  * MRN lookup entity for efficient MRN-based queries
- * PartitionKey: "MRN"
- * RowKey: medicalRecordNumber
+ * PartitionKey: "MRN" (in Examinations table)
+ * RowKey: mrn value (e.g. MRN-maria-ivanova-2026-000001)
  */
 export interface MRNLookup extends BaseEntity {
     mrn: string;
-    patientId: string;
+    examinationId: string;
+    patientId?: string; // Denormalized for context
 }
 
 /**
@@ -97,6 +97,7 @@ export interface DopplerData {
  */
 export interface Examination extends BaseEntity {
     examinationId: string;
+    mrn: string; // MRN-PatientName-YYYY-NNNNNN; assigned at creation, immutable
     patientId: string;
     patientName: string; // Denormalized for list views
     examDate: string; // ISO 8601 date string

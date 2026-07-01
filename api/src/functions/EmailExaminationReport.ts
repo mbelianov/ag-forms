@@ -81,7 +81,7 @@ export async function emailExaminationReport(request: HttpRequest, context: Invo
         context.log('To:', patient.email);
         context.log('Subject:', `Ultrasound Examination Report - ${patient.name}`);
         context.log('Patient:', patient.name);
-        context.log('MRN:', patient.mrn);
+        context.log('MRN:', (examination as any).mrn || 'N/A');
         context.log('Exam Date:', examination.examDate);
         context.log('Exam ID:', examinationId);
         context.log('PDF Size:', `${pdfSizeKB} KB`);

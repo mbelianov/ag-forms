@@ -39,17 +39,13 @@ export async function getPatients(request: HttpRequest, context: InvocationConte
         let nextContinuationToken: string | undefined;
 
         for await (const page of pages) {
-            const entities = page as any;
-            const pageItems = (entities.segment?.items || entities.items || []) as Patient[];
-
-            for (const patient of pageItems) {
+            for (const patient of page) {
                 if (!patient.isDeleted) {
-                    patients.push(patient);
+                    patients.push(patient as Patient);
                 }
             }
-
-            nextContinuationToken = entities.continuationToken;
-            break;
+            nextContinuationToken = (page as any).continuationToken;
+            break; // Only get the first page
         }
 
         context.log('Patients retrieved:', {

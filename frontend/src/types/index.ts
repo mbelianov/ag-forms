@@ -2,11 +2,9 @@
 export interface User {
   id: string;
   username: string;
+  full_name: string;
   email: string;
-  firstName: string;
-  lastName: string;
-  role: 'admin' | 'doctor' | 'nurse';
-  createdAt: string;
+  role: 'admin' | 'doctor' | 'viewer';
 }
 
 // Patient types
@@ -17,7 +15,6 @@ export interface Patient {
   phone: string;
   email?: string;
   address?: string;
-  mrn: string;
   createdAt: string;
   isDeleted: boolean;
   etag?: string;
@@ -61,6 +58,7 @@ export interface Doppler {
 
 export interface Examination {
   examinationId: string;
+  mrn: string; // MRN-PatientName-YYYY-NNNNNN; assigned at creation
   patientId: string;
   patientName: string; // denormalized
   examDate: string; // ISO 8601

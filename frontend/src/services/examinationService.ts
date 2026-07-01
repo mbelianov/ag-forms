@@ -20,10 +20,11 @@ class ExaminationService {
   async getExaminations(patientId?: string): Promise<Examination[]> {
     try {
       const params = patientId ? { patient_id: patientId } : {};
+      // Interceptor unwraps envelope; response.data is now { examinations: [...] }
       const response = await api.get<ExaminationsListResponse>(this.EXAMINATIONS_BASE_URL, { params });
       return response.data.examinations;
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Failed to fetch examinations';
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch examinations';
       throw new Error(message);
     }
   }
@@ -38,7 +39,7 @@ class ExaminationService {
       const response = await api.get<{ examination: Examination }>(`${this.EXAMINATIONS_BASE_URL}/${id}`);
       return response.data.examination;
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Failed to fetch examination';
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch examination';
       throw new Error(message);
     }
   }
@@ -53,7 +54,7 @@ class ExaminationService {
       const response = await api.post<{ examination: Examination }>(this.EXAMINATIONS_BASE_URL, data);
       return response.data.examination;
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Failed to create examination';
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to create examination';
       throw new Error(message);
     }
   }
@@ -67,18 +68,23 @@ class ExaminationService {
    */
   async updateExamination(id: string, data: UpdateExaminationRequest, etag: string): Promise<Examination> {
     try {
+      // Backend reads etag from the request body (see UpdateExamination.ts)
       const response = await api.put<{ examination: Examination }>(
         `${this.EXAMINATIONS_BASE_URL}/${id}`,
-        data,
-        {
-          headers: {
-            'If-Match': etag,
-          },
-        }
+        { ...data, etag }
       );
       return response.data.examination;
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Failed to update examination';
+      const status = error.response?.status;
+      // Backend returns 409 for concurrency conflicts (conflictResponse helper)
+      if (status === 409) {
+        const conflictError: any = new Error(
+          'This examination record was modified by another user. Please go back and reload before editing.'
+        );
+        conflictError.isConcurrencyConflict = true;
+        throw conflictError;
+      }
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to update examination';
       throw new Error(message);
     }
   }

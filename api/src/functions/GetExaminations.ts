@@ -56,7 +56,17 @@ export async function getExaminations(request: HttpRequest, context: InvocationC
         // Get first page only
         for await (const page of entitiesIter) {
             for (const entity of page) {
-                examinations.push(entity as Examination);
+                const exam = entity as any;
+                // Deserialize biometry/doppler from JSON strings
+                examinations.push({
+                    ...exam,
+                    biometry: exam.biometry && typeof exam.biometry === 'string'
+                        ? JSON.parse(exam.biometry)
+                        : exam.biometry,
+                    doppler: exam.doppler && typeof exam.doppler === 'string'
+                        ? JSON.parse(exam.doppler)
+                        : exam.doppler
+                } as Examination);
             }
             nextContinuationToken = page.continuationToken;
             break; // Only get first page

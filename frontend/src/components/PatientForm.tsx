@@ -55,9 +55,11 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
       newErrors.age = 'Age must be between 2 and 99 years';
     }
 
-    // Phone validation
+    // Phone validation — required + format matching backend Joi pattern
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone is required';
+    } else if (!/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/.test(formData.phone.trim())) {
+      newErrors.phone = 'Phone must be a valid phone number (e.g. +1234567890)';
     }
 
     // Email validation (optional but must be valid if provided)
@@ -121,16 +123,6 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
           />
         )}
 
-        {isEdit && patient && (
-          <TextInput
-            id="mrn"
-            labelText="MRN"
-            value={patient.mrn}
-            readOnly
-            disabled
-          />
-        )}
-
         <TextInput
           id="name"
           labelText="Name"
@@ -139,6 +131,7 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
           onChange={(e) => handleChange('name', e.target.value)}
           invalid={!!errors.name}
           invalidText={errors.name}
+          aria-label="Patient name"
           required
           disabled={isSubmitting}
         />
@@ -149,9 +142,16 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
           min={2}
           max={99}
           value={formData.age}
-          onChange={(_e, { value }) => handleChange('age', value || 2)}
+          onChange={(_e, state) => {
+            const v = state?.value;
+            // Only update if a valid number was parsed; ignore blank/NaN states
+            if (typeof v === 'number' && !isNaN(v)) {
+              handleChange('age', v);
+            }
+          }}
           invalid={!!errors.age}
           invalidText={errors.age}
+          aria-label="Patient age in years"
           required
           disabled={isSubmitting}
         />
@@ -159,11 +159,12 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
         <TextInput
           id="phone"
           labelText="Phone"
-          placeholder="Enter phone number"
+          placeholder="e.g. +1234567890"
           value={formData.phone}
           onChange={(e) => handleChange('phone', e.target.value)}
           invalid={!!errors.phone}
           invalidText={errors.phone}
+          aria-label="Patient phone number"
           required
           disabled={isSubmitting}
         />
@@ -177,6 +178,7 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
           onChange={(e) => handleChange('email', e.target.value)}
           invalid={!!errors.email}
           invalidText={errors.email}
+          aria-label="Patient email address"
           disabled={isSubmitting}
         />
 
@@ -187,6 +189,7 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
           value={formData.address}
           onChange={(e) => handleChange('address', e.target.value)}
           rows={3}
+          aria-label="Patient address"
           disabled={isSubmitting}
         />
 

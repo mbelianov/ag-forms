@@ -13,7 +13,6 @@ interface PatientSearchEntity extends BaseEntity {
     patientId: string;
     name: string;
     normalizedName: string;
-    mrn: string;
     createdAt: string;
 }
 
@@ -125,7 +124,6 @@ export async function updatePatient(request: HttpRequest, context: InvocationCon
                 patientId,
                 name: updatedPatient.name,
                 normalizedName: newNormalizedName,
-                mrn: updatedPatient.mrn,
                 createdAt: existingPatient.createdAt
             };
 

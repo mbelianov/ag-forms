@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { InlineLoading } from '@carbon/react';
+import { InlineLoading, InlineNotification } from '@carbon/react';
 import ExaminationForm from '../components/ExaminationForm';
 import { examinationService } from '../services/examinationService';
 import { patientService } from '../services/patientService';
@@ -10,9 +10,10 @@ export default function CreateExaminationPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const preselectedPatientId = searchParams.get('patientId');
-  
+
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoadingPatients, setIsLoadingPatients] = useState(true);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const loadPatients = async () => {
@@ -30,22 +31,15 @@ export default function CreateExaminationPage() {
   }, []);
 
   const handleSubmit = async (data: CreateExaminationRequest) => {
-    try {
-      const examination = await examinationService.createExamination(data);
-      
-      // Show success notification
-      console.log('Examination created successfully:', examination);
-      
-      // Navigate to examination detail page
+    const examination = await examinationService.createExamination(data);
+    const patientName = patients.find((p) => p.patientId === data.patientId)?.name || 'patient';
+    setSuccessMessage(`Examination for ${patientName} created successfully.`);
+    setTimeout(() => {
       navigate(`/examinations/${examination.examinationId}`);
-    } catch (error) {
-      // Error is handled by ExaminationForm component
-      throw error;
-    }
+    }, 1200);
   };
 
   const handleCancel = () => {
-    // If came from patient detail, go back there, otherwise go to examinations list
     if (preselectedPatientId) {
       navigate(`/patients/${preselectedPatientId}`);
     } else {
@@ -64,11 +58,22 @@ export default function CreateExaminationPage() {
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
       <h1 style={{ marginBottom: '2rem' }}>Create Examination</h1>
-      <ExaminationForm 
+
+      {successMessage && (
+        <InlineNotification
+          kind="success"
+          title="Examination Created"
+          subtitle={successMessage}
+          lowContrast
+          style={{ marginBottom: '1.5rem' }}
+        />
+      )}
+
+      <ExaminationForm
         patients={patients}
         preselectedPatientId={preselectedPatientId || undefined}
-        onSubmit={handleSubmit} 
-        onCancel={handleCancel} 
+        onSubmit={handleSubmit}
+        onCancel={handleCancel}
       />
     </div>
   );

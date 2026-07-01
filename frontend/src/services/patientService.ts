@@ -15,10 +15,11 @@ class PatientService {
   async getPatients(continuationToken?: string): Promise<PatientsListResponse> {
     try {
       const params = continuationToken ? { continuationToken } : {};
+      // Interceptor unwraps envelope; response.data is now { patients, continuationToken? }
       const response = await api.get<PatientsListResponse>(this.PATIENTS_BASE_URL, { params });
       return response.data;
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Failed to fetch patients';
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch patients';
       throw new Error(message);
     }
   }
@@ -33,7 +34,7 @@ class PatientService {
       const response = await api.get<{ patient: Patient }>(`${this.PATIENTS_BASE_URL}/${id}`);
       return response.data.patient;
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Failed to fetch patient';
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch patient';
       throw new Error(message);
     }
   }
@@ -48,7 +49,7 @@ class PatientService {
       const response = await api.post<{ patient: Patient }>(this.PATIENTS_BASE_URL, data);
       return response.data.patient;
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Failed to create patient';
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to create patient';
       throw new Error(message);
     }
   }
@@ -62,18 +63,23 @@ class PatientService {
    */
   async updatePatient(id: string, data: UpdatePatientRequest, etag: string): Promise<Patient> {
     try {
+      // Backend reads etag from the request body (see UpdatePatient.ts)
       const response = await api.put<{ patient: Patient }>(
         `${this.PATIENTS_BASE_URL}/${id}`,
-        data,
-        {
-          headers: {
-            'If-Match': etag,
-          },
-        }
+        { ...data, etag }
       );
       return response.data.patient;
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Failed to update patient';
+      const status = error.response?.status;
+      // Backend returns 409 for concurrency conflicts (conflictResponse helper)
+      if (status === 409) {
+        const conflictError: any = new Error(
+          'This patient record was modified by another user. Please go back and reload before editing.'
+        );
+        conflictError.isConcurrencyConflict = true;
+        throw conflictError;
+      }
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to update patient';
       throw new Error(message);
     }
   }
@@ -85,12 +91,14 @@ class PatientService {
    */
   async searchPatients(query: string): Promise<Patient[]> {
     try {
-      const response = await api.get<{ patients: Patient[] }>(`${this.PATIENTS_BASE_URL}/search`, {
-        params: { q: query },
+      // Route: v1/patients-search (avoids collision with v1/patients/{id})
+      // Parameter: name (matches backend SearchPatients.ts)
+      const response = await api.get<{ patients: Patient[] }>('/v1/patients-search', {
+        params: { name: query },
       });
       return response.data.patients;
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Failed to search patients';
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to search patients';
       throw new Error(message);
     }
   }

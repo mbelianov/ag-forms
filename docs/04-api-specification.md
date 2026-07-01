@@ -311,7 +311,6 @@ Cookie: session_token=<signed-token>
         "id": "660e8400-e29b-41d4-a716-446655440001",
         "name": "Мария Иванова",
         "age": 28,
-        "medical_record_number": "MRN-2026-001234",
         "created_at": "2026-06-10T10:30:00Z",
         "etag": "W/\"datetime'2026-06-10T10%3A30%3A00.0000000Z'\""
       }
@@ -363,7 +362,6 @@ Content-Type: application/json
     "address": "София, ул. Витоша 15",
     "phone": "+359888123456",
     "email": "maria.ivanova@email.bg",
-    "medical_record_number": "MRN-2026-001234",
     "created_by": "550e8400-e29b-41d4-a716-446655440000",
     "created_at": "2026-06-12T10:46:00Z",
     "etag": "W/\"datetime'2026-06-12T10%3A46%3A00.0000000Z'\""
@@ -377,7 +375,6 @@ Content-Type: application/json
 
 **Errors:**
 - `400 Bad Request`: Invalid input data
-- `409 Conflict`: Duplicate MRN or conflicting lookup entity
 - `422 Unprocessable Entity`: Validation errors
 
 ---
@@ -405,11 +402,9 @@ Cookie: session_token=<signed-token>
     "address": "София, ул. Витоша 15",
     "phone": "+359888123456",
     "email": "maria.ivanova@email.bg",
-    "medical_record_number": "MRN-2026-001234",
     "created_by": "550e8400-e29b-41d4-a716-446655440000",
     "created_at": "2026-06-12T10:30:00Z",
     "updated_at": "2026-06-12T10:30:00Z",
-    "examination_count": 3,
     "etag": "W/\"datetime'2026-06-12T10%3A30%3A00.0000000Z'\""
   },
   "meta": {
@@ -455,7 +450,6 @@ If-Match: W/"datetime'2026-06-12T10%3A30%3A00.0000000Z'"
     "address": "София, ул. Витоша 15",
     "phone": "+359888999888",
     "email": "maria.ivanova@email.bg",
-    "medical_record_number": "MRN-2026-001234",
     "updated_at": "2026-06-12T11:00:00Z",
     "etag": "W/\"datetime'2026-06-12T11%3A00%3A00.0000000Z'\""
   },
@@ -531,6 +525,7 @@ Cookie: session_token=<signed-token>
     "examinations": [
       {
         "id": "770e8400-e29b-41d4-a716-446655440002",
+        "mrn": "MRN-mariya-ivanova-2026-000001",
         "patient_id": "660e8400-e29b-41d4-a716-446655440001",
         "patient_name": "Мария Иванова",
         "exam_date": "2026-06-12",
@@ -618,7 +613,9 @@ Content-Type: application/json
   "success": true,
   "data": {
     "id": "770e8400-e29b-41d4-a716-446655440002",
+    "mrn": "MRN-mariya-ivanova-2026-000001",
     "patient_id": "660e8400-e29b-41d4-a716-446655440001",
+    "patient_name": "Мария Иванова",
     "exam_date": "2026-06-12",
     "status": "draft",
     "created_by": "550e8400-e29b-41d4-a716-446655440000",
@@ -652,27 +649,17 @@ Cookie: session_token=<signed-token>
   "success": true,
   "data": {
     "id": "770e8400-e29b-41d4-a716-446655440002",
+    "mrn": "MRN-mariya-ivanova-2026-000001",
     "patient_id": "660e8400-e29b-41d4-a716-446655440001",
-    "patient": {
-      "id": "660e8400-e29b-41d4-a716-446655440001",
-      "name": "Мария Иванова",
-      "age": 28,
-      "medical_record_number": "MRN-2026-001234"
-    },
+    "patient_name": "Мария Иванова",
     "exam_date": "2026-06-12",
+    "gestational_age": "28w 3d",
     "status": "completed",
-    "data": {
-      "pregnancy_data": {},
-      "ultrasound_findings": {},
-      "biometry": {},
-      "anatomy": {},
-      "doppler": {},
-      "comments": "Normal examination"
-    },
-    "created_by": {
-      "id": "550e8400-e29b-41d4-a716-446655440000",
-      "full_name": "Dr. Arabadzhikova"
-    },
+    "biometry": { "bpd": 70, "hc": 250, "ac": 220, "fl": 50 },
+    "doppler": { "pi": 1.2, "ri": 0.7, "vessel": "Umbilical Artery" },
+    "findings": "Normal examination",
+    "notes": "",
+    "created_by": "550e8400-e29b-41d4-a716-446655440000",
     "created_at": "2026-06-12T10:35:00Z",
     "updated_at": "2026-06-12T10:35:00Z",
     "etag": "W/\"datetime'2026-06-12T10%3A35%3A00.0000000Z'\""
@@ -729,6 +716,33 @@ If-Match: W/"datetime'2026-06-12T10%3A35%3A00.0000000Z'"
 - `404 Not Found`: Examination not found
 - `409 Conflict`: ETag mismatch or concurrent update
 - `422 Unprocessable Entity`: Validation errors
+
+---
+
+### GET /examinations/mrn/{mrn}
+
+Resolve a Medical Record Number to a full examination record.
+
+**Request:**
+
+```http
+GET /api/v1/examinations/mrn/MRN-mariya-ivanova-2026-000001
+Cookie: session_token=<signed-token>
+```
+
+**Route note:** The literal path segment `mrn` is matched before the `{id}` wildcard in `GET /examinations/{id}`, so there is no route collision.
+
+**Response (200 OK):** Identical shape to `GET /examinations/:id`.
+
+**Errors:**
+- `400 Bad Request`: MRN format is invalid (does not match `MRN-{nameSegment}-YYYY-NNNNNN`)
+- `404 Not Found`: No examination with this MRN exists, or it is soft-deleted
+
+---
+
+### ~~GET /patients/mrn/{mrn}~~ — **Retired**
+
+`GET /v1/patients/mrn/{mrn}` is retired with no replacement at the patient level. MRN is now examination-level. Use `GET /v1/examinations/mrn/{mrn}` instead.
 
 ---
 

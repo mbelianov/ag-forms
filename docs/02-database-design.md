@@ -82,8 +82,7 @@ The storage design follows these principles:
 ┌──────────▼──────────┐
 │   PatientProfile    │
 ├─────────────────────┤
-│ patient_id          │
-│ medical_record_no   │
+│ patient_id          │  ← sole stable patient identifier (UUID)
 │ name                │
 │ age                 │
 │ address             │
@@ -99,12 +98,17 @@ The storage design follows these principles:
 ┌──────────▼──────────┐
 │ ExaminationRecord   │
 ├─────────────────────┤
-│ examination_id      │
+│ examination_id      │  ← internal routing key (UUID)
+│ mrn                 │  ← MRN-PatientName-YYYY-NNNNNN; unique per examination
 │ patient_id          │
 │ exam_date           │
 │ exam_type           │
+│ gestational_age     │
 │ status              │
-│ data_json           │
+│ biometry_json       │
+│ doppler_json        │
+│ findings            │
+│ notes               │
 │ created_by          │
 │ updated_by          │
 │ created_at          │
@@ -129,6 +133,11 @@ The storage design follows these principles:
 
 ```
 
+**Key changes from previous model:**
+- `medical_record_no` removed from `PatientProfile`
+- `mrn` added to `ExaminationRecord` with format `MRN-PatientName-YYYY-NNNNNN`
+- Patient's sole stable identifier is `patient_id` (UUID)
+
 ### Relationship Strategy
 
 Azure Table Storage does not support foreign keys or joins. Relationships are handled as follows:
@@ -142,7 +151,7 @@ Azure Table Storage does not support foreign keys or joins. Relationships are ha
 ### Denormalization Rules
 
 The design allows controlled duplication for performance:
-- Examination list entities may include `patient_name` and `medical_record_number`
+- Examination list entities include `patient_name` and `mrn` (the examination's own MRN, format `MRN-PatientName-YYYY-NNNNNN`)
 - Audit entries may include `user_name` for easier reporting
 
 All duplicated fields are treated as **read optimization fields**, not authoritative sources.
@@ -184,32 +193,34 @@ Primary patient entity:
 - **PartitionKey:** `PATIENT`
 - **RowKey:** `{patientId}`
 
-Optional MRN lookup entity:
-- **PartitionKey:** `MRN`
-- **RowKey:** `{medicalRecordNumber}`
-
-Optional search/list entity:
+Search/list entity:
 - **PartitionKey:** `PATIENT_SEARCH_{firstLetter}`
 - **RowKey:** `{normalized_name}_{patientId}`
 
 This supports:
 - Direct patient retrieval by ID
-- Direct lookup by MRN
-- Prefix-oriented search support through read-optimized entities
+- Prefix-oriented name search through read-optimized entities
+
+**Note:** The `MRN` partition in the `Patients` table is retired. No MRN rows are written to `Patients`.
 
 #### Examinations Table
 Primary examination entity:
 - **PartitionKey:** `PATIENT_{patientId}`
 - **RowKey:** `{reverseTicks}_{examinationId}`
 
-Optional direct lookup entity:
+Direct lookup entity:
 - **PartitionKey:** `EXAM`
 - **RowKey:** `{examinationId}`
+
+MRN lookup entity:
+- **PartitionKey:** `MRN`
+- **RowKey:** `{mrn}` (e.g. `MRN-mariya-ivanova-2026-000001`)
 
 This supports:
 - Efficient retrieval of all examinations for a patient
 - Natural descending sort by exam date using reverse ticks
 - Direct examination lookup when only examination ID is known
+- Examination lookup by human-readable MRN
 
 #### AuditLogs Table
 - **PartitionKey:** `AUDIT_{yyyyMM}`
@@ -273,28 +284,16 @@ This is the correct optimization model for Azure Table Storage.
 |----------|------|----------|-------|
 | PartitionKey | string | Yes | `PATIENT` |
 | RowKey | string | Yes | Patient ID (UUID) |
-| medical_record_number | string | Yes | Unique MRN |
 | name | string | Yes | Patient full name |
-| normalized_name | string | Yes | Search normalization |
 | age | int | Yes | Validated in application |
 | address | string | No | Residential address |
-| phone | string | No | Contact phone |
+| phone | string | Yes | Contact phone |
 | email | string | No | Contact email |
 | created_by | string | Yes | User ID |
-| created_by_name | string | No | Optional denormalized display field |
 | created_at | datetime | Yes | Creation timestamp |
 | updated_at | datetime | Yes | Last update timestamp |
 | is_deleted | boolean | Yes | Soft delete flag |
 | deleted_at | datetime | No | Soft delete timestamp |
-
-#### MRN Lookup Entity
-
-| Property | Type | Required | Notes |
-|----------|------|----------|-------|
-| PartitionKey | string | Yes | `MRN` |
-| RowKey | string | Yes | Medical record number |
-| patient_id | string | Yes | Target patient ID |
-| patient_name | string | No | Optional display field |
 
 #### Search Entity
 
@@ -304,7 +303,6 @@ This is the correct optimization model for Azure Table Storage.
 | RowKey | string | Yes | `{normalized_name}_{patientId}` |
 | patient_id | string | Yes | Target patient ID |
 | name | string | Yes | Display name |
-| medical_record_number | string | Yes | MRN |
 | created_at | datetime | Yes | Sorting support |
 
 ### Examinations Table
@@ -315,16 +313,18 @@ This is the correct optimization model for Azure Table Storage.
 |----------|------|----------|-------|
 | PartitionKey | string | Yes | `PATIENT_{patientId}` |
 | RowKey | string | Yes | `{reverseTicks}_{examinationId}` |
-| examination_id | string | Yes | Stable examination ID |
+| examination_id | string | Yes | Stable examination ID (UUID) |
+| mrn | string | Yes | Assigned at creation; format `MRN-PatientName-YYYY-NNNNNN`; immutable |
 | patient_id | string | Yes | Owning patient |
 | patient_name | string | No | Denormalized for list views |
-| medical_record_number | string | No | Denormalized for list views |
 | exam_date | string | Yes | ISO date |
-| exam_type | string | Yes | Usually `prenatal_ultrasound` |
+| gestational_age | string | No | e.g. `28w 3d` |
 | status | string | Yes | `draft`, `completed`, `reviewed` |
-| data_json | string | Yes | Serialized examination payload |
+| biometry | string | No | JSON-serialized biometry measurements |
+| doppler | string | No | JSON-serialized doppler measurements |
+| findings | string | No | Clinical findings |
+| notes | string | No | Additional notes |
 | created_by | string | Yes | User ID |
-| created_by_name | string | No | Optional display field |
 | updated_by | string | No | User ID |
 | created_at | datetime | Yes | Creation timestamp |
 | updated_at | datetime | Yes | Last update timestamp |
@@ -336,12 +336,23 @@ This is the correct optimization model for Azure Table Storage.
 | Property | Type | Required | Notes |
 |----------|------|----------|-------|
 | PartitionKey | string | Yes | `EXAM` |
-| RowKey | string | Yes | Examination ID |
-| patient_partition_key | string | Yes | Pointer to primary entity partition |
-| patient_row_key | string | Yes | Pointer to primary entity row |
+| RowKey | string | Yes | Examination ID (UUID) |
+| mrn | string | Yes | Assigned at creation; immutable |
 | patient_id | string | Yes | Owning patient |
 | exam_date | string | Yes | ISO date |
 | status | string | Yes | Current status |
+| ... | ... | ... | All other fields same as primary entity |
+
+#### MRN Lookup Entity (Examinations Table)
+
+| Property | Type | Required | Notes |
+|----------|------|----------|-------|
+| PartitionKey | string | Yes | `MRN` |
+| RowKey | string | Yes | Full MRN value (e.g. `MRN-mariya-ivanova-2026-000001`) |
+| examination_id | string | Yes | Target examination ID |
+| patient_id | string | Yes | Owning patient (denormalized for context) |
+| exam_date | string | No | Denormalized for display |
+| is_deleted | boolean | Yes | Soft-delete flag; mirrors examination state |
 
 ### AuditLogs Table
 
@@ -375,7 +386,8 @@ This is the correct optimization model for Azure Table Storage.
 | Login by username | Username lookup entity → primary user entity |
 | Get user by ID | Point read on `Users` |
 | Get patient by ID | Point read on `Patients` |
-| Get patient by MRN | MRN lookup entity → primary patient entity |
+| **Get examination by MRN** | **MRN lookup entity in `Examinations` (`PartitionKey = MRN`) → primary examination entity** |
+| ~~Get patient by MRN~~ | ~~Retired — use examination MRN lookup instead~~ |
 | List examinations for patient | Query `Examinations` by `PartitionKey = PATIENT_{patientId}` |
 | Get examination by ID | Direct lookup entity → primary examination entity |
 | List audit logs by month | Query `AuditLogs` by monthly partition |
@@ -434,23 +446,22 @@ Because Azure Table Storage does not provide relational constraints, all validat
 | age | Required, 2-99 years | "Age must be between 2 and 99 years" |
 | phone | Required, valid phone format | "Invalid phone number format" |
 | email | Optional, valid email format | "Invalid email address" |
-| medical_record_number | Required, unique | "Medical record number already exists" |
 
 ### Examination Validation Rules
 
 | Field | Validation Rule | Error Message |
 |-------|----------------|---------------|
+| mrn | System-generated; forbidden in request body | "MRN is assigned by the system and cannot be provided" |
 | exam_date | Required, not future date | "Exam date cannot be in the future" |
 | patient_id | Required, must exist and not be deleted | "Patient not found" |
 | status | Must be `draft`, `completed`, or `reviewed` | "Invalid examination status" |
-| heart_rate | integer | "Heart rate must ineteger" |
-| bpd | integer | "BPD must be ineteger" |
-| hc | integer | "HC must be ineteger" |
-| ac | integer | "AC must be ineteger" |
-| fl | integer | "FL must be ineteger" |
-| efw | integer | "EFW must be ineteger" |
-| doppler_pi | number | "PI must be ineteger" |
-| doppler_ri | number | "RI must be ineteger" |
+| bpd | integer | "BPD must be an integer" |
+| hc | integer | "HC must be an integer" |
+| ac | integer | "AC must be an integer" |
+| fl | integer | "FL must be an integer" |
+| efw | integer | "EFW must be an integer" |
+| doppler_pi | number | "PI must be a valid number" |
+| doppler_ri | number (0–1) | "RI must be between 0 and 1" |
 
 ### Referential Integrity Rules
 
@@ -471,26 +482,33 @@ Azure Table Storage supports transactional batches only within the same partitio
 
 ### Medical Record Number Generation
 
-MRN generation is handled in application logic, not by database sequences.
+MRN generation is handled in application logic, not by database sequences. MRN is **examination-level**, not patient-level.
 
-Recommended format:
-- `MRN-{YYYY}-{NNNNNN}`
+**Format:** `MRN-{nameSegment}-{YYYY}-{NNNNNN}`
 
-Recommended generation approach:
-1. Use a dedicated counter entity per year, or
-2. Use a time-based unique identifier with collision checks
+- `nameSegment` is derived from the patient's name at examination creation time using Bulgarian Cyrillic transliteration followed by lowercase/hyphen normalization, maximum 20 characters.
+- `YYYY` is the year of examination creation.
+- `NNNNNN` is a zero-padded 6-digit global-per-year sequential counter.
 
-For simplicity and reliability, document a counter entity pattern:
+**Validation regex:** `^MRN-[a-z0-9-]{1,20}-\d{4}-\d{6}$`
+
+**Examples:**
+- Patient "Мария Иванова", year 2026, counter 1 → `MRN-mariya-ivanova-2026-000001`
+- Patient "Александър Петров", year 2026, counter 2 → `MRN-aleksandar-petro-2026-000002`
+
+Counter entity:
 - **PartitionKey:** `COUNTER`
 - **RowKey:** `MRN_{YYYY}`
 
-Updates to the counter must use optimistic concurrency to avoid duplicate MRNs.
+Updates to the counter must use optimistic concurrency to avoid duplicate MRNs. The counter is incremented inside `generateMRN(patientName)` in `api/src/utils/mrnGenerator.ts`.
 
 ### Soft Delete Rules
 
+When an examination is soft-deleted, its MRN lookup entity in the `Examinations` table is also soft-deleted (`is_deleted = true`). The MRN is not recycled or reassigned. A deleted examination's MRN remains permanently retired.
+
 Soft delete is required for:
 - Patients
-- Examinations
+- Examinations (including the MRN lookup entity)
 - Users where policy requires deactivation instead of removal
 
 Soft delete behavior:

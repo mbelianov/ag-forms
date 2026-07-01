@@ -224,10 +224,10 @@ export default function ExaminationForm({
           >
             <SelectItem value="" text="Select a patient" />
             {patients.map((patient) => (
-              <SelectItem 
-                key={patient.patientId} 
-                value={patient.patientId} 
-                text={`${patient.name} (${patient.mrn})`} 
+              <SelectItem
+                key={patient.patientId}
+                value={patient.patientId}
+                text={patient.name}
               />
             ))}
           </Select>

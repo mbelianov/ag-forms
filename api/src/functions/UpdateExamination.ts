@@ -2,7 +2,7 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { requireAuth, requireRole } from '../utils/authMiddleware';
 import { handleError } from '../utils/errorHandler';
 import { successResponse, unauthorizedResponse, forbiddenResponse, errorResponse } from '../utils/responseHelpers';
-import { getEntity, updateEntity, ensureTableExists } from '../utils/tableClient';
+import { getEntity, updateEntity, ensureTableExists, getTableClient } from '../utils/tableClient';
 import { validateExamination } from '../utils/validation';
 import { logExaminationUpdated } from '../utils/auditService';
 import { Examination } from '../types';
@@ -30,7 +30,8 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
         }
 
         const body = await request.json() as any;
-        const { examDate, gestationalAge, biometry, doppler, findings, notes, status, etag } = body;
+        // Strip any client-supplied mrn — MRN is immutable once assigned
+        const { mrn: _discardedMrn, examDate, gestationalAge, biometry, doppler, findings, notes, status, etag } = body;
 
         // Require ETag for optimistic concurrency
         if (!etag) {
@@ -99,11 +100,13 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             changedFields.push('gestationalAge');
         }
         if (biometry !== undefined) {
-            updatedLookupEntity.biometry = biometry;
+            // Serialize to JSON string for Azure Table Storage
+            updatedLookupEntity.biometry = (typeof biometry === 'string' ? biometry : JSON.stringify(biometry)) as any;
             changedFields.push('biometry');
         }
         if (doppler !== undefined) {
-            updatedLookupEntity.doppler = doppler;
+            // Serialize to JSON string for Azure Table Storage
+            updatedLookupEntity.doppler = (typeof doppler === 'string' ? doppler : JSON.stringify(doppler)) as any;
             changedFields.push('doppler');
         }
         if (findings !== undefined && findings !== existingExam.findings) {
@@ -126,11 +129,17 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
         await updateEntity(EXAMINATIONS_TABLE, updatedLookupEntity);
 
         // Also update primary entity (PATIENT_{patientId} partition)
-        const primaryEntity = await getEntity<Examination>(
-            EXAMINATIONS_TABLE,
-            `PATIENT_${existingExam.patientId}`,
-            existingExam.rowKey
-        );
+        // The primary entity has rowKey = "${reverseTicks}_${examinationId}" — query to find it
+        const tableClient = getTableClient(EXAMINATIONS_TABLE);
+        let primaryEntity: (Examination & any) | null = null;
+        for await (const ent of tableClient.listEntities<Examination>({
+            queryOptions: {
+                filter: `PartitionKey eq 'PATIENT_${existingExam.patientId}' and examinationId eq '${examinationId}'`
+            }
+        })) {
+            primaryEntity = ent;
+            break;
+        }
 
         if (primaryEntity) {
             const updatedPrimaryEntity: Examination & { updatedBy: string } = {

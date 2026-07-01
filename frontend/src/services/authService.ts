@@ -25,10 +25,11 @@ class AuthService {
         loginData
       );
 
+      // Interceptor unwraps the envelope; response.data is now { user: User }
       return response.data.user;
     } catch (error: any) {
       // Return generic error message per security requirements
-      const message = error.response?.data?.error || 'Login failed. Please check your credentials.';
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Login failed. Please check your credentials.';
       throw new Error(message);
     }
   }
@@ -51,10 +52,18 @@ class AuthService {
    */
   async getCurrentUser(): Promise<User | null> {
     try {
-      const response = await api.get<{ user: User }>(
+      // Interceptor unwraps the envelope; response.data is now the user object directly
+      const response = await api.get<{ id: string; username: string; full_name: string; email: string; role: string; last_login?: string }>(
         `${this.AUTH_BASE_URL}/me`
       );
-      return response.data.user;
+      const apiUser = response.data;
+      return {
+        id: apiUser.id,
+        username: apiUser.username,
+        full_name: apiUser.full_name,
+        email: apiUser.email,
+        role: apiUser.role as 'admin' | 'doctor' | 'viewer',
+      };
     } catch (error: any) {
       // Return null if not authenticated (401) or any other error
       if (error.response?.status === 401) {

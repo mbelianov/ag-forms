@@ -78,10 +78,13 @@ export const extractTokenFromRequest = (req: HttpRequest): string | null => {
         return token;
     }
 
-    // Check cookies
+    // Check cookies — accept both 'session_token' (production) and 'token' (legacy/test)
     const cookieHeader = req.headers.get('cookie');
     if (cookieHeader) {
         const cookies = parseCookies(cookieHeader);
+        if (cookies.session_token) {
+            return cookies.session_token;
+        }
         if (cookies.token) {
             return cookies.token;
         }

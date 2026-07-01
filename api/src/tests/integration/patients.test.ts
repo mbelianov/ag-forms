@@ -7,7 +7,6 @@ declare const afterEach: any;
 import { createPatient } from '../../functions/CreatePatient';
 import { getPatients } from '../../functions/GetPatients';
 import { getPatient } from '../../functions/GetPatient';
-import { getPatientByMRN } from '../../functions/GetPatientByMRN';
 import { searchPatients } from '../../functions/SearchPatients';
 import { updatePatient } from '../../functions/UpdatePatient';
 import { deletePatient } from '../../functions/DeletePatient';
@@ -41,8 +40,11 @@ describe('Patients Integration', () => {
         const response = await createPatient(request, context);
         const body = parseBody(response);
 
-        expect(response.status).toBe(500);
-        expect(body.status).toBe('error');
+        // Should succeed — patient created; MRN is no longer on patient
+        expect(response.status).toBe(201);
+        expect(body.success).toBe(true);
+        expect(body.data.patient.name).toBe('Maria Petrova');
+        expect(body.data.patient.mrn).toBeUndefined();
     });
 
     test('should list patients with pagination', async () => {
@@ -82,22 +84,6 @@ describe('Patients Integration', () => {
 
         expect(response.status).toBe(200);
         expect(body.data.patient.patientId).toBe(patient.patientId);
-    });
-
-    test('should get patient by MRN', async () => {
-        const doctor = await createTestUser('doctor');
-        const patient = await createTestPatient();
-        const request = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${doctor.token}`
-        });
-        (request as any).params = { mrn: patient.mrn };
-        const context = mockInvocationContext();
-
-        const response = await getPatientByMRN(request, context);
-        const body = parseBody(response);
-
-        expect(response.status).toBe(200);
-        expect(body.data.patient.mrn).toBe(patient.mrn);
     });
 
     test('should search patients by name prefix', async () => {
@@ -177,20 +163,6 @@ describe('Patients Integration', () => {
         expect(body.data.message).toBe('Patient deleted successfully');
     });
 
-    test('should reject invalid MRN lookup format', async () => {
-        const doctor = await createTestUser('doctor');
-        const request = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${doctor.token}`
-        });
-        (request as any).params = { mrn: 'bad-mrn' };
-        const context = mockInvocationContext();
-
-        const response = await getPatientByMRN(request, context);
-        const body = parseBody(response);
-
-        expect(response.status).toBe(400);
-        expect(body.message).toBe('Invalid MRN format');
-    });
 });
 
 // Made with Bob

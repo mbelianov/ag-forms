@@ -47,11 +47,7 @@ export async function getPatientByMRN(request: HttpRequest, context: InvocationC
     }
 }
 
-app.http('GetPatientByMRN', {
-    methods: ['GET'],
-    authLevel: 'function',
-    route: 'v1/patients/mrn/{mrn}',
-    handler: getPatientByMRN
-});
+// GetPatientByMRN is retired. The route v1/patients/mrn/{mrn} is no longer registered.
+// Use GET v1/examinations/mrn/{mrn} (GetExaminationByMRN) instead.
 
 // Made with Bob

@@ -14,6 +14,7 @@ export default function EditExaminationPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -26,7 +27,6 @@ export default function EditExaminationPage() {
       setIsLoading(true);
       setError(null);
       try {
-        // Load examination and patients in parallel
         const [examinationData, patientsResponse] = await Promise.all([
           examinationService.getExamination(id),
           patientService.getPatients(),
@@ -52,20 +52,19 @@ export default function EditExaminationPage() {
       throw new Error('ETag not available for optimistic concurrency');
     }
 
-    try {
-      const updatedExamination = await examinationService.updateExamination(
-        id, 
-        data, 
-        examination.etag
-      );
-      console.log('Examination updated successfully:', updatedExamination);
-      
-      // Navigate back to examination detail page
+    // examinationService.updateExamination already converts 409 conflicts into a
+    // decorated Error (isConcurrencyConflict=true) — no need to inspect .response here.
+    const updatedExamination = await examinationService.updateExamination(
+      id,
+      data,
+      examination.etag
+    );
+    setSuccessMessage(
+      `Examination for ${updatedExamination.patientName} updated successfully.`
+    );
+    setTimeout(() => {
       navigate(`/examinations/${id}`);
-    } catch (error) {
-      // Error is handled by ExaminationForm component
-      throw error;
-    }
+    }, 1200);
   };
 
   const handleCancel = () => {
@@ -108,6 +107,17 @@ export default function EditExaminationPage() {
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
       <h1 style={{ marginBottom: '2rem' }}>Edit Examination</h1>
+
+      {successMessage && (
+        <InlineNotification
+          kind="success"
+          title="Examination Updated"
+          subtitle={successMessage}
+          lowContrast
+          style={{ marginBottom: '1.5rem' }}
+        />
+      )}
+
       <ExaminationForm
         examination={examination}
         patients={patients}

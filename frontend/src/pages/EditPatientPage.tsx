@@ -12,6 +12,7 @@ export default function EditPatientPage() {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const loadPatient = async () => {
@@ -45,16 +46,14 @@ export default function EditPatientPage() {
       throw new Error('ETag not available for optimistic concurrency');
     }
 
-    try {
-      const updatedPatient = await patientService.updatePatient(id, data, patient.etag);
-      console.log('Patient updated successfully:', updatedPatient);
-      
-      // Navigate back to patient detail page
+    // patientService.updatePatient throws an error with isConcurrencyConflict=true on 409.
+    // Any other errors bubble up to PatientForm's catch block and are shown as submitError.
+    const updatedPatient = await patientService.updatePatient(id, data, patient.etag);
+    setSuccessMessage(`Patient "${updatedPatient.name}" updated successfully.`);
+    // Brief delay so user sees the success notification before redirect
+    setTimeout(() => {
       navigate(`/patients/${id}`);
-    } catch (error) {
-      // Error is handled by PatientForm component
-      throw error;
-    }
+    }, 1200);
   };
 
   const handleCancel = () => {
@@ -97,6 +96,17 @@ export default function EditPatientPage() {
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
       <h1 style={{ marginBottom: '2rem' }}>Edit Patient</h1>
+
+      {successMessage && (
+        <InlineNotification
+          kind="success"
+          title="Patient Updated"
+          subtitle={successMessage}
+          lowContrast
+          style={{ marginBottom: '1.5rem' }}
+        />
+      )}
+
       <PatientForm
         patient={patient}
         onSubmit={handleSubmit}

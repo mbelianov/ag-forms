@@ -4,7 +4,7 @@ import { handleError } from '../utils/errorHandler';
 import { successResponse, unauthorizedResponse, forbiddenResponse, errorResponse } from '../utils/responseHelpers';
 import { getEntity, ensureTableExists, updateEntity } from '../utils/tableClient';
 import { logExaminationDeleted } from '../utils/auditService';
-import { Examination } from '../types';
+import { Examination, MRNLookup } from '../types';
 
 const EXAMINATIONS_TABLE = 'Examinations';
 
@@ -78,6 +78,25 @@ export async function deleteExamination(request: HttpRequest, context: Invocatio
             };
 
             await updateEntity(EXAMINATIONS_TABLE, deletedPrimaryEntity);
+        }
+
+        // Also soft delete MRN lookup entity (MRN partition)
+        if (examination.mrn) {
+            const mrnLookup = await getEntity<MRNLookup & { isDeleted: boolean; deletedAt?: string; deletedBy?: string }>(
+                EXAMINATIONS_TABLE,
+                'MRN',
+                examination.mrn
+            );
+
+            if (mrnLookup) {
+                const deletedMrnLookup = {
+                    ...mrnLookup,
+                    isDeleted: true,
+                    deletedAt: now,
+                    deletedBy: user.userId
+                };
+                await updateEntity(EXAMINATIONS_TABLE, deletedMrnLookup);
+            }
         }
 
         await logExaminationDeleted(user.userId, examinationId);

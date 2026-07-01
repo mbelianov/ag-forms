@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DataTable,
@@ -9,9 +9,7 @@ import {
   TableBody,
   TableCell,
   TableContainer,
-  TableToolbar,
-  TableToolbarContent,
-  TableToolbarSearch,
+  Search,
   Button,
   Pagination,
   InlineLoading,
@@ -24,7 +22,6 @@ import type { Patient } from '../types';
 const headers = [
   { key: 'name', header: 'Name' },
   { key: 'age', header: 'Age' },
-  { key: 'mrn', header: 'MRN' },
   { key: 'phone', header: 'Phone' },
   { key: 'createdAt', header: 'Created Date' },
 ];
@@ -35,14 +32,15 @@ export default function PatientsPage() {
   const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchInfo, setSearchInfo] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [continuationToken, setContinuationToken] = useState<string | undefined>();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Debounce timer for search
-  const [searchTimer, setSearchTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  // Use ref for debounce timer to avoid stale closure issues
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadPatients = useCallback(async (token?: string) => {
     setIsLoading(true);
@@ -63,23 +61,35 @@ export default function PatientsPage() {
     loadPatients();
   }, [loadPatients]);
 
-  const handleSearch = useCallback(async (query: string) => {
+  const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
+    setPage(1);
 
     // Clear existing timer
-    if (searchTimer) {
-      clearTimeout(searchTimer);
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
     }
 
-    // If query is empty, show all patients
+    // Empty query — restore full list, clear all notices
     if (!query.trim()) {
       setFilteredPatients(patients);
       setIsSearching(false);
+      setSearchInfo(null);
       return;
     }
 
+    // Single character — show info hint, don't call the API
+    if (query.trim().length < 2) {
+      setFilteredPatients(patients);
+      setSearchInfo('Type at least 2 characters to search.');
+      return;
+    }
+
+    // Two or more characters — clear any lingering info hint and search
+    setSearchInfo(null);
+
     // Debounce search by 300ms
-    const timer = setTimeout(async () => {
+    searchTimerRef.current = setTimeout(async () => {
       setIsSearching(true);
       try {
         const results = await patientService.searchPatients(query);
@@ -91,9 +101,16 @@ export default function PatientsPage() {
         setIsSearching(false);
       }
     }, 300);
+  }, [patients]);
 
-    setSearchTimer(timer);
-  }, [patients, searchTimer]);
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleRowClick = (patientId: string) => {
     navigate(`/patients/${patientId}`);
@@ -115,13 +132,13 @@ export default function PatientsPage() {
   const rows = filteredPatients.map((patient) => ({
     id: patient.patientId,
     name: patient.name,
-    age: patient.age.toString(),
-    mrn: patient.mrn,
+    age: `${patient.age} yrs`,
     phone: patient.phone,
     createdAt: formatDate(patient.createdAt),
   }));
 
   // Pagination
+  const totalItems = rows.length;
   const startIndex = (page - 1) * pageSize;
   const endIndex = startIndex + pageSize;
   const paginatedRows = rows.slice(startIndex, endIndex);
@@ -138,6 +155,17 @@ export default function PatientsPage() {
     <div style={{ padding: '2rem' }}>
       <h1 style={{ marginBottom: '2rem' }}>Patients</h1>
 
+      {searchInfo && (
+        <InlineNotification
+          kind="info"
+          title=""
+          subtitle={searchInfo}
+          lowContrast
+          hideCloseButton
+          style={{ marginBottom: '1rem' }}
+        />
+      )}
+
       {error && (
         <InlineNotification
           kind="error"
@@ -149,6 +177,33 @@ export default function PatientsPage() {
         />
       )}
 
+      {/* Search and actions live OUTSIDE DataTable so they are never re-mounted
+          when paginatedRows changes and DataTable recreates its render-prop tree */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        <div style={{ flex: 1 }}>
+          <Search
+            id="patient-search"
+            labelText=""
+            placeholder="Search by name…"
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            onClear={() => handleSearch('')}
+            aria-label="Search patients"
+          />
+        </div>
+        {isSearching && (
+          <InlineLoading description="Searching..." style={{ width: 'auto', flexShrink: 0 }} />
+        )}
+        <Button
+          renderIcon={Add}
+          onClick={handleCreatePatient}
+          aria-label="Create new patient"
+          style={{ flexShrink: 0 }}
+        >
+          Create Patient
+        </Button>
+      </div>
+
       <DataTable rows={paginatedRows} headers={headers}>
         {({
           rows,
@@ -159,27 +214,11 @@ export default function PatientsPage() {
           getTableContainerProps,
         }) => (
           <TableContainer
-            title=""
-            description=""
+            title="Patient List"
+            description={`${totalItems} patient${totalItems !== 1 ? 's' : ''} found`}
             {...getTableContainerProps()}
           >
-            <TableToolbar>
-              <TableToolbarContent>
-                <TableToolbarSearch
-                  placeholder="Search by name or MRN"
-                  onChange={(e: any) => handleSearch(e.target?.value || e)}
-                  value={searchQuery}
-                  disabled={isSearching}
-                />
-                <Button
-                  renderIcon={Add}
-                  onClick={handleCreatePatient}
-                >
-                  Create Patient
-                </Button>
-              </TableToolbarContent>
-            </TableToolbar>
-            <Table {...getTableProps()}>
+            <Table {...getTableProps()} aria-label="Patients table">
               <TableHead>
                 <TableRow>
                   {headers.map((header) => (
@@ -193,10 +232,10 @@ export default function PatientsPage() {
                 {rows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={headers.length}>
-                      <div style={{ textAlign: 'center', padding: '2rem' }}>
+                      <div style={{ textAlign: 'center', padding: '2rem', color: '#525252' }}>
                         {searchQuery
-                          ? 'No patients found matching your search'
-                          : 'No patients yet. Create your first patient to get started.'}
+                          ? `No patients found matching "${searchQuery}"`
+                          : 'No patients yet. Click "Create Patient" to add your first patient.'}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -207,6 +246,7 @@ export default function PatientsPage() {
                       key={row.id}
                       onClick={() => handleRowClick(row.id)}
                       style={{ cursor: 'pointer' }}
+                      aria-label={`View patient details`}
                     >
                       {row.cells.map((cell) => (
                         <TableCell key={cell.id}>{cell.value}</TableCell>
@@ -220,7 +260,7 @@ export default function PatientsPage() {
         )}
       </DataTable>
 
-      {rows.length > pageSize && (
+      {totalItems > pageSize && (
         <Pagination
           backwardText="Previous page"
           forwardText="Next page"
@@ -228,10 +268,10 @@ export default function PatientsPage() {
           page={page}
           pageSize={pageSize}
           pageSizes={[10, 20, 30, 40, 50]}
-          totalItems={rows.length}
-          onChange={({ page, pageSize }) => {
-            setPage(page);
-            setPageSize(pageSize);
+          totalItems={totalItems}
+          onChange={({ page: newPage, pageSize: newPageSize }) => {
+            setPage(newPage);
+            setPageSize(newPageSize);
           }}
           style={{ marginTop: '1rem' }}
         />

@@ -39,8 +39,19 @@ export async function getExamination(request: HttpRequest, context: InvocationCo
 
         context.log('Examination retrieved:', { examinationId });
 
+        // Deserialize biometry/doppler from JSON strings back to objects
+        const deserializedExamination = {
+            ...examination,
+            biometry: examination.biometry && typeof examination.biometry === 'string'
+                ? JSON.parse(examination.biometry as any)
+                : examination.biometry,
+            doppler: examination.doppler && typeof examination.doppler === 'string'
+                ? JSON.parse(examination.doppler as any)
+                : examination.doppler
+        };
+
         return successResponse({
-            examination
+            examination: deserializedExamination
         });
     } catch (error) {
         context.error('Error in getExamination:', error);

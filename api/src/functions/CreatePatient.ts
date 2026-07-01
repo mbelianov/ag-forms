@@ -4,10 +4,9 @@ import { requireAuth, requireRole } from '../utils/authMiddleware';
 import { handleError } from '../utils/errorHandler';
 import { successResponse, unauthorizedResponse, forbiddenResponse, errorResponse } from '../utils/responseHelpers';
 import { createEntity, ensureTableExists } from '../utils/tableClient';
-import { generateMRN } from '../utils/mrnGenerator';
 import { validatePatient } from '../utils/validation';
 import { logPatientCreated } from '../utils/auditService';
-import { Patient, MRNLookup, BaseEntity } from '../types';
+import { Patient, BaseEntity } from '../types';
 
 const PATIENTS_TABLE = 'Patients';
 
@@ -15,7 +14,6 @@ interface PatientSearchEntity extends BaseEntity {
     patientId: string;
     name: string;
     normalizedName: string;
-    mrn: string;
     createdAt: string;
 }
 
@@ -51,7 +49,6 @@ export async function createPatient(request: HttpRequest, context: InvocationCon
         await ensureTableExists(PATIENTS_TABLE);
 
         const patientId = uuidv4();
-        const mrn = await generateMRN();
         const now = new Date().toISOString();
         const normalizedName = normalizePatientName(name);
 
@@ -64,20 +61,11 @@ export async function createPatient(request: HttpRequest, context: InvocationCon
             phone: phone.trim(),
             email: email ? email.trim() : undefined,
             address: address ? address.trim() : undefined,
-            mrn,
             createdAt: now,
             updatedAt: now,
             isDeleted: false,
             createdBy: user.userId,
             updatedBy: user.userId
-        };
-
-        const mrnLookupEntity: MRNLookup & { createdAt: string } = {
-            partitionKey: 'MRN',
-            rowKey: mrn,
-            mrn,
-            patientId,
-            createdAt: now
         };
 
         const searchEntity: PatientSearchEntity = {
@@ -86,17 +74,15 @@ export async function createPatient(request: HttpRequest, context: InvocationCon
             patientId,
             name: name.trim(),
             normalizedName,
-            mrn,
             createdAt: now
         };
 
         await createEntity(PATIENTS_TABLE, patientEntity);
-        await createEntity(PATIENTS_TABLE, mrnLookupEntity);
         await createEntity(PATIENTS_TABLE, searchEntity);
 
         await logPatientCreated(user.userId, patientId, patientEntity);
 
-        context.log('Patient created:', { patientId, mrn, createdBy: user.userId });
+        context.log('Patient created:', { patientId, createdBy: user.userId });
 
         return successResponse({
             message: 'Patient created successfully',

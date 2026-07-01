@@ -7,6 +7,7 @@ declare const afterEach: any;
 import { createExamination } from '../../functions/CreateExamination';
 import { getExaminations } from '../../functions/GetExaminations';
 import { getExamination } from '../../functions/GetExamination';
+import { getExaminationByMRN } from '../../functions/GetExaminationByMRN';
 import { updateExamination } from '../../functions/UpdateExamination';
 import { deleteExamination } from '../../functions/DeleteExamination';
 import { calculateExamination } from '../../functions/CalculateExamination';
@@ -54,8 +55,11 @@ describe('Examinations Integration', () => {
         const response = await createExamination(request, context);
         const body = parseBody(response);
 
-        expect(response.status).toBe(500);
-        expect(body.status).toBe('error');
+        // Should succeed — examination created with MRN
+        expect(response.status).toBe(201);
+        expect(body.success).toBe(true);
+        expect(body.data.examination.patientId).toBe(patient.patientId);
+        expect(body.data.examination.mrn).toMatch(/^MRN-[a-z0-9-]{1,20}-\d{4}-\d{6}$/);
     });
 
     test('should list examinations for all and by patient', async () => {
@@ -126,8 +130,10 @@ describe('Examinations Integration', () => {
         const response = await updateExamination(request, context);
         const body = parseBody(response);
 
-        expect(response.status).toBe(500);
-        expect(body.status).toBe('error');
+        // Should succeed — examination updated
+        expect(response.status).toBe(200);
+        expect(body.success).toBe(true);
+        expect(body.data.examination.status).toBe('completed');
     });
 
     test('should soft delete examination as admin', async () => {
@@ -208,7 +214,41 @@ describe('Examinations Integration', () => {
         const body = parseBody(response);
 
         expect(response.status).toBe(403);
-        expect(body.message).toBe('Admin role required to delete examinations');
+        expect(body.error.message).toBe('Admin role required to delete examinations');
+    });
+
+    test('should get examination by MRN', async () => {
+        const doctor = await createTestUser('doctor');
+        const patient = await createTestPatient();
+        const examination = await createTestExamination(patient.patientId);
+
+        const request = mockHttpRequest('GET', undefined, {
+            authorization: `Bearer ${doctor.token}`
+        });
+        (request as any).params = { mrn: examination.mrn };
+        const context = mockInvocationContext();
+
+        const response = await getExaminationByMRN(request, context);
+        const body = parseBody(response);
+
+        expect(response.status).toBe(200);
+        expect(body.data.examination.examinationId).toBe(examination.examinationId);
+        expect(body.data.examination.mrn).toBe(examination.mrn);
+    });
+
+    test('should reject invalid MRN format on GetExaminationByMRN', async () => {
+        const doctor = await createTestUser('doctor');
+        const request = mockHttpRequest('GET', undefined, {
+            authorization: `Bearer ${doctor.token}`
+        });
+        (request as any).params = { mrn: 'bad-mrn' };
+        const context = mockInvocationContext();
+
+        const response = await getExaminationByMRN(request, context);
+        const body = parseBody(response);
+
+        expect(response.status).toBe(400);
+        expect(body.error.message).toBe('Invalid MRN format');
     });
 
     test('should reject invalid page size', async () => {
@@ -223,7 +263,7 @@ describe('Examinations Integration', () => {
         const body = parseBody(response);
 
         expect(response.status).toBe(400);
-        expect(body.message).toBe('Page size must be a positive number');
+        expect(body.error.message).toBe('Page size must be a positive number');
     });
 });
 

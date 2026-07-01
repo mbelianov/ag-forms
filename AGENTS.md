@@ -2,75 +2,22 @@
 
 This file provides guidance to agents when working with code in this repository.
 
-## Critical Non-Obvious Patterns
-
-### Architecture Decisions (Non-Standard)
-- **Azure Table Storage instead of SQL** - All data uses partition/row keys, not relational joins
-- **Client-side PDF generation** - Browser generates PDFs, not server (cost optimization)
-- **Application-managed auth** - Custom user table, NOT Microsoft Entra ID
-- **Reverse ticks for sorting** - Examination RowKeys use reverse ticks for descending chronological order
-- **Triple entity creation** - Patient creation writes 3 entities: main patient, MRN lookup, and search entity (partitioned by first letter)
-
-### Data Model (Critical Partition Keys)
-- Users: `PartitionKey = USER`, lookup by `PartitionKey = USERNAME` (normalized lowercase)
-- Patients: `PartitionKey = PATIENT`, lookup by `PartitionKey = MRN`
-- Patient Search: `PartitionKey = PATIENT_SEARCH_{firstLetter}` (enables efficient name search)
-- Examinations: `PartitionKey = PATIENT_{patientId}` (enables efficient patient queries)
-- Audit: `PartitionKey = AUDIT_{yyyyMM}` (time-based retention)
-- Counters: `PartitionKey = COUNTER`, `RowKey = MRN_{YYYY}`
-
-### Validation Rules (Non-Standard Ranges)
-- Patient age: **2-99 years** (NOT 0-120)
-- Biometry (BPD, HC, AC, FL, EFW): **MUST be integers** (use `parseInt`, NOT `parseFloat`)
-- Doppler PI/RI: floats allowed
-- Gestational age format: `"28w 3d"` (regex: `^\d{1,2}w\s?\d{1}d$`)
-
-### MRN Generation (Optimistic Concurrency)
-- Format: `MRN-{YYYY}-{NNNNNN}`
-- Uses counter entity with ETag-based optimistic concurrency
-- Retries up to 5 times with exponential backoff on conflict
-- Counter resets yearly (separate counter per year)
-
-### Authentication Implementation
-- Token extraction: checks `Authorization: Bearer` header THEN cookies
-- Account lockout: 5 failed attempts = 30 min lockout
-- Username normalization: ALWAYS lowercase before lookup
-- Password min length: **12 characters** (not 8)
-
-### Response Helpers (Mandatory)
-- ALWAYS use `successResponse()` and `errorResponse()` from `utils/responseHelpers.ts`
-- NEVER expose error details to client (log server-side only)
-
-### Testing (Jest)
-- Tests in `src/tests/` directory (NOT `__tests__`)
-- Run single test: `npm test -- src/tests/utils/validation.test.ts`
-
-### Build/Run (PowerShell Scripts)
-- **3 terminals required**: `start-azurite.ps1`, `start-functions.ps1`, `start-frontend.ps1`
-- Azurite MUST bind to `127.0.0.1` (NOT `0.0.0.0`)
-- `npm start` automatically runs `prestart` (clean + build)
-
-### TypeScript Configuration (Non-Standard)
-- **`strict: false`** - Intentionally disabled (do NOT enable)
-- **`rootDir: "."`** - Root is project root, not `src/`
-- CommonJS modules (NOT ES modules) - no top-level await
-
-### Azure Functions v4 Registration (CRITICAL)
-- MUST call `app.http()` to register function or it won't be discovered
-- Function name in `app.http()` becomes URL path
-- Most endpoints should use `authLevel: 'function'` (NOT `anonymous`)
-
-### Frontend (Vite + React)
-- Server binds to `127.0.0.1:3000` (NOT `0.0.0.0`)
-- Uses React 19 (NOT 18) - check for breaking changes
-- TypeScript 6.0 (NOT 5.x)
-
-### Security (Non-Negotiable)
-- NEVER log passwords, tokens, or full medical payloads
-- ALWAYS use ETag for updates (optimistic concurrency)
-- Soft delete only: set `isDeleted = true`, never hard delete
-- Generic error messages to clients (detailed logs server-side)
-
-### Bulgarian Context
-- УЗД = Ultrasound examination
-- Medical terminology may be in Bulgarian
+- Backend/frontend are separate npm projects; the root PowerShell scripts are the intended local-dev entrypoints: [`start-azurite.ps1`](start-azurite.ps1), [`start-functions.ps1`](start-functions.ps1), [`start-frontend.ps1`](start-frontend.ps1).
+- Backend single-test command is `cd api && npm test -- src/tests/utils/validation.test.ts`; Jest roots are [`api/src`](api/src), but coverage explicitly excludes [`api/src/tests/**`](api/src/tests).
+- [`api/package.json`](api/package.json) `start` is not a plain runtime start: it runs `prestart` (`clean && build`) before `func start`.
+- Azure Functions are only discovered when a file calls [`app.http(...)`](api/src/functions/Login.ts:185); the registration name becomes the function name and routes are usually explicit `v1/...`.
+- API responses should go through [`successResponse()`](api/src/utils/responseHelpers.ts:25) / [`errorResponse()`](api/src/utils/responseHelpers.ts:55); they enforce the wrapped payload shape and localhost CORS for `http://127.0.0.1:3000`.
+- Auth is cookie-first on the frontend: [`frontend/src/services/api.ts`](frontend/src/services/api.ts) sends `withCredentials`, while backend auth accepts either `Authorization: Bearer` or the `session_token` cookie via [`extractTokenFromRequest()`](api/src/utils/tokenService.ts:73).
+- Login lowercases usernames and uses a two-entity lookup in `Users`: `USERNAME/{normalizedUsername}` -> `USER/{userId}`; tests seed both records in [`createTestUser()`](api/src/tests/testUtils.ts:32).
+- Patient creation writes two rows into `Patients`: main `PATIENT` and a search row `PATIENT_SEARCH_{firstLetter}` keyed as `${normalizedName}_${patientId}` in [`createPatient()`](api/src/functions/CreatePatient.ts:29).
+- Patient rename must keep the search row in sync; [`updatePatient()`](api/src/functions/UpdatePatient.ts:29) deletes the old search entity and creates a new one when normalized name changes.
+- Examinations are stored three times in `Examinations`: timeline rows under `PATIENT_{patientId}` with row key `${reverseTicks}_${examinationId}` for descending sort (reverseTicks = `9999999999999 - Date.now()`), direct lookup rows under `EXAM/{examinationId}`, and MRN lookup rows under `MRN/{mrn}` in [`createExamination()`](api/src/functions/CreateExamination.ts:15).
+- Table updates rely on optimistic concurrency; [`updateEntity()`](api/src/utils/tableClient.ts:166) requires `entity.etag` and surfaces 412 conflicts.
+- Soft delete is the project convention; delete flows set `isDeleted` and timestamps instead of removing rows, even though hard-delete helpers exist in [`api/src/utils/tableClient.ts`](api/src/utils/tableClient.ts).
+- Validation is domain-specific: patient age `2-99`, gestational age format `28w 3d`, biometry values are integers, doppler values may be floats.
+- Backend TS is intentionally loose: [`api/tsconfig.json`](api/tsconfig.json) uses `strict: false`, `rootDir: "."`, and CommonJS output.
+- Frontend dev server must stay on `127.0.0.1:3000`; [`frontend/vite.config.ts`](frontend/vite.config.ts) proxies `/api` to `http://localhost:7071`.
+- Frontend service types use `import type` and the codebase prefers single quotes + semicolons; the axios interceptor in [`api.ts`](frontend/src/services/api.ts) unwraps the envelope once so `/v1/auth/login` yields `response.data.user` and `/v1/auth/me` yields `response.data` directly — preserve these endpoint-specific shapes when changing [`authService.ts`](frontend/src/services/authService.ts).
+- MRN generation ([`mrnGenerator.ts`](api/src/utils/mrnGenerator.ts)) transliterates Cyrillic patient names (full Bulgarian map) and uses optimistic-concurrency retries (max 5) against a `Counters` table; the format is `MRN-{nameSegment}-{YYYY}-{NNNNNN}`.
+- Login brute-force protection: account locks after 5 failed attempts for 30 minutes; the lock state is stored on the `USER` entity, not a separate table.
+- Medical terminology may appear in Bulgarian; `УЗД` means ultrasound examination.

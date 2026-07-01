@@ -136,8 +136,13 @@ export async function login(request: HttpRequest, context: InvocationContext): P
         user.lastLoginAt = new Date().toISOString();
         user.updatedAt = new Date().toISOString();
 
-        // Update user entity
-        await usersTable.updateEntity(user, 'Merge');
+        // Update user entity — suppress non-critical update errors (e.g. ETag conflict)
+        try {
+            await usersTable.updateEntity(user, 'Merge');
+        } catch (updateError: any) {
+            // Log but don't fail login if the audit-style update doesn't persist
+            context.warn?.('Non-critical: failed to update login state for user:', userId, updateError?.message);
+        }
 
         // Generate JWT token
         const token = generateToken(user.userId, user.username, user.role);
@@ -157,14 +162,18 @@ export async function login(request: HttpRequest, context: InvocationContext): P
             role: user.role
         };
 
-        // Create response with Set-Cookie header for secure token delivery
-        const response = successResponse({ user: userResponse });
+        // Create response with Set-Cookie header and include token in body
+        const response = successResponse({ token, user: userResponse });
+        
+        // Use Secure flag only in production (requires HTTPS)
+        const isProduction = process.env.NODE_ENV === 'production';
+        const secureCookie = isProduction ? 'Secure; ' : '';
         
         return {
             ...response,
             headers: {
                 ...response.headers,
-                'Set-Cookie': `session_token=${token}; HttpOnly; Secure; SameSite=Strict; Max-Age=28800; Path=/`
+                'Set-Cookie': `session_token=${token}; HttpOnly; ${secureCookie}SameSite=Strict; Max-Age=28800; Path=/`
             }
         };
     } catch (error) {

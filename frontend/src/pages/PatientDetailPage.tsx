@@ -35,6 +35,7 @@ export default function PatientDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingExaminations, setIsLoadingExaminations] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [examinationsError, setExaminationsError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadPatient = async () => {
@@ -64,11 +65,16 @@ export default function PatientDetailPage() {
       if (!id) return;
 
       setIsLoadingExaminations(true);
+      setExaminationsError(null);
       try {
         const examinationsData = await examinationService.getExaminations(id);
-        setExaminations(examinationsData);
+        // Sort newest first by examDate
+        const sorted = [...examinationsData].sort(
+          (a, b) => new Date(b.examDate).getTime() - new Date(a.examDate).getTime()
+        );
+        setExaminations(sorted);
       } catch (err: any) {
-        console.error('Failed to load examinations:', err);
+        setExaminationsError(err.message || 'Failed to load examinations');
       } finally {
         setIsLoadingExaminations(false);
       }
@@ -82,7 +88,6 @@ export default function PatientDetailPage() {
   };
 
   const handleCreateExamination = () => {
-    // TODO: Navigate to create examination page when implemented
     navigate(`/examinations/new?patientId=${id}`);
   };
 
@@ -109,10 +114,11 @@ export default function PatientDetailPage() {
   };
 
   const getStatusTag = (status: string) => {
+    // Plan: draft=gray, completed=green, reviewed=blue
     const statusConfig = {
       draft: { type: 'gray' as const, label: 'Draft' },
-      completed: { type: 'blue' as const, label: 'Completed' },
-      reviewed: { type: 'green' as const, label: 'Reviewed' },
+      completed: { type: 'green' as const, label: 'Completed' },
+      reviewed: { type: 'blue' as const, label: 'Reviewed' },
     };
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
     return <Tag type={config.type}>{config.label}</Tag>;
@@ -181,16 +187,6 @@ export default function PatientDetailPage() {
             </Button>
           </Stack>
         </div>
-
-        {/* MRN Display - Prominent */}
-        <Tile style={{ backgroundColor: '#f4f4f4', padding: '1.5rem' }}>
-          <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.5rem' }}>
-            Medical Record Number
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#161616' }}>
-            {patient.mrn}
-          </div>
-        </Tile>
 
         {/* Patient Information */}
         <Tile>
@@ -273,9 +269,15 @@ export default function PatientDetailPage() {
           </div>
           
           {isLoadingExaminations ? (
-            <div style={{ textAlign: 'center', padding: '2rem' }}>
-              <InlineLoading description="Loading examinations..." />
-            </div>
+            <InlineLoading description="Loading examinations..." />
+          ) : examinationsError ? (
+            <InlineNotification
+              kind="error"
+              title="Unable to load examinations"
+              subtitle={examinationsError}
+              lowContrast
+              hideCloseButton
+            />
           ) : examinations.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '2rem', color: '#525252' }}>
               <p>No examinations yet.</p>

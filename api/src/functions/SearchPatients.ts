@@ -12,7 +12,6 @@ interface PatientSearchEntity extends BaseEntity {
     patientId: string;
     name: string;
     normalizedName: string;
-    mrn: string;
     createdAt: string;
 }
 
@@ -79,10 +78,11 @@ export async function searchPatients(request: HttpRequest, context: InvocationCo
     }
 }
 
+// Route uses a dedicated path to avoid collision with v1/patients/{id}
 app.http('SearchPatients', {
     methods: ['GET'],
     authLevel: 'function',
-    route: 'v1/patients/search',
+    route: 'v1/patients-search',
     handler: searchPatients
 });
 

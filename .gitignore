@@ -69,6 +69,8 @@ secrets/
 tmp/
 temp/
 *.tmp
+mrn-to-examination-migration-plan.md
+
 
 # OS
 Thumbs.db
