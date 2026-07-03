@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { InlineLoading, InlineNotification, Button } from '@carbon/react';
+import { Breadcrumb, BreadcrumbItem, InlineNotification, Button } from '@carbon/react';
 import { ArrowLeft } from '@carbon/icons-react';
 import PatientForm from '../components/PatientForm';
 import { patientService } from '../services/patientService';
+import PageLoader from '../components/PageLoader';
+import ErrorMessage from '../components/ErrorMessage';
+import { useAutoNotification } from '../utils/useAutoNotification';
 import type { Patient, UpdatePatientRequest } from '../types';
 
 export default function EditPatientPage() {
@@ -14,28 +17,32 @@ export default function EditPatientPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadPatient = async () => {
-      if (!id) {
-        setError('Patient ID is required');
-        setIsLoading(false);
-        return;
-      }
+  const clearSuccess = useCallback(() => setSuccessMessage(null), []);
+  useAutoNotification(successMessage, clearSuccess);
 
-      setIsLoading(true);
-      setError(null);
-      try {
-        const patientData = await patientService.getPatient(id);
-        setPatient(patientData);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load patient');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const loadPatient = useCallback(async () => {
+    if (!id) {
+      setError('Patient ID is required');
+      setIsLoading(false);
+      return;
+    }
 
-    loadPatient();
+    setIsLoading(true);
+    setError(null);
+    try {
+      const patientData = await patientService.getPatient(id);
+      setPatient(patientData);
+    } catch (err: any) {
+      console.error('[EditPatient] Failed to load patient:', err);
+      setError(err.message || 'Failed to load patient');
+    } finally {
+      setIsLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    loadPatient();
+  }, [loadPatient]);
 
   const handleSubmit = async (data: UpdatePatientRequest) => {
     if (!patient || !id) {
@@ -65,21 +72,15 @@ export default function EditPatientPage() {
   };
 
   if (isLoading) {
-    return (
-      <div style={{ padding: '2rem' }}>
-        <InlineLoading description="Loading patient details..." />
-      </div>
-    );
+    return <PageLoader description="Loading patient details..." />;
   }
 
   if (error || !patient) {
     return (
       <div style={{ padding: '2rem' }}>
-        <InlineNotification
-          kind="error"
-          title="Error"
-          subtitle={error || 'Patient not found'}
-          lowContrast
+        <ErrorMessage
+          message={error || 'Patient not found'}
+          onRetry={error ? loadPatient : undefined}
         />
         <Button
           kind="tertiary"
@@ -95,6 +96,13 @@ export default function EditPatientPage() {
 
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
+      <Breadcrumb noTrailingSlash style={{ marginBottom: '1rem' }}>
+        <BreadcrumbItem href="/dashboard">Home</BreadcrumbItem>
+        <BreadcrumbItem href="/patients">Patients</BreadcrumbItem>
+        <BreadcrumbItem href={`/patients/${id}`}>{patient.name}</BreadcrumbItem>
+        <BreadcrumbItem isCurrentPage>Edit</BreadcrumbItem>
+      </Breadcrumb>
+
       <h1 style={{ marginBottom: '2rem' }}>Edit Patient</h1>
 
       {successMessage && (

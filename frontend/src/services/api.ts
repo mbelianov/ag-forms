@@ -37,7 +37,7 @@ api.interceptors.response.use(
       // Only redirect if not already on login page or calling auth endpoints
       const isAuthEndpoint = error.config?.url?.includes('/auth/');
       const isLoginPage = window.location.pathname === '/login';
-      
+
       if (!isAuthEndpoint && !isLoginPage) {
         console.error('Unauthorized access - redirecting to login');
         window.location.href = '/login';
@@ -45,6 +45,10 @@ api.interceptors.response.use(
     } else if (error.response?.status === 403) {
       // Forbidden
       console.error('Forbidden access');
+    } else if (error.response?.status === 423) {
+      // Account locked — attach a human-readable message
+      error.isAccountLocked = true;
+      error.message = 'Account locked. Please try again in 30 minutes.';
     }
     return Promise.reject(error);
   }

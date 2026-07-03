@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { InlineLoading, InlineNotification } from '@carbon/react';
+import { Breadcrumb, BreadcrumbItem, InlineNotification } from '@carbon/react';
 import ExaminationForm from '../components/ExaminationForm';
 import { examinationService } from '../services/examinationService';
 import { patientService } from '../services/patientService';
+import PageLoader from '../components/PageLoader';
+import { useAutoNotification } from '../utils/useAutoNotification';
 import type { CreateExaminationRequest, Patient } from '../types';
 
 export default function CreateExaminationPage() {
@@ -14,6 +16,9 @@ export default function CreateExaminationPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoadingPatients, setIsLoadingPatients] = useState(true);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const clearSuccess = useCallback(() => setSuccessMessage(null), []);
+  useAutoNotification(successMessage, clearSuccess);
 
   useEffect(() => {
     const loadPatients = async () => {
@@ -48,15 +53,17 @@ export default function CreateExaminationPage() {
   };
 
   if (isLoadingPatients) {
-    return (
-      <div style={{ padding: '2rem' }}>
-        <InlineLoading description="Loading patients..." />
-      </div>
-    );
+    return <PageLoader description="Loading patients..." />;
   }
 
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
+      <Breadcrumb noTrailingSlash style={{ marginBottom: '1rem' }}>
+        <BreadcrumbItem href="/dashboard">Home</BreadcrumbItem>
+        <BreadcrumbItem href="/examinations">Examinations</BreadcrumbItem>
+        <BreadcrumbItem isCurrentPage>Create Examination</BreadcrumbItem>
+      </Breadcrumb>
+
       <h1 style={{ marginBottom: '2rem' }}>Create Examination</h1>
 
       {successMessage && (

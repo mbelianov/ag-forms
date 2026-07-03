@@ -19,7 +19,7 @@ class ExaminationService {
    */
   async getExaminations(patientId?: string): Promise<Examination[]> {
     try {
-      const params = patientId ? { patient_id: patientId } : {};
+      const params = patientId ? { patientId } : {};
       // Interceptor unwraps envelope; response.data is now { examinations: [...] }
       const response = await api.get<ExaminationsListResponse>(this.EXAMINATIONS_BASE_URL, { params });
       return response.data.examinations;

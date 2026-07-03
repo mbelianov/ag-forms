@@ -110,6 +110,7 @@ export interface Examination extends BaseEntity {
     createdAt: string;
     updatedAt: string;
     createdBy: string; // userId
+    createdByName?: string; // denormalized username
     isDeleted: boolean;
     deletedAt?: string;
 }

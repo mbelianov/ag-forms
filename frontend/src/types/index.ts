@@ -56,6 +56,39 @@ export interface Doppler {
   vessel?: string;
 }
 
+export interface PregnancyData {
+  last_menstrual_period?: string; // YYYY-MM-DD
+  ultrasound_date?: string;       // YYYY-MM-DD
+  obstetric_history?: string;     // e.g. "G1P0"
+  family_history?: string;
+}
+
+export interface UltrasoundFindings {
+  presentation?: string;   // e.g. "cephalic"
+  gender?: string;         // e.g. "female" | "male" | "unknown"
+  heart_rate?: number;     // integer, bpm
+  fetal_movement?: string; // e.g. "active"
+  placenta?: string;       // e.g. "anterior, grade 1"
+  umbilical_cord?: string; // e.g. "3 vessels"
+}
+
+export interface AnatomyFindings {
+  head?: string;
+  brain?: string;
+  heart?: string;
+  abdomen?: string;
+  kidneys?: string;
+  limbs?: string;
+  skeleton?: string;
+}
+
+export interface ExaminationData {
+  pregnancy_data?: PregnancyData;
+  ultrasound_findings?: UltrasoundFindings;
+  anatomy?: AnatomyFindings;
+  comments?: string;
+}
+
 export interface Examination {
   examinationId: string;
   mrn: string; // MRN-PatientName-YYYY-NNNNNN; assigned at creation
@@ -69,6 +102,7 @@ export interface Examination {
   notes?: string;
   findings?: string;
   createdBy: string;
+  createdByName?: string; // denormalized username
   createdAt: string;
   isDeleted: boolean;
   etag?: string;
@@ -83,6 +117,7 @@ export interface CreateExaminationRequest {
   doppler?: Doppler;
   notes?: string;
   findings?: string;
+  data?: ExaminationData;
 }
 
 export interface UpdateExaminationRequest {
@@ -93,6 +128,7 @@ export interface UpdateExaminationRequest {
   doppler?: Doppler;
   notes?: string;
   findings?: string;
+  data?: ExaminationData;
 }
 
 export interface ExaminationsListResponse {

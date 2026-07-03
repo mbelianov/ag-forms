@@ -52,18 +52,11 @@ class AuthService {
    */
   async getCurrentUser(): Promise<User | null> {
     try {
-      // Interceptor unwraps the envelope; response.data is now the user object directly
-      const response = await api.get<{ id: string; username: string; full_name: string; email: string; role: string; last_login?: string }>(
+      // Interceptor unwraps the outer envelope; response.data is now { user: {...} }
+      const response = await api.get<{ user: User }>(
         `${this.AUTH_BASE_URL}/me`
       );
-      const apiUser = response.data;
-      return {
-        id: apiUser.id,
-        username: apiUser.username,
-        full_name: apiUser.full_name,
-        email: apiUser.email,
-        role: apiUser.role as 'admin' | 'doctor' | 'viewer',
-      };
+      return response.data.user;
     } catch (error: any) {
       // Return null if not authenticated (401) or any other error
       if (error.response?.status === 401) {

@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
+  Breadcrumb,
+  BreadcrumbItem,
   Button,
   Stack,
-  InlineLoading,
   InlineNotification,
+  InlineLoading,
   Tile,
   DataTable,
   Table,
@@ -14,11 +16,16 @@ import {
   TableBody,
   TableCell,
   TableContainer,
-  Tag,
+  Modal,
 } from '@carbon/react';
-import { Edit, Add, ArrowLeft } from '@carbon/icons-react';
+import { Edit, Add, ArrowLeft, TrashCan } from '@carbon/icons-react';
 import { patientService } from '../services/patientService';
 import { examinationService } from '../services/examinationService';
+import { useAuth } from '../contexts/AuthContext';
+import PageLoader from '../components/PageLoader';
+import ErrorMessage from '../components/ErrorMessage';
+import { useAutoNotification } from '../utils/useAutoNotification';
+import { getStatusTag } from '../utils/statusHelpers';
 import type { Patient, Examination } from '../types';
 
 const examinationHeaders = [
@@ -30,35 +37,44 @@ const examinationHeaders = [
 export default function PatientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [examinations, setExaminations] = useState<Examination[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingExaminations, setIsLoadingExaminations] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [examinationsError, setExaminationsError] = useState<string | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSuccess, setDeleteSuccess] = useState(false);
+
+  const clearDeleteSuccess = useCallback(() => setDeleteSuccess(false), []);
+  useAutoNotification(deleteSuccess ? 'done' : null, clearDeleteSuccess);
+
+  const loadPatient = useCallback(async () => {
+    if (!id) {
+      setError('Patient ID is required');
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const patientData = await patientService.getPatient(id);
+      setPatient(patientData);
+    } catch (err: any) {
+      console.error('[PatientDetail] Failed to load patient:', err);
+      setError(err.message || 'Failed to load patient');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id]);
 
   useEffect(() => {
-    const loadPatient = async () => {
-      if (!id) {
-        setError('Patient ID is required');
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-      setError(null);
-      try {
-        const patientData = await patientService.getPatient(id);
-        setPatient(patientData);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load patient');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     loadPatient();
-  }, [id]);
+  }, [loadPatient]);
 
   useEffect(() => {
     const loadExaminations = async () => {
@@ -87,6 +103,33 @@ export default function PatientDetailPage() {
     navigate(`/patients/${id}/edit`);
   };
 
+  const handleDeleteClick = () => {
+    setDeleteError(null);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDeleteCancel = () => {
+    setIsDeleteModalOpen(false);
+    setDeleteError(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!id) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await patientService.deletePatient(id);
+      setIsDeleteModalOpen(false);
+      setDeleteSuccess(true);
+      setTimeout(() => navigate('/patients'), 1200);
+    } catch (err: any) {
+      setIsDeleteModalOpen(false);
+      setDeleteError(err.message || 'Failed to delete patient');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleCreateExamination = () => {
     navigate(`/examinations/new?patientId=${id}`);
   };
@@ -113,37 +156,20 @@ export default function PatientDetailPage() {
     });
   };
 
-  const getStatusTag = (status: string) => {
-    // Plan: draft=gray, completed=green, reviewed=blue
-    const statusConfig = {
-      draft: { type: 'gray' as const, label: 'Draft' },
-      completed: { type: 'green' as const, label: 'Completed' },
-      reviewed: { type: 'blue' as const, label: 'Reviewed' },
-    };
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
-    return <Tag type={config.type}>{config.label}</Tag>;
-  };
-
   const handleExaminationClick = (examinationId: string) => {
     navigate(`/examinations/${examinationId}`);
   };
 
   if (isLoading) {
-    return (
-      <div style={{ padding: '2rem' }}>
-        <InlineLoading description="Loading patient details..." />
-      </div>
-    );
+    return <PageLoader description="Loading patient details..." />;
   }
 
   if (error || !patient) {
     return (
       <div style={{ padding: '2rem' }}>
-        <InlineNotification
-          kind="error"
-          title="Error"
-          subtitle={error || 'Patient not found'}
-          lowContrast
+        <ErrorMessage
+          message={error || 'Patient not found'}
+          onRetry={error ? loadPatient : undefined}
         />
         <Button
           kind="tertiary"
@@ -151,7 +177,7 @@ export default function PatientDetailPage() {
           onClick={handleBack}
           style={{ marginTop: '1rem' }}
         >
-          Back to Patients
+          Back to Patients List
         </Button>
       </div>
     );
@@ -159,17 +185,42 @@ export default function PatientDetailPage() {
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+      <Breadcrumb noTrailingSlash style={{ marginBottom: '1rem' }}>
+        <BreadcrumbItem href="/dashboard">Home</BreadcrumbItem>
+        <BreadcrumbItem href="/patients">Patients</BreadcrumbItem>
+        <BreadcrumbItem isCurrentPage>{patient.name}</BreadcrumbItem>
+      </Breadcrumb>
+
       <Stack gap={6}>
+        {deleteSuccess && (
+          <InlineNotification
+            kind="success"
+            title="Patient deleted"
+            subtitle="Redirecting to patients list…"
+            lowContrast
+            hideCloseButton
+          />
+        )}
+        {deleteError && (
+          <InlineNotification
+            kind="error"
+            title="Delete failed"
+            subtitle={deleteError}
+            lowContrast
+            onCloseButtonClick={() => setDeleteError(null)}
+          />
+        )}
+
         {/* Header with actions */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <h1>Patient Details</h1>
-          <Stack orientation="horizontal" gap={4}>
+          <Stack orientation="horizontal" gap={4} style={{ flexWrap: 'wrap' }}>
             <Button
               kind="tertiary"
               renderIcon={ArrowLeft}
               onClick={handleBack}
             >
-              Back to Patients
+              Back to Patients List
             </Button>
             <Button
               kind="secondary"
@@ -185,6 +236,15 @@ export default function PatientDetailPage() {
             >
               Create Examination
             </Button>
+            {(user?.role === 'admin' || user?.role === 'doctor') && (
+              <Button
+                kind="danger"
+                renderIcon={TrashCan}
+                onClick={handleDeleteClick}
+              >
+                Delete Patient
+              </Button>
+            )}
           </Stack>
         </div>
 
@@ -315,12 +375,15 @@ export default function PatientDetailPage() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {rows.map((row) => (
+                      {rows.map((row) => {
+                        const exam = examinations.find((e) => e.examinationId === row.id);
+                        return (
                         <TableRow
                           {...getRowProps({ row })}
                           key={row.id}
                           onClick={() => handleExaminationClick(row.id)}
                           style={{ cursor: 'pointer' }}
+                          aria-label={exam ? `View examination from ${formatExamDate(exam.examDate)}` : 'View examination'}
                         >
                           {row.cells.map((cell) => (
                             <TableCell key={cell.id}>
@@ -330,7 +393,8 @@ export default function PatientDetailPage() {
                             </TableCell>
                           ))}
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </TableContainer>
@@ -339,6 +403,27 @@ export default function PatientDetailPage() {
           )}
         </Tile>
       </Stack>
+
+      <Modal
+        open={isDeleteModalOpen}
+        danger
+        modalHeading="Delete Patient"
+        primaryButtonText={isDeleting ? 'Deleting…' : 'Delete'}
+        secondaryButtonText="Cancel"
+        primaryButtonDisabled={isDeleting}
+        onRequestSubmit={handleDeleteConfirm}
+        onRequestClose={handleDeleteCancel}
+        onSecondarySubmit={handleDeleteCancel}
+      >
+        <p>
+          Are you sure you want to delete <strong>{patient?.name}</strong>?
+        </p>
+        <p style={{ marginTop: '0.75rem' }}>
+          This will permanently delete the patient record and{' '}
+          <strong>all {examinations.length > 0 ? examinations.length : ''} associated examination{examinations.length !== 1 ? 's' : ''}</strong>.
+          This action cannot be undone.
+        </p>
+      </Modal>
     </div>
   );
 }

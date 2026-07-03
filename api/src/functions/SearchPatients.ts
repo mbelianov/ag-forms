@@ -20,8 +20,15 @@ const normalizePatientName = (name: string): string => {
 };
 
 const getSearchPartitionKey = (normalizedName: string): string => {
-    const firstLetter = normalizedName.charAt(0) || 'unknown';
-    return `PATIENT_SEARCH_${firstLetter}`;
+    const firstChar = normalizedName.charAt(0);
+    // Use the Unicode code-point hex value as the bucket suffix so the partition
+    // key remains pure ASCII and is safe for Azure Table Storage OData filters,
+    // regardless of whether the patient name uses Latin, Cyrillic, or any other
+    // Unicode script.  e.g. "a" -> "0061", "и" -> "0438".
+    const bucket = firstChar
+        ? firstChar.codePointAt(0)!.toString(16).padStart(4, '0')
+        : 'unknown';
+    return `PATIENT_SEARCH_${bucket}`;
 };
 
 export async function searchPatients(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {

@@ -85,6 +85,19 @@ class PatientService {
   }
 
   /**
+   * Delete a patient (and cascade-delete all associated examinations)
+   * @param id - Patient ID
+   */
+  async deletePatient(id: string): Promise<void> {
+    try {
+      await api.delete(`${this.PATIENTS_BASE_URL}/${id}`);
+    } catch (error: any) {
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to delete patient';
+      throw new Error(message);
+    }
+  }
+
+  /**
    * Search patients by name or MRN
    * @param query - Search query string
    * @returns List of matching patients

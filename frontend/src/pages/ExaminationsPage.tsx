@@ -16,13 +16,13 @@ import {
   Select,
   SelectItem,
   Pagination,
-  InlineLoading,
   InlineNotification,
-  Tag,
 } from '@carbon/react';
+import { getStatusTag } from '../utils/statusHelpers';
 import { Add, View } from '@carbon/icons-react';
 import { examinationService } from '../services/examinationService';
 import { patientService } from '../services/patientService';
+import PageLoader from '../components/PageLoader';
 import type { Examination, Patient } from '../types';
 
 const headers = [
@@ -157,17 +157,6 @@ export default function ExaminationsPage() {
     });
   };
 
-  const getStatusTag = (status: string) => {
-    // Plan: draft=gray, completed=green, reviewed=blue
-    const statusConfig = {
-      draft: { type: 'gray' as const, label: 'Draft' },
-      completed: { type: 'green' as const, label: 'Completed' },
-      reviewed: { type: 'blue' as const, label: 'Reviewed' },
-    };
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
-    return <Tag type={config.type}>{config.label}</Tag>;
-  };
-
   // Prepare rows for DataTable — keep patientId for click handler
   const allRows = filteredExaminations.map((exam) => ({
     id: exam.examinationId,
@@ -177,7 +166,7 @@ export default function ExaminationsPage() {
     examDate: formatDate(exam.examDate),
     gestationalAge: exam.gestationalAge || '—',
     status: exam.status,
-    createdBy: exam.createdBy,
+    createdBy: exam.createdByName || exam.createdBy,
     actions: exam.examinationId, // used to render button
   }));
 
@@ -187,11 +176,7 @@ export default function ExaminationsPage() {
   const paginatedRows = allRows.slice(startIndex, startIndex + pageSize);
 
   if (isLoading && examinations.length === 0) {
-    return (
-      <div style={{ padding: '2rem' }}>
-        <InlineLoading description="Loading examinations..." />
-      </div>
-    );
+    return <PageLoader description="Loading examinations..." />;
   }
 
   return (
@@ -300,7 +285,7 @@ export default function ExaminationsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.map((row) => {
+                  rows.map((row, rowIndex) => {
                     // Find the original examination to get patientId
                     const originalRow = allRows.find((r) => r.id === row.id);
                     return (
@@ -308,7 +293,10 @@ export default function ExaminationsPage() {
                         {...getRowProps({ row })}
                         key={row.id}
                         onClick={() => handleRowClick(row.id)}
-                        style={{ cursor: 'pointer' }}
+                        style={{
+                          cursor: 'pointer',
+                          backgroundColor: rowIndex % 2 === 0 ? '#ffffff' : '#f4f4f4',
+                        }}
                       >
                         {row.cells.map((cell) => {
                           if (cell.info.header === 'status') {
@@ -369,22 +357,20 @@ export default function ExaminationsPage() {
         )}
       </DataTable>
 
-      {totalItems > pageSize && (
-        <Pagination
-          backwardText="Previous page"
-          forwardText="Next page"
-          itemsPerPageText="Items per page:"
-          page={page}
-          pageSize={pageSize}
-          pageSizes={[10, 20, 30, 40, 50]}
-          totalItems={totalItems}
-          onChange={({ page: newPage, pageSize: newPageSize }) => {
-            setPage(newPage);
-            setPageSize(newPageSize);
-          }}
-          style={{ marginTop: '1rem' }}
-        />
-      )}
+      <Pagination
+        backwardText="Previous page"
+        forwardText="Next page"
+        itemsPerPageText="Items per page:"
+        page={page}
+        pageSize={pageSize}
+        pageSizes={[10, 20, 30, 40, 50]}
+        totalItems={totalItems}
+        onChange={({ page: newPage, pageSize: newPageSize }) => {
+          setPage(newPage);
+          setPageSize(newPageSize);
+        }}
+        style={{ marginTop: '1rem' }}
+      />
     </div>
   );
 }

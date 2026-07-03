@@ -1,15 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
+  Breadcrumb,
+  BreadcrumbItem,
   Button,
   Stack,
-  InlineLoading,
-  InlineNotification,
   Tile,
-  Tag,
 } from '@carbon/react';
 import { Edit, ArrowLeft } from '@carbon/icons-react';
 import { examinationService } from '../services/examinationService';
+import PageLoader from '../components/PageLoader';
+import ErrorMessage from '../components/ErrorMessage';
+import { getStatusTag } from '../utils/statusHelpers';
 import type { Examination } from '../types';
 
 export default function ExaminationDetailPage() {
@@ -19,28 +21,29 @@ export default function ExaminationDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadExamination = async () => {
-      if (!id) {
-        setError('Examination ID is required');
-        setIsLoading(false);
-        return;
-      }
+  const loadExamination = useCallback(async () => {
+    if (!id) {
+      setError('Examination ID is required');
+      setIsLoading(false);
+      return;
+    }
 
-      setIsLoading(true);
-      setError(null);
-      try {
-        const examinationData = await examinationService.getExamination(id);
-        setExamination(examinationData);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load examination');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadExamination();
+    setIsLoading(true);
+    setError(null);
+    try {
+      const examinationData = await examinationService.getExamination(id);
+      setExamination(examinationData);
+    } catch (err: any) {
+      console.error('[ExaminationDetail] Failed to load examination:', err);
+      setError(err.message || 'Failed to load examination');
+    } finally {
+      setIsLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    loadExamination();
+  }, [loadExamination]);
 
   const handleEdit = () => {
     navigate(`/examinations/${id}/edit`);
@@ -74,33 +77,16 @@ export default function ExaminationDetailPage() {
     });
   };
 
-  const getStatusTag = (status: string) => {
-    // Plan: draft=gray, completed=green, reviewed=blue
-    const statusConfig = {
-      draft: { type: 'gray' as const, label: 'Draft' },
-      completed: { type: 'green' as const, label: 'Completed' },
-      reviewed: { type: 'blue' as const, label: 'Reviewed' },
-    };
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
-    return <Tag type={config.type}>{config.label}</Tag>;
-  };
-
   if (isLoading) {
-    return (
-      <div style={{ padding: '2rem' }}>
-        <InlineLoading description="Loading examination details..." />
-      </div>
-    );
+    return <PageLoader description="Loading examination details..." />;
   }
 
   if (error || !examination) {
     return (
       <div style={{ padding: '2rem' }}>
-        <InlineNotification
-          kind="error"
-          title="Error"
-          subtitle={error || 'Examination not found'}
-          lowContrast
+        <ErrorMessage
+          message={error || 'Examination not found'}
+          onRetry={error ? loadExamination : undefined}
         />
         <Button
           kind="tertiary"
@@ -119,6 +105,14 @@ export default function ExaminationDetailPage() {
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+      <Breadcrumb noTrailingSlash style={{ marginBottom: '1rem' }}>
+        <BreadcrumbItem href="/dashboard">Home</BreadcrumbItem>
+        <BreadcrumbItem href="/examinations">Examinations</BreadcrumbItem>
+        <BreadcrumbItem isCurrentPage>
+          {examination.patientName} — {formatDate(examination.examDate)}
+        </BreadcrumbItem>
+      </Breadcrumb>
+
       <Stack gap={6}>
         {/* Header with actions */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
@@ -138,7 +132,7 @@ export default function ExaminationDetailPage() {
               onClick={handleBackToPatient}
               aria-label={`Back to patient ${examination.patientName}`}
             >
-              Back to Patient
+              Back to Patient Details
             </Button>
             <Button
               kind="primary"
@@ -380,7 +374,7 @@ export default function ExaminationDetailPage() {
             renderIcon={ArrowLeft}
             onClick={handleBackToPatient}
           >
-            Back to Patient
+            Back to Patient Details
           </Button>
           <Button
             kind="primary"

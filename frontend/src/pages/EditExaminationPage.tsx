@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { InlineLoading, InlineNotification, Button } from '@carbon/react';
+import { Breadcrumb, BreadcrumbItem, InlineNotification, Button } from '@carbon/react';
 import { ArrowLeft } from '@carbon/icons-react';
 import ExaminationForm from '../components/ExaminationForm';
 import { examinationService } from '../services/examinationService';
 import { patientService } from '../services/patientService';
+import PageLoader from '../components/PageLoader';
+import ErrorMessage from '../components/ErrorMessage';
+import { useAutoNotification } from '../utils/useAutoNotification';
 import type { Examination, UpdateExaminationRequest, Patient } from '../types';
 
 export default function EditExaminationPage() {
@@ -16,32 +19,36 @@ export default function EditExaminationPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!id) {
-        setError('Examination ID is required');
-        setIsLoading(false);
-        return;
-      }
+  const clearSuccess = useCallback(() => setSuccessMessage(null), []);
+  useAutoNotification(successMessage, clearSuccess);
 
-      setIsLoading(true);
-      setError(null);
-      try {
-        const [examinationData, patientsResponse] = await Promise.all([
-          examinationService.getExamination(id),
-          patientService.getPatients(),
-        ]);
-        setExamination(examinationData);
-        setPatients(patientsResponse.patients);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load examination');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const loadData = useCallback(async () => {
+    if (!id) {
+      setError('Examination ID is required');
+      setIsLoading(false);
+      return;
+    }
 
-    loadData();
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [examinationData, patientsResponse] = await Promise.all([
+        examinationService.getExamination(id),
+        patientService.getPatients(),
+      ]);
+      setExamination(examinationData);
+      setPatients(patientsResponse.patients);
+    } catch (err: any) {
+      console.error('[EditExamination] Failed to load data:', err);
+      setError(err.message || 'Failed to load examination');
+    } finally {
+      setIsLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleSubmit = async (data: UpdateExaminationRequest) => {
     if (!examination || !id) {
@@ -76,21 +83,15 @@ export default function EditExaminationPage() {
   };
 
   if (isLoading) {
-    return (
-      <div style={{ padding: '2rem' }}>
-        <InlineLoading description="Loading examination details..." />
-      </div>
-    );
+    return <PageLoader description="Loading examination details..." />;
   }
 
   if (error || !examination) {
     return (
       <div style={{ padding: '2rem' }}>
-        <InlineNotification
-          kind="error"
-          title="Error"
-          subtitle={error || 'Examination not found'}
-          lowContrast
+        <ErrorMessage
+          message={error || 'Examination not found'}
+          onRetry={error ? loadData : undefined}
         />
         <Button
           kind="tertiary"
@@ -106,6 +107,15 @@ export default function EditExaminationPage() {
 
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
+      <Breadcrumb noTrailingSlash style={{ marginBottom: '1rem' }}>
+        <BreadcrumbItem href="/dashboard">Home</BreadcrumbItem>
+        <BreadcrumbItem href="/examinations">Examinations</BreadcrumbItem>
+        <BreadcrumbItem href={`/examinations/${id}`}>
+          {examination.patientName}
+        </BreadcrumbItem>
+        <BreadcrumbItem isCurrentPage>Edit</BreadcrumbItem>
+      </Breadcrumb>
+
       <h1 style={{ marginBottom: '2rem' }}>Edit Examination</h1>
 
       {successMessage && (

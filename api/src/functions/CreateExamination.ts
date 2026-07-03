@@ -87,6 +87,7 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             createdAt: now,
             updatedAt: now,
             createdBy: user.userId,
+            createdByName: user.username, // Denormalized for list views
             updatedBy: user.userId,
             isDeleted: false
         };
@@ -109,6 +110,7 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             createdAt: now,
             updatedAt: now,
             createdBy: user.userId,
+            createdByName: user.username, // Denormalized for list views
             updatedBy: user.userId,
             isDeleted: false
         };

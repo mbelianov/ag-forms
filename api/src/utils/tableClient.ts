@@ -72,8 +72,12 @@ export const queryEntities = async <T extends BaseEntity>(
         let filter = `PartitionKey eq '${partitionKey}'`;
         
         if (rowKeyPrefix) {
-            // Add row key prefix filter for range queries
-            filter += ` and RowKey ge '${rowKeyPrefix}' and RowKey lt '${rowKeyPrefix}~'`;
+            // Add row key prefix filter for range queries.
+            // \uFFFF is the highest BMP code point and sorts after every Unicode
+            // character (including Cyrillic), making this range correct for any
+            // script.  The old ASCII sentinel "~" (U+007E) sorted below all
+            // Cyrillic letters, causing Cyrillic-name searches to return zero rows.
+            filter += ` and RowKey ge '${rowKeyPrefix}' and RowKey lt '${rowKeyPrefix}\uFFFF'`;
         }
 
         const entitiesIter = tableClient.listEntities<T>({

@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLocked, setIsLocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const { login, isAuthenticated } = useAuth();
@@ -29,6 +30,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLocked(false);
     setIsSubmitting(true);
 
     try {
@@ -36,8 +38,11 @@ export default function LoginPage() {
       await login(username, password);
       // Navigation handled by AuthContext after successful login
     } catch (err: any) {
-      // Display generic error message per security requirements
-      setError(err.message || 'Login failed. Please check your credentials.');
+      if (err.isAccountLocked) {
+        setIsLocked(true);
+      } else {
+        setError(err.message || 'Login failed. Please check your credentials.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -47,6 +52,16 @@ export default function LoginPage() {
     <div style={{ maxWidth: '400px', margin: '4rem auto', padding: '2rem' }}>
       <h1 style={{ marginBottom: '2rem' }}>Login to AG Forms</h1>
       
+      {isLocked && (
+        <InlineNotification
+          kind="warning"
+          title="Account Locked"
+          subtitle="Account locked. Please try again in 30 minutes."
+          onCloseButtonClick={() => setIsLocked(false)}
+          style={{ marginBottom: '1rem', minWidth: '100%' }}
+        />
+      )}
+
       {error && (
         <InlineNotification
           kind="error"

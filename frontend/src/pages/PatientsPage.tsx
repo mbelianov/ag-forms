@@ -12,11 +12,12 @@ import {
   Search,
   Button,
   Pagination,
-  InlineLoading,
   InlineNotification,
+  InlineLoading,
 } from '@carbon/react';
 import { Add } from '@carbon/icons-react';
 import { patientService } from '../services/patientService';
+import PageLoader from '../components/PageLoader';
 import type { Patient } from '../types';
 
 const headers = [
@@ -144,11 +145,7 @@ export default function PatientsPage() {
   const paginatedRows = rows.slice(startIndex, endIndex);
 
   if (isLoading && patients.length === 0) {
-    return (
-      <div style={{ padding: '2rem' }}>
-        <InlineLoading description="Loading patients..." />
-      </div>
-    );
+    return <PageLoader description="Loading patients..." />;
   }
 
   return (
@@ -246,7 +243,7 @@ export default function PatientsPage() {
                       key={row.id}
                       onClick={() => handleRowClick(row.id)}
                       style={{ cursor: 'pointer' }}
-                      aria-label={`View patient details`}
+                      aria-label={`View patient ${rows.find(r => r.id === row.id)?.cells[0]?.value ?? ''}`}
                     >
                       {row.cells.map((cell) => (
                         <TableCell key={cell.id}>{cell.value}</TableCell>
