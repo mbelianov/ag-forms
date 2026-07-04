@@ -107,7 +107,7 @@
 
 ---
 
-### TASK-007 · Implement auto-calculation trigger and display
+### TASK-007 · ⚠️ Implement auto-calculation trigger and display *(Partially completed — percentiles still missing)*
 
 - **Files to create/modify:**
   - `frontend/src/utils/calculations.ts` *(new)* — client-side gestational age, expected delivery date helper functions
@@ -142,7 +142,7 @@
 
 ---
 
-### TASK-009 · Expand examination form with full clinical data sections
+### ~~TASK-009~~ ✅ Expand examination form with full clinical data sections
 
 - **File:** `frontend/src/components/ExaminationForm.tsx`
 - **Issue:** The spec defines three sub-objects in the examination payload that are entirely absent from the form:
@@ -423,9 +423,9 @@
 | Duplicate `getStatusTag` in `ExaminationsPage` | `AGENTS.md` | Use shared `statusHelpers.getStatusTag()` | ✅ **Fixed** | Local copy can diverge from shared utility. → TASK-004 |
 | HTTP 423 (Account Locked) not handled | `docs/04-api-specification.md` § POST /auth/login; `docs/TEST-CASES.md` TC-AUTH-006 | Show "Account locked" message on 5 failed attempts | ✅ **Fixed** | Raw server message forwarded; no user-friendly locked-account copy. → TASK-005 |
 | Examination delete action | `docs/04-api-specification.md` § DELETE /examinations/:id | Delete button + confirmation modal on examination detail page | **Missing** | No delete in service or UI. → TASK-006 |
-| Auto-calculation trigger + display | `docs/04-api-specification.md` § POST /examinations/:id/calculate | Calculate button → gestational age, delivery date, percentiles | **Missing** | No service call, no display of calculated values. → TASK-007 |
+| Auto-calculation trigger + display | `docs/04-api-specification.md` § POST /examinations/:id/calculate | Calculate button → gestational age, delivery date, percentiles | **Partial** | Gestational age and delivery date implemented; biometry percentiles display still missing. → TASK-007 |
 | Change Password UI | `docs/04-api-specification.md` § POST /auth/change-password | Profile icon → Change Password page/dialog | **Missing** | No page, no service method, profile icon is non-interactive. → TASK-008 |
-| Examination full clinical data sections | `docs/04-api-specification.md` § POST /examinations body | `pregnancy_data`, `ultrasound_findings`, `anatomy` sub-objects | **Missing** | Entirely absent from `ExaminationForm.tsx`. → TASK-009 |
+| Examination full clinical data sections | `docs/04-api-specification.md` § POST /examinations body | `pregnancy_data`, `ultrasound_findings`, `anatomy` sub-objects | ✅ **Fixed** | Added accordion sections + types + multi-column layout. → TASK-009 |
 | Viewer-role UI visibility | `docs/03-security-architecture.md` § Permission Model | Hide Create/Edit/Delete for viewer role | **Missing** | Only the patient Delete button is guarded; all Create/Edit buttons visible to viewer. → TASK-010 |
 | Admin navigation item "Users" | `docs/TEST-CASES.md` TC-AUTH-001 | Admins see "Users" in nav; doctors do not | **Missing** | Nav bar always shows the same three items regardless of role. → TASK-011 |
 | Status filter via API query param | `docs/04-api-specification.md` § GET /examinations | Pass `?status=` to server | **Partial** | Client-side only. → TASK-012 |
@@ -453,7 +453,7 @@
 | `Sidebar` component | `docs/01-architecture-overview.md` § Frontend Components Structure | Persistent left-side navigation panel | **Missing** | Header-only layout; no sidebar. → TASK-029 |
 | `Footer` component | `docs/01-architecture-overview.md` § Frontend Components Structure | Common footer at bottom of every page | **Missing** | No footer anywhere. → TASK-029 |
 | `LoginForm` sub-component | `docs/01-architecture-overview.md` § Frontend Components Structure (`auth/LoginForm.tsx`) | Reusable login form under `components/auth/` | **Missing** | Login inlined in `LoginPage.tsx`. → TASK-029 |
-| Biometry percentiles display | `docs/04-api-specification.md` § POST /examinations/:id/calculate | Percentile values shown beside raw measurements | **Missing** | Raw measurements only in detail page. → TASK-007 |
+| Biometry percentiles display | `docs/04-api-specification.md` § POST /examinations/:id/calculate | Percentile values shown beside raw measurements | **Missing** | Raw measurements only in detail page; percentile display not yet implemented. → TASK-007 |
 | Expected delivery date display | `docs/04-api-specification.md` § POST /examinations/:id/calculate | Calculated EDD shown on detail page | **Missing** | No field for this anywhere. → TASK-007 |
 | `PatientList` sub-component | `docs/01-architecture-overview.md` § components/patients/ | Reusable list component | **Missing** | Inlined in `PatientsPage.tsx`. → TASK-029 |
 | `PatientSearch` sub-component | `docs/01-architecture-overview.md` § components/patients/ | Reusable search component | **Missing** | Inlined in `PatientsPage.tsx`. → TASK-029 |

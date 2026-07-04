@@ -21,6 +21,7 @@ import type {
   Patient,
   ExaminationData,
 } from '../types';
+import { calcGAFromLMP, calcGAFromBiometry, calcEFW, calcEDD } from '../utils/calculations';
 
 interface ExaminationFormProps {
   examination?: Examination;
@@ -68,7 +69,6 @@ export default function ExaminationForm({
     // Core fields
     patientId: examination?.patientId || preselectedPatientId || '',
     examDate: examination?.examDate ? examDateToYMD(examination.examDate) : toISODate(new Date()),
-    gestationalAge: examination?.gestationalAge || '',
     status: (examination?.status || 'draft') as 'draft' | 'completed' | 'reviewed',
     // Biometry (integers only)
     bpd: examination?.biometry?.bpd?.toString() || '',
@@ -76,15 +76,17 @@ export default function ExaminationForm({
     ac: examination?.biometry?.ac?.toString() || '',
     fl: examination?.biometry?.fl?.toString() || '',
     efw: examination?.biometry?.efw?.toString() || '',
+    // GA fields (both stored separately)
+    gestationalAge: examination?.gestationalAge || '',                         // GA from LMP
+    gestationalAgeFromBiometry: examination?.gestationalAgeFromBiometry || '', // GA from Biometry
     // Doppler (floats allowed)
     pi: examination?.doppler?.pi?.toString() || '',
     ri: examination?.doppler?.ri?.toString() || '',
     vessel: examination?.doppler?.vessel || '',
     notes: examination?.notes || '',
     findings: examination?.findings || '',
-    // Pregnancy data
+    // Pregnancy data (ultrasound_date intentionally omitted — irrelevant, same as exam date)
     last_menstrual_period: examination?.data?.pregnancy_data?.last_menstrual_period || '',
-    ultrasound_date: examination?.data?.pregnancy_data?.ultrasound_date || '',
     obstetric_history: examination?.data?.pregnancy_data?.obstetric_history || '',
     family_history: examination?.data?.pregnancy_data?.family_history || '',
     // Ultrasound findings
@@ -115,20 +117,20 @@ export default function ExaminationForm({
       setFormData({
         patientId: examination.patientId,
         examDate: examDateToYMD(examination.examDate),
-        gestationalAge: examination.gestationalAge || '',
         status: examination.status,
         bpd: examination.biometry?.bpd?.toString() || '',
         hc: examination.biometry?.hc?.toString() || '',
         ac: examination.biometry?.ac?.toString() || '',
         fl: examination.biometry?.fl?.toString() || '',
         efw: examination.biometry?.efw?.toString() || '',
+        gestationalAge: examination.gestationalAge || '',
+        gestationalAgeFromBiometry: examination.gestationalAgeFromBiometry || '',
         pi: examination.doppler?.pi?.toString() || '',
         ri: examination.doppler?.ri?.toString() || '',
         vessel: examination.doppler?.vessel || '',
         notes: examination.notes || '',
         findings: examination.findings || '',
         last_menstrual_period: examination.data?.pregnancy_data?.last_menstrual_period || '',
-        ultrasound_date: examination.data?.pregnancy_data?.ultrasound_date || '',
         obstetric_history: examination.data?.pregnancy_data?.obstetric_history || '',
         family_history: examination.data?.pregnancy_data?.family_history || '',
         presentation: examination.data?.ultrasound_findings?.presentation || '',
@@ -149,6 +151,62 @@ export default function ExaminationForm({
     }
   }, [examination]);
 
+  // ── Derived values ────────────────────────────────────────────────────────
+  const canCalcGAFromLMP = !!(formData.last_menstrual_period && formData.examDate);
+
+  // EDD is derived live whenever LMP changes — display-only, never stored separately
+  const edd = calcEDD(formData.last_menstrual_period);
+
+  const biometryInts = {
+    bpd: formData.bpd ? parseInt(formData.bpd) : undefined,
+    hc: formData.hc ? parseInt(formData.hc) : undefined,
+    ac: formData.ac ? parseInt(formData.ac) : undefined,
+    fl: formData.fl ? parseInt(formData.fl) : undefined,
+  };
+
+  const canCalcGAFromBiometry = !!(
+    biometryInts.bpd && biometryInts.hc && biometryInts.ac && biometryInts.fl
+  );
+
+  const canCalcEFW = canCalcGAFromBiometry; // same four params required
+
+  // ── Calc handlers ─────────────────────────────────────────────────────────
+
+  const handleCalcGAFromLMP = () => {
+    const result = calcGAFromLMP(formData.last_menstrual_period, formData.examDate);
+    if (result) {
+      handleChange('gestationalAge', result);
+    }
+  };
+
+  const handleCalcGAFromBiometry = () => {
+    const result = calcGAFromBiometry(
+      biometryInts.bpd,
+      biometryInts.hc,
+      biometryInts.ac,
+      biometryInts.fl,
+    );
+    if (result) {
+      handleChange('gestationalAgeFromBiometry', result);
+    }
+  };
+
+  const handleCalcEFW = () => {
+    const result = calcEFW(
+      biometryInts.bpd,
+      biometryInts.hc,
+      biometryInts.ac,
+      biometryInts.fl,
+    );
+    if (result !== undefined) {
+      handleChange('efw', result.toString());
+    }
+  };
+
+  // ── Validation ────────────────────────────────────────────────────────────
+
+  const gaRegex = /^\d{1,2}w\s?\d{1}d$/;
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -168,11 +226,23 @@ export default function ExaminationForm({
       }
     }
 
-    if (formData.gestationalAge) {
-      const gestationalAgeRegex = /^\d{1,2}w\s?\d{1}d$/;
-      if (!gestationalAgeRegex.test(formData.gestationalAge)) {
-        newErrors.gestationalAge = 'Format must be "28w 3d" (weeks and days)';
+    // LMP cannot be in the future
+    if (formData.last_menstrual_period) {
+      const [ly, lm, ld] = formData.last_menstrual_period.split('-').map(Number);
+      const lmpDate = new Date(ly, lm - 1, ld);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (lmpDate > today) {
+        newErrors.last_menstrual_period = 'LMP cannot be in the future';
       }
+    }
+
+    if (formData.gestationalAge && !gaRegex.test(formData.gestationalAge)) {
+      newErrors.gestationalAge = 'Format must be "28w 3d"';
+    }
+
+    if (formData.gestationalAgeFromBiometry && !gaRegex.test(formData.gestationalAgeFromBiometry)) {
+      newErrors.gestationalAgeFromBiometry = 'Format must be "28w 3d"';
     }
 
     // Biometry validation (integers, > 0 if provided)
@@ -217,6 +287,8 @@ export default function ExaminationForm({
     return Object.keys(newErrors).length === 0;
   };
 
+  // ── Submit ────────────────────────────────────────────────────────────────
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
@@ -242,16 +314,13 @@ export default function ExaminationForm({
         vessel: formData.vessel.trim() || undefined,
       } : undefined;
 
-      // Build the nested `data` object — only include sub-objects that have at
-      // least one non-empty field so we don't send empty structures.
+      // Build the nested `data` object — ultrasound_date intentionally excluded
       const pregnancy_data = (
         formData.last_menstrual_period ||
-        formData.ultrasound_date ||
         formData.obstetric_history ||
         formData.family_history
       ) ? {
         last_menstrual_period: formData.last_menstrual_period || undefined,
-        ultrasound_date: formData.ultrasound_date || undefined,
         obstetric_history: formData.obstetric_history.trim() || undefined,
         family_history: formData.family_history.trim() || undefined,
       } : undefined;
@@ -297,6 +366,7 @@ export default function ExaminationForm({
         ...(isEdit ? {} : { patientId: formData.patientId }),
         examDate: formData.examDate,
         gestationalAge: formData.gestationalAge.trim() || undefined,
+        gestationalAgeFromBiometry: formData.gestationalAgeFromBiometry.trim() || undefined,
         status: formData.status,
         biometry,
         doppler,
@@ -324,10 +394,18 @@ export default function ExaminationForm({
     }
   };
 
-  // Grid layout helpers — plain CSS, no new imports needed
+  // ── Layout helpers ────────────────────────────────────────────────────────
   const row2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' };
   const row3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' };
   const rowAuto: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' };
+
+  // Inline style for a "Calc" button vertically aligned with an adjacent input.
+  // Carbon inputs have a label (~1.125rem + 0.5rem gap) above the input itself.
+  const calcButtonWrap: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'flex-end',
+  };
 
   return (
     <Form onSubmit={handleSubmit}>
@@ -374,8 +452,8 @@ export default function ExaminationForm({
           />
         )}
 
-        {/* ── Exam Date | Gestational Age | Status — one row ── */}
-        <div style={row3}>
+        {/* ── Exam Date | Status — two columns (GA moved into Pregnancy Data) ── */}
+        <div style={row2}>
           <DatePicker
             datePickerType="single"
             dateFormat="d/m/Y"
@@ -397,17 +475,6 @@ export default function ExaminationForm({
             />
           </DatePicker>
 
-          <TextInput
-            id="gestationalAge"
-            labelText="Gestational Age (optional)"
-            placeholder="e.g., 28w 3d"
-            value={formData.gestationalAge}
-            onChange={(e) => handleChange('gestationalAge', e.target.value)}
-            invalid={!!errors.gestationalAge}
-            invalidText={errors.gestationalAge}
-            disabled={isSubmitting}
-          />
-
           <Select
             id="status"
             labelText="Status"
@@ -427,40 +494,68 @@ export default function ExaminationForm({
           {/* ── Pregnancy Data ── */}
           <AccordionItem title="Pregnancy Data" open>
             <Stack gap={4}>
-              {/* LMP | Ultrasound Date */}
-              <div style={row2}>
-                <DatePicker
-                  datePickerType="single"
-                  dateFormat="d/m/Y"
-                  value={formData.last_menstrual_period ? toDisplayDate(formData.last_menstrual_period) : ''}
-                  onChange={(dates: Date[]) => {
-                    if (dates[0]) handleChange('last_menstrual_period', toISODate(dates[0]));
-                  }}
-                >
-                  <DatePickerInput
-                    id="last_menstrual_period"
-                    labelText="Last Menstrual Period (LMP)"
-                    placeholder="dd/mm/yyyy"
-                    disabled={isSubmitting}
-                  />
-                </DatePicker>
 
-                <DatePicker
-                  datePickerType="single"
-                  dateFormat="d/m/Y"
-                  value={formData.ultrasound_date ? toDisplayDate(formData.ultrasound_date) : ''}
-                  onChange={(dates: Date[]) => {
-                    if (dates[0]) handleChange('ultrasound_date', toISODate(dates[0]));
-                  }}
-                >
-                  <DatePickerInput
-                    id="ultrasound_date"
-                    labelText="Ultrasound Date"
-                    placeholder="dd/mm/yyyy"
+              {/* LMP | Calc | GA from LMP — single row */}
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'nowrap' }}>
+                <div style={{ flex: '0 0 auto', minWidth: '200px' }}>
+                  <DatePicker
+                    datePickerType="single"
+                    dateFormat="d/m/Y"
+                    value={formData.last_menstrual_period ? toDisplayDate(formData.last_menstrual_period) : ''}
+                    maxDate={todayDisplayDate()}
+                    onChange={(dates: Date[]) => {
+                      if (dates[0]) handleChange('last_menstrual_period', toISODate(dates[0]));
+                    }}
+                  >
+                    <DatePickerInput
+                      id="last_menstrual_period"
+                      labelText="Last Menstrual Period (LMP)"
+                      placeholder="dd/mm/yyyy"
+                      invalid={!!errors.last_menstrual_period}
+                      invalidText={errors.last_menstrual_period}
+                      disabled={isSubmitting}
+                    />
+                  </DatePicker>
+                </div>
+
+                <div style={calcButtonWrap}>
+                  <Button
+                    kind="tertiary"
+                    size="md"
+                    onClick={handleCalcGAFromLMP}
+                    disabled={!canCalcGAFromLMP || isSubmitting}
+                    title={canCalcGAFromLMP ? 'Calculate GA from LMP and Exam Date' : 'Enter LMP to enable calculation'}
+                  >
+                    Calc
+                  </Button>
+                </div>
+
+                <div style={{ flex: 1, minWidth: '180px' }}>
+                  <TextInput
+                    id="gestationalAge"
+                    labelText="Gestational Age from LMP"
+                    placeholder="e.g., 28w 3d"
+                    value={formData.gestationalAge}
+                    onChange={(e) => handleChange('gestationalAge', e.target.value)}
+                    invalid={!!errors.gestationalAge}
+                    invalidText={errors.gestationalAge}
                     disabled={isSubmitting}
                   />
-                </DatePicker>
+                </div>
               </div>
+
+              {/* EDD — read-only derived field, shown only when LMP is set */}
+              {edd && (
+                <div style={row2}>
+                  <TextInput
+                    id="edd"
+                    labelText="Expected Delivery Date (EDD)"
+                    value={edd}
+                    readOnly
+                    disabled
+                  />
+                </div>
+              )}
 
               {/* Obstetric History | Family History */}
               <div style={row2}>
@@ -584,7 +679,7 @@ export default function ExaminationForm({
                 <TextInput id="anat_kidneys" labelText="Kidneys" placeholder="e.g., normal" value={formData.anat_kidneys} onChange={(e) => handleChange('anat_kidneys', e.target.value)} disabled={isSubmitting} />
                 <TextInput id="anat_limbs"   labelText="Limbs"   placeholder="e.g., normal" value={formData.anat_limbs}   onChange={(e) => handleChange('anat_limbs',   e.target.value)} disabled={isSubmitting} />
               </div>
-              {/* Skeleton (half width, keeps left-alignment) */}
+              {/* Skeleton (half width) */}
               <div style={row2}>
                 <TextInput id="anat_skeleton" labelText="Skeleton" placeholder="e.g., normal" value={formData.anat_skeleton} onChange={(e) => handleChange('anat_skeleton', e.target.value)} disabled={isSubmitting} />
               </div>
@@ -593,64 +688,118 @@ export default function ExaminationForm({
 
         </Accordion>
 
-        {/* ── Biometry — all 5 on one auto-fit row ── */}
+        {/* ── Biometry ── */}
         <FormGroup legendText="Biometry (integers only, in mm/grams)">
-          <div style={rowAuto}>
-            <TextInput
-              id="bpd"
-              labelText="BPD (mm)"
-              placeholder="e.g., 85"
-              value={formData.bpd}
-              onChange={(e) => handleChange('bpd', e.target.value)}
-              invalid={!!errors.bpd}
-              invalidText={errors.bpd}
-              disabled={isSubmitting}
-            />
+          <Stack gap={4}>
 
-            <TextInput
-              id="hc"
-              labelText="HC (mm)"
-              placeholder="e.g., 310"
-              value={formData.hc}
-              onChange={(e) => handleChange('hc', e.target.value)}
-              invalid={!!errors.hc}
-              invalidText={errors.hc}
-              disabled={isSubmitting}
-            />
+            {/* BPD | HC | AC | FL — measurement inputs */}
+            <div style={rowAuto}>
+              <TextInput
+                id="bpd"
+                labelText="BPD (mm)"
+                placeholder="e.g., 85"
+                value={formData.bpd}
+                onChange={(e) => handleChange('bpd', e.target.value)}
+                invalid={!!errors.bpd}
+                invalidText={errors.bpd}
+                disabled={isSubmitting}
+              />
 
-            <TextInput
-              id="ac"
-              labelText="AC (mm)"
-              placeholder="e.g., 280"
-              value={formData.ac}
-              onChange={(e) => handleChange('ac', e.target.value)}
-              invalid={!!errors.ac}
-              invalidText={errors.ac}
-              disabled={isSubmitting}
-            />
+              <TextInput
+                id="hc"
+                labelText="HC (mm)"
+                placeholder="e.g., 310"
+                value={formData.hc}
+                onChange={(e) => handleChange('hc', e.target.value)}
+                invalid={!!errors.hc}
+                invalidText={errors.hc}
+                disabled={isSubmitting}
+              />
 
-            <TextInput
-              id="fl"
-              labelText="FL (mm)"
-              placeholder="e.g., 55"
-              value={formData.fl}
-              onChange={(e) => handleChange('fl', e.target.value)}
-              invalid={!!errors.fl}
-              invalidText={errors.fl}
-              disabled={isSubmitting}
-            />
+              <TextInput
+                id="ac"
+                labelText="AC (mm)"
+                placeholder="e.g., 280"
+                value={formData.ac}
+                onChange={(e) => handleChange('ac', e.target.value)}
+                invalid={!!errors.ac}
+                invalidText={errors.ac}
+                disabled={isSubmitting}
+              />
 
-            <TextInput
-              id="efw"
-              labelText="EFW (grams)"
-              placeholder="e.g., 1500"
-              value={formData.efw}
-              onChange={(e) => handleChange('efw', e.target.value)}
-              invalid={!!errors.efw}
-              invalidText={errors.efw}
-              disabled={isSubmitting}
-            />
-          </div>
+              <TextInput
+                id="fl"
+                labelText="FL (mm)"
+                placeholder="e.g., 55"
+                value={formData.fl}
+                onChange={(e) => handleChange('fl', e.target.value)}
+                invalid={!!errors.fl}
+                invalidText={errors.fl}
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {/* GA from Biometry row: Calc button | GA field */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '1rem', alignItems: 'end' }}>
+              <div style={calcButtonWrap}>
+                <Button
+                  kind="tertiary"
+                  size="md"
+                  onClick={handleCalcGAFromBiometry}
+                  disabled={!canCalcGAFromBiometry || isSubmitting}
+                  title={
+                    canCalcGAFromBiometry
+                      ? 'Calculate GA from BPD, HC, AC and FL'
+                      : 'All four measurements (BPD, HC, AC, FL) are required'
+                  }
+                >
+                  AutoCalc GA
+                </Button>
+              </div>
+
+              <TextInput
+                id="gestationalAgeFromBiometry"
+                labelText="GA from Biometry"
+                placeholder="e.g., 28w 3d"
+                value={formData.gestationalAgeFromBiometry}
+                onChange={(e) => handleChange('gestationalAgeFromBiometry', e.target.value)}
+                invalid={!!errors.gestationalAgeFromBiometry}
+                invalidText={errors.gestationalAgeFromBiometry}
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {/* EFW row: Calc button | EFW field */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '1rem', alignItems: 'end' }}>
+              <div style={calcButtonWrap}>
+                <Button
+                  kind="tertiary"
+                  size="md"
+                  onClick={handleCalcEFW}
+                  disabled={!canCalcEFW || isSubmitting}
+                  title={
+                    canCalcEFW
+                      ? 'Calculate EFW from BPD, HC, AC and FL (Hadlock formula)'
+                      : 'All four measurements (BPD, HC, AC, FL) are required'
+                  }
+                >
+                  AutoCalc EFW
+                </Button>
+              </div>
+
+              <TextInput
+                id="efw"
+                labelText="EFW (grams)"
+                placeholder="e.g., 1500"
+                value={formData.efw}
+                onChange={(e) => handleChange('efw', e.target.value)}
+                invalid={!!errors.efw}
+                invalidText={errors.efw}
+                disabled={isSubmitting}
+              />
+            </div>
+
+          </Stack>
         </FormGroup>
 
         {/* ── Doppler — PI | RI | Vessel on one row ── */}

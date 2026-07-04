@@ -58,7 +58,6 @@ export interface Doppler {
 
 export interface PregnancyData {
   last_menstrual_period?: string; // YYYY-MM-DD
-  ultrasound_date?: string;       // YYYY-MM-DD
   obstetric_history?: string;     // e.g. "G1P0"
   family_history?: string;
 }
@@ -95,12 +94,14 @@ export interface Examination {
   patientId: string;
   patientName: string; // denormalized
   examDate: string; // ISO 8601
-  gestationalAge?: string; // "28w 3d" format
+  gestationalAge?: string; // "Xw Yd" — GA from LMP
+  gestationalAgeFromBiometry?: string; // "Xw Yd" — GA derived from biometry measurements
   status: 'draft' | 'completed' | 'reviewed';
   biometry?: Biometry;
   doppler?: Doppler;
   notes?: string;
   findings?: string;
+  data?: ExaminationData;
   createdBy: string;
   createdByName?: string; // denormalized username
   createdAt: string;
@@ -112,6 +113,7 @@ export interface CreateExaminationRequest {
   patientId: string;
   examDate: string;
   gestationalAge?: string;
+  gestationalAgeFromBiometry?: string;
   status: 'draft' | 'completed' | 'reviewed';
   biometry?: Biometry;
   doppler?: Doppler;
@@ -123,6 +125,7 @@ export interface CreateExaminationRequest {
 export interface UpdateExaminationRequest {
   examDate: string;
   gestationalAge?: string;
+  gestationalAgeFromBiometry?: string;
   status: 'draft' | 'completed' | 'reviewed';
   biometry?: Biometry;
   doppler?: Doppler;
