@@ -71,6 +71,41 @@ export interface MRNLookup extends BaseEntity {
 }
 
 /**
+ * Clinical sub-data for pregnancy, ultrasound findings, and anatomy
+ */
+export interface PregnancyData {
+    last_menstrual_period?: string; // YYYY-MM-DD
+    obstetric_history?: string;     // e.g. "G1P0"
+    family_history?: string;
+}
+
+export interface UltrasoundFindings {
+    presentation?: string;   // e.g. "cephalic"
+    gender?: string;         // e.g. "female" | "male" | "unknown"
+    heart_rate?: number;     // integer, bpm
+    fetal_movement?: string; // e.g. "active"
+    placenta?: string;       // e.g. "anterior, grade 1"
+    umbilical_cord?: string; // e.g. "3 vessels"
+}
+
+export interface AnatomyFindings {
+    head?: string;
+    brain?: string;
+    heart?: string;
+    abdomen?: string;
+    kidneys?: string;
+    limbs?: string;
+    skeleton?: string;
+}
+
+export interface ExaminationData {
+    pregnancy_data?: PregnancyData;
+    ultrasound_findings?: UltrasoundFindings;
+    anatomy?: AnatomyFindings;
+    comments?: string;
+}
+
+/**
  * Biometry measurements for ultrasound examination
  */
 export interface BiometryData {
@@ -101,12 +136,14 @@ export interface Examination extends BaseEntity {
     patientId: string;
     patientName: string; // Denormalized for list views
     examDate: string; // ISO 8601 date string
-    gestationalAge?: string; // e.g., "28w 3d"
+    gestationalAge?: string; // e.g., "28w 3d" — GA from LMP
+    gestationalAgeFromBiometry?: string; // e.g., "28w 3d" — GA derived from biometry
     status: 'draft' | 'completed' | 'reviewed';
     biometry?: BiometryData;
     doppler?: DopplerData;
     notes?: string;
     findings?: string;
+    data?: ExaminationData; // nested clinical sub-data (serialized as JSON in Table Storage)
     createdAt: string;
     updatedAt: string;
     createdBy: string; // userId

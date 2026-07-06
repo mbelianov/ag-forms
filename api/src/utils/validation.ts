@@ -147,6 +147,57 @@ const dopplerSchema = Joi.object({
 }).optional();
 
 /**
+ * Pregnancy data sub-schema
+ */
+const pregnancyDataSchema = Joi.object({
+    last_menstrual_period: Joi.string()
+        .pattern(/^\d{4}-\d{2}-\d{2}$/)
+        .optional()
+        .allow('')
+        .messages({ 'string.pattern.base': 'LMP must be in YYYY-MM-DD format' }),
+    obstetric_history: Joi.string().max(500).optional().allow(''),
+    family_history: Joi.string().max(500).optional().allow('')
+}).optional();
+
+/**
+ * Ultrasound findings sub-schema
+ */
+const ultrasoundFindingsSchema = Joi.object({
+    presentation: Joi.string().max(100).optional().allow(''),
+    gender: Joi.string().valid('male', 'female', 'unknown').optional().allow(''),
+    heart_rate: Joi.number().integer().min(1).max(300).optional().messages({
+        'number.min': 'Heart rate must be a positive value',
+        'number.max': 'Heart rate value is out of valid range'
+    }),
+    fetal_movement: Joi.string().max(100).optional().allow(''),
+    placenta: Joi.string().max(500).optional().allow(''),
+    umbilical_cord: Joi.string().max(500).optional().allow('')
+}).optional();
+
+/**
+ * Anatomy sub-schema
+ */
+const anatomySchema = Joi.object({
+    head: Joi.string().max(500).optional().allow(''),
+    brain: Joi.string().max(500).optional().allow(''),
+    heart: Joi.string().max(500).optional().allow(''),
+    abdomen: Joi.string().max(500).optional().allow(''),
+    kidneys: Joi.string().max(500).optional().allow(''),
+    limbs: Joi.string().max(500).optional().allow(''),
+    skeleton: Joi.string().max(500).optional().allow('')
+}).optional();
+
+/**
+ * Examination clinical data sub-schema
+ */
+const examinationDataSchema = Joi.object({
+    pregnancy_data: pregnancyDataSchema,
+    ultrasound_findings: ultrasoundFindingsSchema,
+    anatomy: anatomySchema,
+    comments: Joi.string().max(5000).optional().allow('')
+}).optional();
+
+/**
  * Examination validation schema
  */
 const examinationSchema = Joi.object({
@@ -173,6 +224,13 @@ const examinationSchema = Joi.object({
         .messages({
             'string.pattern.base': 'Gestational age must be in format "28w 3d"'
         }),
+    gestationalAgeFromBiometry: Joi.string()
+        .pattern(/^\d{1,2}w\s?\d{1}d$/)
+        .optional()
+        .allow('')
+        .messages({
+            'string.pattern.base': 'Gestational age from biometry must be in format "28w 3d"'
+        }),
     status: Joi.string()
         .valid('draft', 'completed', 'reviewed')
         .required()
@@ -195,7 +253,8 @@ const examinationSchema = Joi.object({
         .allow('')
         .messages({
             'string.max': 'Findings must not exceed 5000 characters'
-        })
+        }),
+    data: examinationDataSchema
 });
 
 /**

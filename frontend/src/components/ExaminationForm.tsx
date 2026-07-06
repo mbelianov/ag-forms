@@ -21,7 +21,8 @@ import type {
   Patient,
   ExaminationData,
 } from '../types';
-import { calcGAFromLMP, calcGAFromBiometry, calcEFW, calcEDD } from '../utils/calculations';
+import { calcGAFromLMP, calcGAFromBiometry, calcEFW, calcEDD, calcBiometryPercentiles, calcEFWPercentile } from '../utils/calculations';
+import type { BiometryPercentiles } from '../utils/calculations';
 
 interface ExaminationFormProps {
   examination?: Examination;
@@ -111,6 +112,8 @@ export default function ExaminationForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [percentiles, setPercentiles] = useState<BiometryPercentiles | undefined>(undefined);
+  const [efwPercentile, setEfwPercentile] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     if (examination) {
@@ -189,6 +192,15 @@ export default function ExaminationForm({
     if (result) {
       handleChange('gestationalAgeFromBiometry', result);
     }
+    // Calculate percentiles using GA from LMP as the reference age
+    const pct = calcBiometryPercentiles(
+      biometryInts.bpd,
+      biometryInts.hc,
+      biometryInts.ac,
+      biometryInts.fl,
+      formData.gestationalAge,
+    );
+    setPercentiles(pct);
   };
 
   const handleCalcEFW = () => {
@@ -200,6 +212,8 @@ export default function ExaminationForm({
     );
     if (result !== undefined) {
       handleChange('efw', result.toString());
+      const pct = calcEFWPercentile(result, formData.gestationalAge);
+      setEfwPercentile(pct);
     }
   };
 
@@ -739,8 +753,34 @@ export default function ExaminationForm({
               />
             </div>
 
-            {/* GA from Biometry row: Calc button | GA field */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '1rem', alignItems: 'end' }}>
+            {/* Percentile display — shown after AutoCalc GA is pressed */}
+            {percentiles && (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '0.5rem',
+                padding: '0.5rem 0.75rem',
+                background: 'var(--cds-layer-01, #f4f4f4)',
+                borderRadius: '4px',
+                fontSize: '0.875rem',
+              }}>
+                {(
+                  [
+                    ['BPD', formData.bpd, percentiles.bpd],
+                    ['HC',  formData.hc,  percentiles.hc],
+                    ['AC',  formData.ac,  percentiles.ac],
+                    ['FL',  formData.fl,  percentiles.fl],
+                  ] as [string, string, number][]
+                ).map(([label, value, pct]) => (
+                  <span key={label}>
+                    <strong>{label}:</strong> {value}mm ({pct}th)
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* GA from Biometry row: Calc button | GA from Biometry field | GA from LMP (readonly) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: '1rem', alignItems: 'end' }}>
               <div style={calcButtonWrap}>
                 <Button
                   kind="tertiary"
@@ -767,10 +807,17 @@ export default function ExaminationForm({
                 invalidText={errors.gestationalAgeFromBiometry}
                 disabled={isSubmitting}
               />
+
+              <TextInput
+                id="gestationalAgeFromLMPReadonly"
+                labelText="GA from LMP"
+                value={formData.gestationalAge}
+                readOnly
+              />
             </div>
 
-            {/* EFW row: Calc button | EFW field */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '1rem', alignItems: 'end' }}>
+            {/* EFW row: Calc button | EFW field | EFW percentile (read-only) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: '1rem', alignItems: 'end' }}>
               <div style={calcButtonWrap}>
                 <Button
                   kind="tertiary"
@@ -792,10 +839,21 @@ export default function ExaminationForm({
                 labelText="EFW (grams)"
                 placeholder="e.g., 1500"
                 value={formData.efw}
-                onChange={(e) => handleChange('efw', e.target.value)}
+                onChange={(e) => {
+                  handleChange('efw', e.target.value);
+                  setEfwPercentile(undefined);
+                }}
                 invalid={!!errors.efw}
                 invalidText={errors.efw}
                 disabled={isSubmitting}
+              />
+
+              <TextInput
+                id="efwPercentile"
+                labelText="EFW Percentile"
+                value={efwPercentile !== undefined ? `${efwPercentile}th` : ''}
+                placeholder="—"
+                readOnly
               />
             </div>
 

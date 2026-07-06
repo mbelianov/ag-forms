@@ -31,7 +31,7 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
 
         const body = await request.json() as any;
         // Strip any client-supplied mrn — MRN is immutable once assigned
-        const { mrn: _discardedMrn, examDate, gestationalAge, biometry, doppler, findings, notes, status, etag } = body;
+        const { mrn: _discardedMrn, examDate, gestationalAge, gestationalAgeFromBiometry, biometry, doppler, findings, notes, status, data, etag } = body;
 
         // Require ETag for optimistic concurrency
         if (!etag) {
@@ -42,11 +42,13 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
         const updateData: any = {};
         if (examDate !== undefined) updateData.examDate = examDate;
         if (gestationalAge !== undefined) updateData.gestationalAge = gestationalAge;
+        if (gestationalAgeFromBiometry !== undefined) updateData.gestationalAgeFromBiometry = gestationalAgeFromBiometry;
         if (biometry !== undefined) updateData.biometry = biometry;
         if (doppler !== undefined) updateData.doppler = doppler;
         if (findings !== undefined) updateData.findings = findings;
         if (notes !== undefined) updateData.notes = notes;
         if (status !== undefined) updateData.status = status;
+        if (data !== undefined) updateData.data = data;
 
         // Add required fields for validation
         const existingExam = await getEntity<Examination>(
@@ -69,10 +71,12 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             examDate: examDate || existingExam.examDate,
             status: status || existingExam.status,
             gestationalAge: gestationalAge !== undefined ? gestationalAge : existingExam.gestationalAge,
+            gestationalAgeFromBiometry: gestationalAgeFromBiometry !== undefined ? gestationalAgeFromBiometry : existingExam.gestationalAgeFromBiometry,
             biometry: biometry !== undefined ? biometry : existingExam.biometry,
             doppler: doppler !== undefined ? doppler : existingExam.doppler,
             findings: findings !== undefined ? findings : existingExam.findings,
-            notes: notes !== undefined ? notes : existingExam.notes
+            notes: notes !== undefined ? notes : existingExam.notes,
+            data: data !== undefined ? data : undefined
         };
 
         const validation = validateExamination(validationData);
@@ -99,6 +103,10 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             updatedLookupEntity.gestationalAge = gestationalAge;
             changedFields.push('gestationalAge');
         }
+        if (gestationalAgeFromBiometry !== undefined && gestationalAgeFromBiometry !== existingExam.gestationalAgeFromBiometry) {
+            updatedLookupEntity.gestationalAgeFromBiometry = gestationalAgeFromBiometry;
+            changedFields.push('gestationalAgeFromBiometry');
+        }
         if (biometry !== undefined) {
             // Serialize to JSON string for Azure Table Storage
             updatedLookupEntity.biometry = (typeof biometry === 'string' ? biometry : JSON.stringify(biometry)) as any;
@@ -120,6 +128,11 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
         if (status !== undefined && status !== existingExam.status) {
             updatedLookupEntity.status = status;
             changedFields.push('status');
+        }
+        if (data !== undefined) {
+            // Serialize to JSON string for Azure Table Storage
+            updatedLookupEntity.data = (typeof data === 'string' ? data : JSON.stringify(data)) as any;
+            changedFields.push('data');
         }
 
         updatedLookupEntity.updatedAt = now;
@@ -146,11 +159,13 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
                 ...primaryEntity,
                 examDate: updatedLookupEntity.examDate,
                 gestationalAge: updatedLookupEntity.gestationalAge,
+                gestationalAgeFromBiometry: updatedLookupEntity.gestationalAgeFromBiometry,
                 biometry: updatedLookupEntity.biometry,
                 doppler: updatedLookupEntity.doppler,
                 findings: updatedLookupEntity.findings,
                 notes: updatedLookupEntity.notes,
                 status: updatedLookupEntity.status,
+                data: updatedLookupEntity.data,
                 updatedAt: now,
                 updatedBy: user.userId
             };

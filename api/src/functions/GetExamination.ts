@@ -39,7 +39,7 @@ export async function getExamination(request: HttpRequest, context: InvocationCo
 
         context.log('Examination retrieved:', { examinationId });
 
-        // Deserialize biometry/doppler from JSON strings back to objects
+        // Deserialize biometry/doppler/data from JSON strings back to objects
         const deserializedExamination = {
             ...examination,
             biometry: examination.biometry && typeof examination.biometry === 'string'
@@ -47,7 +47,10 @@ export async function getExamination(request: HttpRequest, context: InvocationCo
                 : examination.biometry,
             doppler: examination.doppler && typeof examination.doppler === 'string'
                 ? JSON.parse(examination.doppler as any)
-                : examination.doppler
+                : examination.doppler,
+            data: examination.data && typeof examination.data === 'string'
+                ? JSON.parse(examination.data as any)
+                : examination.data,
         };
 
         return successResponse({

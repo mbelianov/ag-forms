@@ -25,17 +25,19 @@ export async function createExamination(request: HttpRequest, context: Invocatio
         }
 
         const body = await request.json() as any;
-        const { patientId, examDate, gestationalAge, biometry, doppler, findings, notes, status } = body;
+        const { patientId, examDate, gestationalAge, gestationalAgeFromBiometry, biometry, doppler, findings, notes, status, data } = body;
 
-        const validation = validateExamination({ 
-            patientId, 
-            examDate, 
-            gestationalAge, 
-            biometry, 
-            doppler, 
-            findings, 
-            notes, 
-            status 
+        const validation = validateExamination({
+            patientId,
+            examDate,
+            gestationalAge,
+            gestationalAgeFromBiometry,
+            biometry,
+            doppler,
+            findings,
+            notes,
+            status,
+            data
         });
         if (!validation.valid) {
             return errorResponse(validation.errors.join(', '), 400);
@@ -68,6 +70,7 @@ export async function createExamination(request: HttpRequest, context: Invocatio
         // Serialize nested objects to JSON strings for Azure Table Storage
         const biometryStr = biometry ? JSON.stringify(biometry) : undefined;
         const dopplerStr = doppler ? JSON.stringify(doppler) : undefined;
+        const dataStr = data ? JSON.stringify(data) : undefined;
 
         // Create primary examination entity (for patient's exam list)
         const primaryExamEntity: Examination & { updatedBy: string } = {
@@ -79,11 +82,13 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             patientName: patient.name, // Denormalized for list views
             examDate,
             gestationalAge: gestationalAge || undefined,
+            gestationalAgeFromBiometry: gestationalAgeFromBiometry || undefined,
             status,
             biometry: biometryStr as any,
             doppler: dopplerStr as any,
             findings: findings || undefined,
             notes: notes || undefined,
+            data: dataStr as any,
             createdAt: now,
             updatedAt: now,
             createdBy: user.userId,
@@ -102,11 +107,13 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             patientName: patient.name,
             examDate,
             gestationalAge: gestationalAge || undefined,
+            gestationalAgeFromBiometry: gestationalAgeFromBiometry || undefined,
             status,
             biometry: biometryStr as any,
             doppler: dopplerStr as any,
             findings: findings || undefined,
             notes: notes || undefined,
+            data: dataStr as any,
             createdAt: now,
             updatedAt: now,
             createdBy: user.userId,
