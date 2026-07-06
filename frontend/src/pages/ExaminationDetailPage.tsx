@@ -13,6 +13,7 @@ import PageLoader from '../components/PageLoader';
 import ErrorMessage from '../components/ErrorMessage';
 import { getStatusTag } from '../utils/statusHelpers';
 import { calcEDD, calcBiometryPercentiles, calcEFWPercentile } from '../utils/calculations';
+import PrintButton from '../components/reports/PrintButton';
 import type { Examination } from '../types';
 
 export default function ExaminationDetailPage() {
@@ -161,6 +162,7 @@ export default function ExaminationDetailPage() {
             >
               Back to Patient Details
             </Button>
+            <PrintButton examination={examination} />
             <Button
               kind="primary"
               renderIcon={Edit}
@@ -563,6 +565,7 @@ export default function ExaminationDetailPage() {
           >
             Back to Patient Details
           </Button>
+          <PrintButton examination={examination} />
           <Button
             kind="primary"
             renderIcon={Edit}

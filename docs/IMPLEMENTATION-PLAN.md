@@ -269,21 +269,21 @@
 
 ## Phase 5 — PDF & Email Delivery (P0–P1)
 
-### TASK-020 · Implement client-side PDF generation
+### ~~TASK-020~~ ✅ Implement client-side PDF generation
 
-- **Files to create:**
-  - `frontend/src/utils/calculations.ts` *(done in TASK-007)*
-  - `frontend/src/components/reports/pdfDocument.tsx` — defines the A4 document layout using a maintained PDF library (e.g., `@react-pdf/renderer` or `jsPDF`)
-  - `frontend/src/components/reports/PDFPreview.tsx` — renders an inline PDF preview panel
-  - `frontend/src/components/reports/PrintButton.tsx` — triggers browser print or PDF download
-  - `frontend/src/services/print.service.ts` — orchestrates fetch → map → generate → download/print
-- **Files to modify:**
-  - `frontend/src/pages/ExaminationDetailPage.tsx` — add "Download PDF" and "Print" buttons in the action bar
-- **Behaviour:**
-  1. Fetch the full examination record via authenticated API
-  2. Map examination data into a print-ready A4 view model
-  3. Generate PDF client-side (no server call for PDF rendering)
-  4. Offer "Download PDF" (saves file) and "Print" (opens browser print dialog)
+- **Files created:**
+  - `frontend/src/components/reports/pdfDocument.ts` — A4 document layout using `jsPDF` with NotoSans (Latin + Cyrillic, Identity-H encoding) via VFS font registration
+  - `frontend/src/components/reports/PrintButton.tsx` — Carbon ghost buttons for Download PDF and Print with async loading state
+  - `frontend/src/services/print.service.ts` — `buildViewModel()`, `downloadPdf()`, `printExamination()` orchestration
+  - `frontend/public/fonts/NotoSans-Regular.ttf`, `NotoSans-Bold.ttf` — Unicode font assets served as static files
+- **Files modified:**
+  - `frontend/src/pages/ExaminationDetailPage.tsx` — `<PrintButton>` added to both top and bottom action bars
+- **Behaviour implemented:**
+  1. Examination data taken from already-loaded page state — no extra API call
+  2. Client-side biometric calculations (GA, EDD, percentiles) reused from `calculations.ts` (TASK-007)
+  3. Single A4 page view model covering: Patient Information, Examination Date, Biometry Measurements (with percentiles), Doppler Measurements, Pregnancy Data, Ultrasound Findings, Anatomy, Clinical Information, Doctor Signature block
+  4. PDF generated entirely client-side via `jsPDF` with `addFileToVFS` + `Identity-H` for full Cyrillic support
+  5. "Download PDF" saves file; "Print" opens browser print dialog via `autoPrint()` + Blob URL
 - **Spec ref:** `docs/04-api-specification.md` § Client-Side PDF Generation; `docs/01-architecture-overview.md` § Processing Model (Client-Side Rendering Workflows); `docs/README.md` § Phase 5
 - **Priority:** P0
 
@@ -436,7 +436,7 @@
 | Examination `patient_id` query param name | `docs/04-api-specification.md` § GET /examinations | API expects `patient_id`, service sends `patientId` | **Partial** | Query param name mismatch. → TASK-017 |
 | Patient list — MRN, Exam Count, Last Exam Date | `docs/TEST-CASES.md` TC-PAT-016 | Patients table must show MRN, Exam Count, Last Exam Date | **Missing** | Table shows Name, Age, Phone, Created Date only. → TASK-018 |
 | Session Expired notification | `docs/TEST-CASES.md` TC-SESS-003 | Redirect with "Session expired" message on 401 | **Missing** | Silent redirect only. → TASK-019 |
-| PDF generation (client-side) | `docs/04-api-specification.md` § Client-Side PDF Generation | A4 PDF generated in browser; download and print | **Missing** | Zero implementation. → TASK-020 |
+| PDF generation (client-side) | `docs/04-api-specification.md` § Client-Side PDF Generation | A4 PDF generated in browser; download and print | ✅ **Fixed** | jsPDF + NotoSans (Cyrillic), all 8 sections + signature. → TASK-020 |
 | Email report delivery | `docs/04-api-specification.md` § POST /examinations/:id/email-report | Send PDF to patient email from examination detail | **Missing** | No component, no service, no route. → TASK-021 |
 | User management pages (Admin) | `docs/04-api-specification.md` § User Management Endpoints | List, Create, Edit users — admin only | **Missing** | No pages, no service, no routes. → TASK-022 |
 | Audit log viewer (Admin) | `docs/04-api-specification.md` § Audit Log Endpoints | Filterable audit log table — admin only | **Missing** | No page, no service, no route. → TASK-023 |
@@ -460,7 +460,7 @@
 | `PatientDetail` sub-component | `docs/01-architecture-overview.md` § components/patients/ | Reusable detail component | **Missing** | Inlined in `PatientDetailPage.tsx`. → TASK-029 |
 | `ExaminationDetail` sub-component | `docs/01-architecture-overview.md` § components/examinations/ | Reusable detail component | **Missing** | Inlined in `ExaminationDetailPage.tsx`. → TASK-029 |
 | `ExaminationList` sub-component | `docs/01-architecture-overview.md` § components/examinations/ | Reusable list component | **Missing** | Inlined in `ExaminationsPage.tsx`. → TASK-029 |
-| `print.service.ts` | `docs/01-architecture-overview.md` § services/ | PDF generation and print workflow service | **Missing** | No file. → TASK-020 |
+| `print.service.ts` | `docs/01-architecture-overview.md` § services/ | PDF generation and print workflow service | ✅ **Fixed** | Implemented. → TASK-020 |
 | `report-delivery.service.ts` | `docs/01-architecture-overview.md` § services/ | Email delivery service | **Missing** | No file. → TASK-021 |
 
 ---
