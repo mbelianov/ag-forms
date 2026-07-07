@@ -14,6 +14,11 @@ import ExaminationsPage from './pages/ExaminationsPage';
 import CreateExaminationPage from './pages/CreateExaminationPage';
 import ExaminationDetailPage from './pages/ExaminationDetailPage';
 import EditExaminationPage from './pages/EditExaminationPage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
+import UsersPage from './pages/UsersPage';
+import CreateUserPage from './pages/CreateUserPage';
+import EditUserPage from './pages/EditUserPage';
+import AuditLogPage from './pages/AuditLogPage';
 
 function App() {
   return (
@@ -104,6 +109,49 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <EditExaminationPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* TASK-008: Change Password */}
+        <Route
+          path="/change-password"
+          element={
+            <ProtectedRoute>
+              <ChangePasswordPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* TASK-022: User management — admin only */}
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <UsersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/users/new"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <CreateUserPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/users/:id/edit"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <EditUserPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* TASK-023: Audit log — admin only */}
+        <Route
+          path="/audit-logs"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AuditLogPage />
             </ProtectedRoute>
           }
         />

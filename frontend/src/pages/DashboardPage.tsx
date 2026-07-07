@@ -34,7 +34,7 @@ export default function DashboardPage() {
           examinationService.getExaminations(),
         ]);
         setPatients(patientRes.patients);
-        setExaminations(examRes);
+        setExaminations(examRes.examinations);
       } catch (err: any) {
         console.error('[Dashboard] Failed to load data:', err);
         setError('Dashboard data could not be loaded. Statistics may be unavailable.');

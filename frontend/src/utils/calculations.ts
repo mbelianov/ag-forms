@@ -230,3 +230,115 @@ export function calcEFWPercentile(
   return Math.max(1, Math.min(99, Math.round(normalCDF(z) * 100)));
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-037: Patient age at reference date
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Calculate whole-years age of a patient on a given reference date.
+ *
+ * @param birthDate     - Patient birth date as YYYY-MM-DD string
+ * @param referenceDate - Reference date as YYYY-MM-DD string (e.g. exam date)
+ * @returns Whole years of age, or undefined if inputs are invalid / missing
+ */
+export function calculateAgeAtDate(birthDate: string, referenceDate: string): number | undefined {
+  if (!birthDate || !referenceDate) return undefined;
+  const [by, bm, bd] = birthDate.split('-').map(Number);
+  const [ry, rm, rd] = referenceDate.split('-').map(Number);
+  if (!by || !bm || !bd || !ry || !rm || !rd) return undefined;
+
+  let age = ry - by;
+  // Subtract 1 if birthday hasn't occurred yet in the reference year
+  if (rm < bm || (rm === bm && rd < bd)) {
+    age -= 1;
+  }
+  return age >= 0 ? age : undefined;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-034: Extended biometry percentile lookups
+// Reference: Hadlock 1984 / WHO 2017 norms
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Calculate a single biometry percentile for an extended parameter given a
+ * measured value (mm) and gestational age from LMP.
+ *
+ * Uses a Gaussian model: percentile = Φ((measured_cm − mean_cm) / sd_cm)
+ *
+ * @param value_mm  - Measured value in millimetres
+ * @param gaFromLMP - Gestational age string from LMP e.g. "28w 3d"
+ * @param getMeanSd - Function returning { mean, sd } in cm for a given GA week
+ * @returns Percentile [1–99], or undefined if inputs are missing / invalid
+ */
+function calcExtendedPercentile(
+  value_mm: number | undefined,
+  gaFromLMP: string,
+  getMeanSd: (ga: number) => { mean: number; sd: number },
+): number | undefined {
+  if (!value_mm || value_mm <= 0) return undefined;
+  const ga = parseGAWeeks(gaFromLMP);
+  if (ga === undefined) return undefined;
+
+  const { mean, sd } = getMeanSd(ga);
+  const z = (value_mm / 10 - mean) / sd;
+  return Math.max(1, Math.min(99, Math.round(normalCDF(z) * 100)));
+}
+
+/**
+ * OFD (Occipito-frontal Diameter) percentile — Hadlock 1984 reference
+ * mean(cm) ≈ −4.17 + 0.482·ga − 0.00335·ga²   SD ≈ 0.32
+ */
+export function calcOFDPercentile(ofd_mm: number | undefined, gaFromLMP: string): number | undefined {
+  return calcExtendedPercentile(ofd_mm, gaFromLMP, (ga) => ({
+    mean: -4.17 + 0.482 * ga - 0.00335 * ga * ga,
+    sd: 0.32,
+  }));
+}
+
+/**
+ * TCD (Transcerebellar Diameter) percentile — Goldstein 1987 reference
+ * For GA 14–40, TCD_mm ≈ GA_weeks (clinically approximate; SD ≈ 2 mm → 0.20 cm)
+ */
+export function calcTCDPercentile(tcd_mm: number | undefined, gaFromLMP: string): number | undefined {
+  return calcExtendedPercentile(tcd_mm, gaFromLMP, (ga) => ({
+    // Mean TCD in cm ≈ GA/10 (Goldstein 1987 approximation)
+    mean: ga / 10,
+    sd: 0.20,
+  }));
+}
+
+/**
+ * Nuchal Fold (NF) percentile — Benacerraf 1987 reference
+ * Clinically relevant at 15–22 weeks. Mean_cm ≈ 0.2 + 0.012·ga, SD ≈ 0.15
+ */
+export function calcNuchalFoldPercentile(nf_mm: number | undefined, gaFromLMP: string): number | undefined {
+  return calcExtendedPercentile(nf_mm, gaFromLMP, (ga) => ({
+    mean: 0.2 + 0.012 * ga,
+    sd: 0.15,
+  }));
+}
+
+/**
+ * APAD (Antero-Posterior Abdominal Diameter) percentile
+ * Mean_cm ≈ −1.13 + 0.172·ga − 0.000954·ga²   SD ≈ 0.22
+ */
+export function calcAPADPercentile(apad_mm: number | undefined, gaFromLMP: string): number | undefined {
+  return calcExtendedPercentile(apad_mm, gaFromLMP, (ga) => ({
+    mean: -1.13 + 0.172 * ga - 0.000954 * ga * ga,
+    sd: 0.22,
+  }));
+}
+
+/**
+ * TAD (Transverse Abdominal Diameter) percentile
+ * Mean_cm ≈ −1.28 + 0.175·ga − 0.000998·ga²   SD ≈ 0.23
+ */
+export function calcTADPercentile(tad_mm: number | undefined, gaFromLMP: string): number | undefined {
+  return calcExtendedPercentile(tad_mm, gaFromLMP, (ga) => ({
+    mean: -1.28 + 0.175 * ga - 0.000998 * ga * ga,
+    sd: 0.23,
+  }));
+}
+

@@ -54,6 +54,7 @@ const userSchema = Joi.object({
 
 /**
  * Patient validation schema
+ * TASK-038: birthDate (YYYY-MM-DD) replaces required age; age kept as optional for legacy records.
  */
 const patientSchema = Joi.object({
     name: Joi.string()
@@ -65,15 +66,21 @@ const patientSchema = Joi.object({
             'string.max': 'Name must not exceed 255 characters',
             'any.required': 'Name is required'
         }),
+    birthDate: Joi.string()
+        .pattern(/^\d{4}-\d{2}-\d{2}$/)
+        .optional()
+        .allow('')
+        .messages({
+            'string.pattern.base': 'Birth date must be in YYYY-MM-DD format'
+        }),
     age: Joi.number()
         .integer()
         .min(2)
         .max(99)
-        .required()
+        .optional()
         .messages({
             'number.min': 'Age must be between 2 and 99 years',
-            'number.max': 'Age must be between 2 and 99 years',
-            'any.required': 'Age is required'
+            'number.max': 'Age must be between 2 and 99 years'
         }),
     phone: Joi.string()
         .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$/)
@@ -100,6 +107,7 @@ const patientSchema = Joi.object({
 
 /**
  * Biometry data validation schema
+ * TASK-034/035: Extended biometry parameters added.
  */
 const biometrySchema = Joi.object({
     bpd: Joi.number().integer().min(0).max(200).optional().messages({
@@ -126,11 +134,24 @@ const biometrySchema = Joi.object({
         'number.base': 'EFW must be an integer',
         'number.min': 'EFW must be a positive value',
         'number.max': 'EFW value is out of valid range'
-    })
+    }),
+    // TASK-034: Extended biometry
+    ofd: Joi.number().integer().min(0).max(200).optional().messages({ 'number.base': 'OFD must be an integer' }),
+    vp:  Joi.number().integer().min(0).max(100).optional().messages({ 'number.base': 'Vp must be an integer' }),
+    tcd: Joi.number().integer().min(0).max(100).optional().messages({ 'number.base': 'TCD must be an integer' }),
+    cm:  Joi.number().integer().min(0).max(50).optional().messages({ 'number.base': 'CM must be an integer' }),
+    nuchalFold: Joi.number().integer().min(0).max(30).optional().messages({ 'number.base': 'Nuchal Fold must be an integer' }),
+    nb:  Joi.number().integer().min(0).max(30).optional().messages({ 'number.base': 'NB must be an integer' }),
+    apad: Joi.number().integer().min(0).max(200).optional().messages({ 'number.base': 'APAD must be an integer' }),
+    tad:  Joi.number().integer().min(0).max(200).optional().messages({ 'number.base': 'TAD must be an integer' }),
+    // TASK-035: LA and LC
+    la: Joi.number().integer().min(0).max(100).optional().messages({ 'number.base': 'LA must be an integer' }),
+    lc: Joi.number().integer().min(0).max(100).optional().messages({ 'number.base': 'LC must be an integer' })
 }).optional();
 
 /**
  * Doppler data validation schema
+ * TASK-036: Extended vascular parameters added.
  */
 const dopplerSchema = Joi.object({
     pi: Joi.number().min(0).max(10).optional().messages({
@@ -141,9 +162,18 @@ const dopplerSchema = Joi.object({
         'number.min': 'RI must be a positive value',
         'number.max': 'RI must be between 0 and 1'
     }),
-    vessel: Joi.string().max(100).optional().messages({
+    vessel: Joi.string().max(100).optional().allow('').messages({
         'string.max': 'Vessel name must not exceed 100 characters'
-    })
+    }),
+    // TASK-036: Extended vascular parameters
+    utADexPI: Joi.number().min(0).max(10).optional(),
+    utADexRI: Joi.number().min(0).max(1).optional(),
+    utASinPI: Joi.number().min(0).max(10).optional(),
+    utASinRI: Joi.number().min(0).max(1).optional(),
+    cma:      Joi.number().min(0).max(10).optional(),
+    psv:      Joi.number().min(0).max(200).optional(),
+    cpr:      Joi.number().min(0).max(10).optional(),
+    ducVen:   Joi.string().max(200).optional().allow('')
 }).optional();
 
 /**
@@ -176,6 +206,7 @@ const ultrasoundFindingsSchema = Joi.object({
 
 /**
  * Anatomy sub-schema
+ * TASK-036: Extended anatomy fields added.
  */
 const anatomySchema = Joi.object({
     head: Joi.string().max(500).optional().allow(''),
@@ -184,7 +215,12 @@ const anatomySchema = Joi.object({
     abdomen: Joi.string().max(500).optional().allow(''),
     kidneys: Joi.string().max(500).optional().allow(''),
     limbs: Joi.string().max(500).optional().allow(''),
-    skeleton: Joi.string().max(500).optional().allow('')
+    skeleton: Joi.string().max(500).optional().allow(''),
+    // TASK-036: Extended anatomy fields
+    face:     Joi.string().max(500).optional().allow(''),
+    neckSkin: Joi.string().max(500).optional().allow(''),
+    spine:    Joi.string().max(500).optional().allow(''),
+    thorax:   Joi.string().max(500).optional().allow('')
 }).optional();
 
 /**
@@ -199,6 +235,8 @@ const examinationDataSchema = Joi.object({
 
 /**
  * Examination validation schema
+ * TASK-033: examinationType added.
+ * TASK-037: patientAgeAtExam added.
  */
 const examinationSchema = Joi.object({
     mrn: Joi.forbidden()
@@ -238,6 +276,7 @@ const examinationSchema = Joi.object({
             'any.only': 'Status must be one of: draft, completed, reviewed',
             'any.required': 'Status is required'
         }),
+    examinationType: Joi.string().max(100).optional().allow(''), // TASK-033
     biometry: biometrySchema,
     doppler: dopplerSchema,
     notes: Joi.string()
@@ -254,7 +293,8 @@ const examinationSchema = Joi.object({
         .messages({
             'string.max': 'Findings must not exceed 5000 characters'
         }),
-    data: examinationDataSchema
+    data: examinationDataSchema,
+    patientAgeAtExam: Joi.number().integer().min(2).max(99).optional() // TASK-037
 });
 
 /**

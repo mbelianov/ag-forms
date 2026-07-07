@@ -5,24 +5,29 @@ export interface User {
   full_name: string;
   email: string;
   role: 'admin' | 'doctor' | 'viewer';
+  last_login?: string; // TASK-015: ISO date string of last login
 }
 
 // Patient types
 export interface Patient {
   patientId: string;
   name: string;
-  age: number;
+  age?: number;        // legacy — still returned for old records
+  birthDate?: string;  // TASK-038: YYYY-MM-DD — replaces age
   phone: string;
   email?: string;
   address?: string;
+  mrn?: string;        // TASK-018: MRN may be returned for display
   createdAt: string;
+  updatedAt?: string;  // TASK-016
   isDeleted: boolean;
   etag?: string;
 }
 
 export interface CreatePatientRequest {
   name: string;
-  age: number;
+  age?: number;        // legacy — still accepted until TASK-038 fully deployed
+  birthDate?: string;  // TASK-038: YYYY-MM-DD
   phone: string;
   email?: string;
   address?: string;
@@ -30,7 +35,8 @@ export interface CreatePatientRequest {
 
 export interface UpdatePatientRequest {
   name: string;
-  age: number;
+  age?: number;        // legacy
+  birthDate?: string;  // TASK-038
   phone: string;
   email?: string;
   address?: string;
@@ -43,17 +49,39 @@ export interface PatientsListResponse {
 
 // Examination types
 export interface Biometry {
+  // Core (original)
   bpd?: number; // integer, mm
-  hc?: number; // integer, mm
-  ac?: number; // integer, mm
-  fl?: number; // integer, mm
+  hc?: number;  // integer, mm
+  ac?: number;  // integer, mm
+  fl?: number;  // integer, mm
   efw?: number; // integer, grams
+  // TASK-034: Extended biometry parameters
+  ofd?: number;         // Occipito-frontal Diameter, mm
+  vp?: number;          // Vermis, mm
+  tcd?: number;         // Transcerebellar Diameter, mm
+  cm?: number;          // Cisterna Magna, mm
+  nuchalFold?: number;  // Nuchal Fold, mm
+  nb?: number;          // Nasal Bone, mm
+  apad?: number;        // Antero-Posterior Abdominal Diameter, mm
+  tad?: number;         // Transverse Abdominal Diameter, mm
+  // TASK-035: LA and LC
+  la?: number;          // Left Atrium, mm
+  lc?: number;          // Left Cardiac, mm
 }
 
 export interface Doppler {
-  pi?: number; // float
-  ri?: number; // float
+  pi?: number;    // float
+  ri?: number;    // float
   vessel?: string;
+  // TASK-036: Extended vascular parameters
+  utADexPI?: number;  // A.ut. Dex PI
+  utADexRI?: number;  // A.ut. Dex RI
+  utASinPI?: number;  // A.ut. Sin PI
+  utASinRI?: number;  // A.ut. Sin RI
+  cma?: number;       // CMA
+  psv?: number;       // PSV
+  cpr?: number;       // CPR
+  ducVen?: string;    // Duc.Ven (free-text)
 }
 
 export interface PregnancyData {
@@ -79,6 +107,11 @@ export interface AnatomyFindings {
   kidneys?: string;
   limbs?: string;
   skeleton?: string;
+  // TASK-036: Extended anatomy fields
+  face?: string;
+  neckSkin?: string;
+  spine?: string;
+  thorax?: string;
 }
 
 export interface ExaminationData {
@@ -97,14 +130,17 @@ export interface Examination {
   gestationalAge?: string; // "Xw Yd" — GA from LMP
   gestationalAgeFromBiometry?: string; // "Xw Yd" — GA derived from biometry measurements
   status: 'draft' | 'completed' | 'reviewed';
+  examinationType?: string; // TASK-033: e.g. "ultrasound_prenatal"
   biometry?: Biometry;
   doppler?: Doppler;
   notes?: string;
   findings?: string;
   data?: ExaminationData;
+  patientAgeAtExam?: number; // TASK-037: patient age (whole years) at exam date
   createdBy: string;
   createdByName?: string; // denormalized username
   createdAt: string;
+  updatedAt?: string;  // TASK-016
   isDeleted: boolean;
   etag?: string;
 }
@@ -115,11 +151,13 @@ export interface CreateExaminationRequest {
   gestationalAge?: string;
   gestationalAgeFromBiometry?: string;
   status: 'draft' | 'completed' | 'reviewed';
+  examinationType?: string; // TASK-033
   biometry?: Biometry;
   doppler?: Doppler;
   notes?: string;
   findings?: string;
   data?: ExaminationData;
+  patientAgeAtExam?: number; // TASK-037
 }
 
 export interface UpdateExaminationRequest {
@@ -127,6 +165,7 @@ export interface UpdateExaminationRequest {
   gestationalAge?: string;
   gestationalAgeFromBiometry?: string;
   status: 'draft' | 'completed' | 'reviewed';
+  examinationType?: string; // TASK-033
   biometry?: Biometry;
   doppler?: Doppler;
   notes?: string;
@@ -136,6 +175,7 @@ export interface UpdateExaminationRequest {
 
 export interface ExaminationsListResponse {
   examinations: Examination[];
+  continuationToken?: string;
 }
 
 // API Response types

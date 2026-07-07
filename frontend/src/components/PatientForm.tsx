@@ -3,10 +3,11 @@ import {
   Form,
   Stack,
   TextInput,
-  NumberInput,
   TextArea,
   Button,
   InlineNotification,
+  DatePicker,
+  DatePickerInput,
 } from '@carbon/react';
 import type { Patient, CreatePatientRequest, UpdatePatientRequest } from '../types';
 
@@ -17,10 +18,24 @@ interface PatientFormProps {
   isEdit?: boolean;
 }
 
+// Helper: YYYY-MM-DD → dd/mm/yyyy for DatePicker display
+function toDisplayDate(iso: string): string {
+  const [yyyy, mm, dd] = iso.split('-');
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+// Helper: Date → YYYY-MM-DD
+function toISODate(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function PatientForm({ patient, onSubmit, onCancel, isEdit = false }: PatientFormProps) {
   const [formData, setFormData] = useState({
     name: patient?.name || '',
-    age: patient?.age || 2,
+    birthDate: patient?.birthDate || '',
     phone: patient?.phone || '',
     email: patient?.email || '',
     address: patient?.address || '',
@@ -34,7 +49,7 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
     if (patient) {
       setFormData({
         name: patient.name,
-        age: patient.age,
+        birthDate: patient.birthDate || '',
         phone: patient.phone,
         email: patient.email || '',
         address: patient.address || '',
@@ -45,24 +60,36 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    // Name validation
     if (!formData.name.trim()) {
       newErrors.name = 'Name is required';
     }
 
-    // Age validation (2-99 years per AGENTS.md)
-    if (formData.age < 2 || formData.age > 99) {
-      newErrors.age = 'Age must be between 2 and 99 years';
+    // Birth date validation — must be in the past, patient must be 2–99 years old
+    if (!formData.birthDate) {
+      newErrors.birthDate = 'Date of birth is required';
+    } else {
+      const [by, bm, bd] = formData.birthDate.split('-').map(Number);
+      const today = new Date();
+      const birthDateObj = new Date(by, bm - 1, bd);
+      if (birthDateObj >= today) {
+        newErrors.birthDate = 'Date of birth must be in the past';
+      } else {
+        let age = today.getFullYear() - by;
+        if (today.getMonth() + 1 < bm || (today.getMonth() + 1 === bm && today.getDate() < bd)) {
+          age -= 1;
+        }
+        if (age < 2 || age > 99) {
+          newErrors.birthDate = 'Patient must be between 2 and 99 years old';
+        }
+      }
     }
 
-    // Phone validation — required + format matching backend Joi pattern
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone is required';
     } else if (!/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/.test(formData.phone.trim())) {
       newErrors.phone = 'Phone must be a valid phone number (e.g. +1234567890)';
     }
 
-    // Email validation (optional but must be valid if provided)
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Invalid email format';
     }
@@ -84,7 +111,7 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
     try {
       const submitData: CreatePatientRequest | UpdatePatientRequest = {
         name: formData.name.trim(),
-        age: formData.age,
+        birthDate: formData.birthDate,
         phone: formData.phone.trim(),
         email: formData.email.trim() || undefined,
         address: formData.address.trim() || undefined,
@@ -98,9 +125,8 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
     }
   };
 
-  const handleChange = (field: string, value: string | number) => {
+  const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error for this field when user starts typing
     if (errors[field]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -136,25 +162,33 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
           disabled={isSubmitting}
         />
 
-        <NumberInput
-          id="age"
-          label="Age (years)"
-          min={2}
-          max={99}
-          value={formData.age}
-          onChange={(_e, state) => {
-            const v = state?.value;
-            // Only update if a valid number was parsed; ignore blank/NaN states
-            if (typeof v === 'number' && !isNaN(v)) {
-              handleChange('age', v);
+        {/* TASK-038: DatePicker for birth date replaces the NumberInput age field */}
+        <DatePicker
+          datePickerType="single"
+          dateFormat="d/m/Y"
+          value={formData.birthDate ? toDisplayDate(formData.birthDate) : ''}
+          maxDate={(() => {
+            const today = new Date();
+            const dd = String(today.getDate()).padStart(2, '0');
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const yyyy = today.getFullYear();
+            return `${dd}/${mm}/${yyyy}`;
+          })()}
+          onChange={(dates: Date[]) => {
+            if (dates[0]) {
+              handleChange('birthDate', toISODate(dates[0]));
             }
           }}
-          invalid={!!errors.age}
-          invalidText={errors.age}
-          aria-label="Patient age in years"
-          required
-          disabled={isSubmitting}
-        />
+        >
+          <DatePickerInput
+            id="birthDate"
+            labelText="Date of Birth"
+            placeholder="dd/mm/yyyy"
+            invalid={!!errors.birthDate}
+            invalidText={errors.birthDate}
+            disabled={isSubmitting}
+          />
+        </DatePicker>
 
         <TextInput
           id="phone"

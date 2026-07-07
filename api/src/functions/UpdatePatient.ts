@@ -50,7 +50,7 @@ export async function updatePatient(request: HttpRequest, context: InvocationCon
         }
 
         const body = await request.json() as any;
-        const { name, age, phone, email, address, etag } = body;
+        const { name, age, birthDate, phone, email, address, etag } = body;
 
         if (!etag) {
             return errorResponse('ETag is required', 400);
@@ -71,6 +71,7 @@ export async function updatePatient(request: HttpRequest, context: InvocationCon
         const mergedPatientData = {
             name: name !== undefined ? name : existingPatient.name,
             age: age !== undefined ? age : existingPatient.age,
+            birthDate: birthDate !== undefined ? birthDate : existingPatient.birthDate,
             phone: phone !== undefined ? phone : existingPatient.phone,
             email: email !== undefined ? email : existingPatient.email,
             address: address !== undefined ? address : existingPatient.address
@@ -86,6 +87,7 @@ export async function updatePatient(request: HttpRequest, context: InvocationCon
             ...existingPatient,
             name: mergedPatientData.name.trim(),
             age: mergedPatientData.age,
+            birthDate: mergedPatientData.birthDate || undefined,
             phone: mergedPatientData.phone.trim(),
             email: mergedPatientData.email ? mergedPatientData.email.trim() : undefined,
             address: mergedPatientData.address ? mergedPatientData.address.trim() : undefined,
@@ -97,6 +99,7 @@ export async function updatePatient(request: HttpRequest, context: InvocationCon
         const changes: Record<string, any> = {};
         if (existingPatient.name !== updatedPatient.name) changes.name = updatedPatient.name;
         if (existingPatient.age !== updatedPatient.age) changes.age = updatedPatient.age;
+        if (existingPatient.birthDate !== updatedPatient.birthDate) changes.birthDate = updatedPatient.birthDate;
         if (existingPatient.phone !== updatedPatient.phone) changes.phone = updatedPatient.phone;
         if (existingPatient.email !== updatedPatient.email) changes.email = updatedPatient.email;
         if (existingPatient.address !== updatedPatient.address) changes.address = updatedPatient.address;

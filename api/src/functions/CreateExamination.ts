@@ -25,7 +25,7 @@ export async function createExamination(request: HttpRequest, context: Invocatio
         }
 
         const body = await request.json() as any;
-        const { patientId, examDate, gestationalAge, gestationalAgeFromBiometry, biometry, doppler, findings, notes, status, data } = body;
+        const { patientId, examDate, gestationalAge, gestationalAgeFromBiometry, biometry, doppler, findings, notes, status, data, examinationType, patientAgeAtExam } = body;
 
         const validation = validateExamination({
             patientId,
@@ -37,7 +37,9 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             findings,
             notes,
             status,
-            data
+            data,
+            examinationType,
+            patientAgeAtExam
         });
         if (!validation.valid) {
             return errorResponse(validation.errors.join(', '), 400);
@@ -84,11 +86,13 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             gestationalAge: gestationalAge || undefined,
             gestationalAgeFromBiometry: gestationalAgeFromBiometry || undefined,
             status,
+            examinationType: examinationType || undefined,
             biometry: biometryStr as any,
             doppler: dopplerStr as any,
             findings: findings || undefined,
             notes: notes || undefined,
             data: dataStr as any,
+            patientAgeAtExam: patientAgeAtExam !== undefined ? patientAgeAtExam : undefined,
             createdAt: now,
             updatedAt: now,
             createdBy: user.userId,
@@ -109,11 +113,13 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             gestationalAge: gestationalAge || undefined,
             gestationalAgeFromBiometry: gestationalAgeFromBiometry || undefined,
             status,
+            examinationType: examinationType || undefined,
             biometry: biometryStr as any,
             doppler: dopplerStr as any,
             findings: findings || undefined,
             notes: notes || undefined,
             data: dataStr as any,
+            patientAgeAtExam: patientAgeAtExam !== undefined ? patientAgeAtExam : undefined,
             createdAt: now,
             updatedAt: now,
             createdBy: user.userId,

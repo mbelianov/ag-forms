@@ -5,15 +5,17 @@ import { Loading } from '@carbon/react';
 
 interface ProtectedRouteProps {
   children: ReactNode;
+  requiredRole?: 'admin' | 'doctor' | 'viewer';
 }
 
 /**
- * Protected Route component that checks authentication status
- * Redirects to login if not authenticated
- * Shows loading state while checking authentication
+ * Protected Route component that checks authentication status and optional role.
+ * Redirects to login if not authenticated.
+ * Redirects to dashboard if authenticated but role doesn't match.
+ * Shows loading state while checking authentication.
  */
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useAuth();
+export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -34,6 +36,11 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Redirect to dashboard if role requirement not met
+  if (requiredRole && user?.role !== requiredRole) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   // Render protected content if authenticated

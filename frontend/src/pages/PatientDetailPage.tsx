@@ -26,6 +26,8 @@ import PageLoader from '../components/PageLoader';
 import ErrorMessage from '../components/ErrorMessage';
 import { useAutoNotification } from '../utils/useAutoNotification';
 import { getStatusTag } from '../utils/statusHelpers';
+import { calculateAgeAtDate } from '../utils/calculations';
+import { formatDateTime, formatDateShort, formatPlainDate } from '../utils/formatters';
 import type { Patient, Examination } from '../types';
 
 const examinationHeaders = [
@@ -83,7 +85,8 @@ export default function PatientDetailPage() {
       setIsLoadingExaminations(true);
       setExaminationsError(null);
       try {
-        const examinationsData = await examinationService.getExaminations(id);
+        const result = await examinationService.getExaminations(id);
+        const examinationsData = result.examinations;
         // Sort newest first by examDate
         const sorted = [...examinationsData].sort(
           (a, b) => new Date(b.examDate).getTime() - new Date(a.examDate).getTime()
@@ -134,27 +137,17 @@ export default function PatientDetailPage() {
     navigate(`/examinations/new?patientId=${id}`);
   };
 
+  // TASK-038: Derive display age from birthDate or fall back to stored age
+  const patientAge = patient
+    ? (patient.birthDate
+        ? calculateAgeAtDate(patient.birthDate, new Date().toISOString().split('T')[0])
+        : patient.age)
+    : undefined;
+
   const handleBack = () => {
     navigate('/patients');
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const formatExamDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
 
   const handleExaminationClick = (examinationId: string) => {
     navigate(`/examinations/${examinationId}`);
@@ -222,20 +215,25 @@ export default function PatientDetailPage() {
             >
               Back to Patients List
             </Button>
-            <Button
-              kind="secondary"
-              renderIcon={Edit}
-              onClick={handleEdit}
-            >
-              Edit Patient
-            </Button>
-            <Button
-              kind="primary"
-              renderIcon={Add}
-              onClick={handleCreateExamination}
-            >
-              Create Examination
-            </Button>
+            {/* TASK-010: Edit/Create visible only to admin/doctor */}
+            {(user?.role === 'admin' || user?.role === 'doctor') && (
+              <Button
+                kind="secondary"
+                renderIcon={Edit}
+                onClick={handleEdit}
+              >
+                Edit Patient
+              </Button>
+            )}
+            {(user?.role === 'admin' || user?.role === 'doctor') && (
+              <Button
+                kind="primary"
+                renderIcon={Add}
+                onClick={handleCreateExamination}
+              >
+                Create Test {/* TASK-032 */}
+              </Button>
+            )}
             {(user?.role === 'admin' || user?.role === 'doctor') && (
               <Button
                 kind="danger"
@@ -264,10 +262,12 @@ export default function PatientDetailPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
               <div>
                 <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
-                  Age
+                  {patient.birthDate ? 'Date of Birth' : 'Age'}
                 </div>
                 <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                  {patient.age} years
+                  {patient.birthDate
+                    ? `${formatPlainDate(patient.birthDate)} (${patientAge !== undefined ? `${patientAge} yrs` : '—'})`
+                    : (patientAge !== undefined ? `${patientAge} years` : '—')}
                 </div>
               </div>
 
@@ -308,28 +308,41 @@ export default function PatientDetailPage() {
                 Created
               </div>
               <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                {formatDate(patient.createdAt)}
+                {formatDateTime(patient.createdAt)}
               </div>
             </div>
+            {/* TASK-016: show updatedAt */}
+            {patient.updatedAt && (
+              <div>
+                <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
+                  Last Updated
+                </div>
+                <div style={{ fontSize: '1rem', fontWeight: 500 }}>
+                  {formatDateTime(patient.updatedAt)}
+                </div>
+              </div>
+            )}
           </Stack>
         </Tile>
 
-        {/* Examinations Section */}
+        {/* TASK-032: Ultrasound Prenatal Tests Section */}
         <Tile>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <h3>Examinations</h3>
-            <Button
-              kind="tertiary"
-              size="sm"
-              renderIcon={Add}
-              onClick={handleCreateExamination}
-            >
-              Add Examination
-            </Button>
+            <h3>Ultrasound Prenatal Tests</h3>
+            {(user?.role === 'admin' || user?.role === 'doctor') && (
+              <Button
+                kind="tertiary"
+                size="sm"
+                renderIcon={Add}
+                onClick={handleCreateExamination}
+              >
+                Add Test
+              </Button>
+            )}
           </div>
           
           {isLoadingExaminations ? (
-            <InlineLoading description="Loading examinations..." />
+            <InlineLoading description="Loading tests..." />
           ) : examinationsError ? (
             <InlineNotification
               kind="error"
@@ -349,7 +362,7 @@ export default function PatientDetailPage() {
             <DataTable
               rows={examinations.map((exam) => ({
                 id: exam.examinationId,
-                examDate: formatExamDate(exam.examDate),
+                examDate: formatDateShort(exam.examDate.includes('T') ? exam.examDate : exam.examDate + 'T00:00:00'),
                 status: exam.status,
                 gestationalAge: exam.gestationalAge || '-',
               }))}
@@ -383,7 +396,7 @@ export default function PatientDetailPage() {
                           key={row.id}
                           onClick={() => handleExaminationClick(row.id)}
                           style={{ cursor: 'pointer' }}
-                          aria-label={exam ? `View examination from ${formatExamDate(exam.examDate)}` : 'View examination'}
+                          aria-label={exam ? `View examination from ${formatDateShort(exam.examDate.includes('T') ? exam.examDate : exam.examDate + 'T00:00:00')}` : 'View examination'}
                         >
                           {row.cells.map((cell) => (
                             <TableCell key={cell.id}>

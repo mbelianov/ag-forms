@@ -39,7 +39,8 @@ api.interceptors.response.use(
       const isLoginPage = window.location.pathname === '/login';
 
       if (!isAuthEndpoint && !isLoginPage) {
-        console.error('Unauthorized access - redirecting to login');
+        // TASK-019: Store session-expired flag so LoginPage can show a warning
+        sessionStorage.setItem('session_expired', 'true');
         window.location.href = '/login';
       }
     } else if (error.response?.status === 403) {

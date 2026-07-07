@@ -18,17 +18,23 @@ import {
 import { Add } from '@carbon/icons-react';
 import { patientService } from '../services/patientService';
 import PageLoader from '../components/PageLoader';
+import { useAuth } from '../contexts/AuthContext';
+import { calculateAgeAtDate } from '../utils/calculations';
+import { formatDateShort } from '../utils/formatters';
 import type { Patient } from '../types';
 
 const headers = [
   { key: 'name', header: 'Name' },
   { key: 'age', header: 'Age' },
   { key: 'phone', header: 'Phone' },
+  { key: 'mrn', header: 'MRN' },
   { key: 'createdAt', header: 'Created Date' },
 ];
 
 export default function PatientsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canCreate = user?.role !== 'viewer';
   const [patients, setPatients] = useState<Patient[]>([]);
   const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -121,21 +127,23 @@ export default function PatientsPage() {
     navigate('/patients/new');
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+  // TASK-038: Display age from birthDate if available, else fall back to stored age
+  const displayAge = (patient: Patient): string => {
+    if (patient.birthDate) {
+      const age = calculateAgeAtDate(patient.birthDate, new Date().toISOString().split('T')[0]);
+      return age !== undefined ? `${age} yrs` : '—';
+    }
+    return patient.age !== undefined ? `${patient.age} yrs` : '—';
   };
 
   // Prepare rows for DataTable
   const rows = filteredPatients.map((patient) => ({
     id: patient.patientId,
     name: patient.name,
-    age: `${patient.age} yrs`,
+    age: displayAge(patient),
     phone: patient.phone,
-    createdAt: formatDate(patient.createdAt),
+    mrn: patient.mrn || '—',  // TASK-018: show MRN
+    createdAt: formatDateShort(patient.createdAt),
   }));
 
   // Pagination
@@ -191,14 +199,17 @@ export default function PatientsPage() {
         {isSearching && (
           <InlineLoading description="Searching..." style={{ width: 'auto', flexShrink: 0 }} />
         )}
-        <Button
-          renderIcon={Add}
-          onClick={handleCreatePatient}
-          aria-label="Create new patient"
-          style={{ flexShrink: 0 }}
-        >
-          Create Patient
-        </Button>
+        {/* TASK-010: hide Create for viewer */}
+        {canCreate && (
+          <Button
+            renderIcon={Add}
+            onClick={handleCreatePatient}
+            aria-label="Create new patient"
+            style={{ flexShrink: 0 }}
+          >
+            Create Patient
+          </Button>
+        )}
       </div>
 
       <DataTable rows={paginatedRows} headers={headers}>

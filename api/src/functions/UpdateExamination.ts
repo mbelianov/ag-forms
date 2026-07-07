@@ -31,7 +31,7 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
 
         const body = await request.json() as any;
         // Strip any client-supplied mrn — MRN is immutable once assigned
-        const { mrn: _discardedMrn, examDate, gestationalAge, gestationalAgeFromBiometry, biometry, doppler, findings, notes, status, data, etag } = body;
+        const { mrn: _discardedMrn, examDate, gestationalAge, gestationalAgeFromBiometry, biometry, doppler, findings, notes, status, data, etag, examinationType, patientAgeAtExam } = body;
 
         // Require ETag for optimistic concurrency
         if (!etag) {
@@ -49,6 +49,8 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
         if (notes !== undefined) updateData.notes = notes;
         if (status !== undefined) updateData.status = status;
         if (data !== undefined) updateData.data = data;
+        if (examinationType !== undefined) updateData.examinationType = examinationType;
+        if (patientAgeAtExam !== undefined) updateData.patientAgeAtExam = patientAgeAtExam;
 
         // Add required fields for validation
         const existingExam = await getEntity<Examination>(
@@ -76,7 +78,9 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             doppler: doppler !== undefined ? doppler : existingExam.doppler,
             findings: findings !== undefined ? findings : existingExam.findings,
             notes: notes !== undefined ? notes : existingExam.notes,
-            data: data !== undefined ? data : undefined
+            data: data !== undefined ? data : undefined,
+            examinationType: examinationType !== undefined ? examinationType : existingExam.examinationType,
+            patientAgeAtExam: patientAgeAtExam !== undefined ? patientAgeAtExam : existingExam.patientAgeAtExam
         };
 
         const validation = validateExamination(validationData);
@@ -134,6 +138,14 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             updatedLookupEntity.data = (typeof data === 'string' ? data : JSON.stringify(data)) as any;
             changedFields.push('data');
         }
+        if (examinationType !== undefined && examinationType !== existingExam.examinationType) {
+            updatedLookupEntity.examinationType = examinationType;
+            changedFields.push('examinationType');
+        }
+        if (patientAgeAtExam !== undefined && patientAgeAtExam !== existingExam.patientAgeAtExam) {
+            updatedLookupEntity.patientAgeAtExam = patientAgeAtExam;
+            changedFields.push('patientAgeAtExam');
+        }
 
         updatedLookupEntity.updatedAt = now;
         updatedLookupEntity.updatedBy = user.userId;
@@ -165,7 +177,9 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
                 findings: updatedLookupEntity.findings,
                 notes: updatedLookupEntity.notes,
                 status: updatedLookupEntity.status,
+                examinationType: updatedLookupEntity.examinationType,
                 data: updatedLookupEntity.data,
+                patientAgeAtExam: updatedLookupEntity.patientAgeAtExam,
                 updatedAt: now,
                 updatedBy: user.userId
             };

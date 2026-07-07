@@ -233,6 +233,16 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   doc.setFontSize(8);
   setTextColor(doc, C_MID);
 
+  if (vm.examinationType) {
+    doc.text(`Type: ${vm.examinationType.replace(/_/g, ' ')}`, MARGIN_L, y);
+    y += 4;
+  }
+
+  if (vm.patientAgeAtExam !== undefined) {
+    doc.text(`Patient age at exam: ${vm.patientAgeAtExam} years`, MARGIN_L, y);
+    y += 4;
+  }
+
   if (vm.gestationalAge) {
     const gaLabel = 'GA (LMP): ';
     doc.text(gaLabel, MARGIN_L, y);
@@ -274,6 +284,18 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
     ['AC', vm.biometry.ac],
     ['FL', vm.biometry.fl],
     ['EFW', vm.biometry.efw],
+    // TASK-034: Extended biometry
+    ['OFD', vm.biometry.ofd],
+    ['Vp', vm.biometry.vp],
+    ['TCD', vm.biometry.tcd],
+    ['CM', vm.biometry.cm],
+    ['Nuchal Fold', vm.biometry.nuchalFold],
+    ['NB', vm.biometry.nb],
+    ['APAD', vm.biometry.apad],
+    ['TAD', vm.biometry.tad],
+    // TASK-035: LA/LC
+    ['LA', vm.biometry.la],
+    ['LC', vm.biometry.lc],
   ];
   if (biometryPairs.some(([, v]) => v)) {
     y = sectionHeading(doc, 'Biometry Measurements', y);
@@ -286,6 +308,15 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
     ['PI', vm.doppler.pi],
     ['RI', vm.doppler.ri],
     ['Vessel', vm.doppler.vessel],
+    // TASK-036: Extended vascular
+    ['A.ut. Dex PI', vm.doppler.utADexPI],
+    ['A.ut. Dex RI', vm.doppler.utADexRI],
+    ['A.ut. Sin PI', vm.doppler.utASinPI],
+    ['A.ut. Sin RI', vm.doppler.utASinRI],
+    ['CMA', vm.doppler.cma],
+    ['PSV', vm.doppler.psv],
+    ['CPR', vm.doppler.cpr],
+    ['Duc.Ven', vm.doppler.ducVen],
   ];
   if (dopplerPairs.some(([, v]) => v)) {
     rule(doc, y);
@@ -335,6 +366,11 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
     ['Kidneys', vm.anatomy.kidneys],
     ['Limbs', vm.anatomy.limbs],
     ['Skeleton', vm.anatomy.skeleton],
+    // TASK-036: Extended anatomy
+    ['Face', vm.anatomy.face],
+    ['Neck Skin', vm.anatomy.neckSkin],
+    ['Spine', vm.anatomy.spine],
+    ['Thorax', vm.anatomy.thorax],
   ];
   if (anatomyPairs.some(([, v]) => v)) {
     rule(doc, y);

@@ -17,18 +17,38 @@ import {
   SelectItem,
   Pagination,
   InlineNotification,
+  DatePicker,
+  DatePickerInput,
 } from '@carbon/react';
 import { getStatusTag } from '../utils/statusHelpers';
 import { Add, View } from '@carbon/icons-react';
 import { examinationService } from '../services/examinationService';
 import { patientService } from '../services/patientService';
 import PageLoader from '../components/PageLoader';
+import { useAuth } from '../contexts/AuthContext';
+import { formatDateShort } from '../utils/formatters';
 import type { Examination, Patient } from '../types';
+
+// TASK-033: default type label
+const EXAM_TYPE_LABEL = 'Ultrasound Prenatal Test';
+
+function toISODate(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function toDisplayDate(iso: string): string {
+  const [yyyy, mm, dd] = iso.split('-');
+  return `${dd}/${mm}/${yyyy}`;
+}
 
 const headers = [
   { key: 'patientName', header: 'Patient Name' },
   { key: 'mrn', header: 'MRN' },
   { key: 'examDate', header: 'Exam Date' },
+  { key: 'examinationType', header: 'Type' },
   { key: 'gestationalAge', header: 'Gestational Age' },
   { key: 'status', header: 'Status' },
   { key: 'createdBy', header: 'Created By' },
@@ -37,6 +57,9 @@ const headers = [
 
 export default function ExaminationsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canCreate = user?.role !== 'viewer';
+
   const [examinations, setExaminations] = useState<Examination[]>([]);
   const [filteredExaminations, setFilteredExaminations] = useState<Examination[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -44,9 +67,13 @@ export default function ExaminationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [continuationToken, setContinuationToken] = useState<string | undefined>();
+  const [hasMore, setHasMore] = useState(false);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -59,14 +86,38 @@ export default function ExaminationsPage() {
     }
   }, []);
 
-  const loadExaminations = useCallback(async (patientId?: string) => {
+  const loadExaminations = useCallback(async (opts?: {
+    patientId?: string;
+    status?: string;
+    from_date?: string;
+    to_date?: string;
+    token?: string;
+    append?: boolean;
+  }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await examinationService.getExaminations(patientId || undefined);
-      setExaminations(data);
-      setFilteredExaminations(data);
-      setSearchQuery('');
+      const result = await examinationService.getExaminations({
+        patientId: opts?.patientId,
+        status: opts?.status || undefined,
+        from_date: opts?.from_date || undefined,
+        to_date: opts?.to_date || undefined,
+        continuationToken: opts?.token,
+      });
+      const newExams = result.examinations;
+      if (opts?.append) {
+        setExaminations((prev) => {
+          const all = [...prev, ...newExams];
+          setFilteredExaminations(all);
+          return all;
+        });
+      } else {
+        setExaminations(newExams);
+        setFilteredExaminations(newExams);
+        setSearchQuery('');
+      }
+      setContinuationToken(result.continuationToken);
+      setHasMore(!!result.continuationToken);
     } catch (err: any) {
       setError(err.message || 'Failed to load examinations');
     } finally {
@@ -88,33 +139,34 @@ export default function ExaminationsPage() {
     };
   }, []);
 
+  const applyFilters = useCallback(
+    (baseList: Examination[], query: string) => {
+      if (!query.trim()) return baseList;
+      const lowerQuery = query.toLowerCase();
+      return baseList.filter((exam) =>
+        exam.patientName.toLowerCase().includes(lowerQuery)
+      );
+    },
+    []
+  );
+
   const handlePatientFilter = (patientId: string) => {
     setSelectedPatientId(patientId);
     setPage(1);
-    loadExaminations(patientId || undefined);
+    loadExaminations({ patientId: patientId || undefined, status: selectedStatus || undefined, from_date: fromDate || undefined, to_date: toDate || undefined });
   };
 
   const handleStatusFilter = (status: string) => {
     setSelectedStatus(status);
     setPage(1);
+    // TASK-012: pass status to API
+    loadExaminations({ patientId: selectedPatientId || undefined, status: status || undefined, from_date: fromDate || undefined, to_date: toDate || undefined });
   };
 
-  const applyFilters = useCallback(
-    (baseList: Examination[], query: string, status: string) => {
-      let result = baseList;
-      if (status) {
-        result = result.filter((exam) => exam.status === status);
-      }
-      if (query.trim()) {
-        const lowerQuery = query.toLowerCase();
-        result = result.filter((exam) =>
-          exam.patientName.toLowerCase().includes(lowerQuery)
-        );
-      }
-      return result;
-    },
-    []
-  );
+  const handleDateFilter = (from: string, to: string) => {
+    setPage(1);
+    loadExaminations({ patientId: selectedPatientId || undefined, status: selectedStatus || undefined, from_date: from || undefined, to_date: to || undefined });
+  };
 
   const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
@@ -125,16 +177,21 @@ export default function ExaminationsPage() {
     }
 
     searchTimerRef.current = setTimeout(() => {
-      setFilteredExaminations(applyFilters(examinations, query, selectedStatus));
+      setFilteredExaminations(applyFilters(examinations, query));
     }, 200);
-  }, [examinations, selectedStatus, applyFilters]);
+  }, [examinations, applyFilters]);
 
-  // Re-apply status filter whenever it changes
-  useEffect(() => {
-    setFilteredExaminations(applyFilters(examinations, searchQuery, selectedStatus));
-    setPage(1);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStatus]);
+  const handleLoadMore = () => {
+    if (!continuationToken) return;
+    loadExaminations({
+      patientId: selectedPatientId || undefined,
+      status: selectedStatus || undefined,
+      from_date: fromDate || undefined,
+      to_date: toDate || undefined,
+      token: continuationToken,
+      append: true,
+    });
+  };
 
   const handleRowClick = (examinationId: string) => {
     navigate(`/examinations/${examinationId}`);
@@ -149,21 +206,16 @@ export default function ExaminationsPage() {
     navigate('/examinations/new');
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
   // Prepare rows for DataTable — keep patientId for click handler
   const allRows = filteredExaminations.map((exam) => ({
     id: exam.examinationId,
     patientName: exam.patientName,
     patientId: exam.patientId,
     mrn: exam.mrn,
-    examDate: formatDate(exam.examDate),
+    examDate: formatDateShort(exam.examDate.includes('T') ? exam.examDate : exam.examDate + 'T00:00:00'),
+    examinationType: exam.examinationType
+      ? exam.examinationType.replace(/_/g, ' ')
+      : EXAM_TYPE_LABEL,
     gestationalAge: exam.gestationalAge || '—',
     status: exam.status,
     createdBy: exam.createdByName || exam.createdBy,
@@ -176,12 +228,13 @@ export default function ExaminationsPage() {
   const paginatedRows = allRows.slice(startIndex, startIndex + pageSize);
 
   if (isLoading && examinations.length === 0) {
-    return <PageLoader description="Loading examinations..." />;
+    return <PageLoader description="Loading ultrasound prenatal tests..." />;
   }
 
   return (
     <div style={{ padding: '2rem' }}>
-      <h1 style={{ marginBottom: '2rem' }}>Examinations</h1>
+      {/* TASK-032: renamed page title */}
+      <h1 style={{ marginBottom: '2rem' }}>Ultrasound Prenatal Tests</h1>
 
       {error && (
         <InlineNotification
@@ -228,6 +281,39 @@ export default function ExaminationsPage() {
             <SelectItem value="reviewed" text="Reviewed" />
           </Select>
         </div>
+        {/* TASK-014: Date range filter */}
+        <div style={{ flex: '0 0 auto' }}>
+          <DatePicker
+            datePickerType="range"
+            dateFormat="d/m/Y"
+            value={[
+              fromDate ? toDisplayDate(fromDate) : '',
+              toDate ? toDisplayDate(toDate) : '',
+            ]}
+            onChange={(dates: Date[]) => {
+              const from = dates[0] ? toISODate(dates[0]) : '';
+              const to = dates[1] ? toISODate(dates[1]) : '';
+              setFromDate(from);
+              setToDate(to);
+              if (from && to) {
+                handleDateFilter(from, to);
+              } else if (!from && !to) {
+                handleDateFilter('', '');
+              }
+            }}
+          >
+            <DatePickerInput
+              id="fromDate"
+              labelText="From Date"
+              placeholder="dd/mm/yyyy"
+            />
+            <DatePickerInput
+              id="toDate"
+              labelText="To Date"
+              placeholder="dd/mm/yyyy"
+            />
+          </DatePicker>
+        </div>
       </div>
 
       <DataTable rows={paginatedRows} headers={headers}>
@@ -240,8 +326,8 @@ export default function ExaminationsPage() {
           getTableContainerProps,
         }) => (
           <TableContainer
-            title="Examinations"
-            description={`${totalItems} examination${totalItems !== 1 ? 's' : ''} found`}
+            title="Ultrasound Prenatal Tests"
+            description={`${totalItems} test${totalItems !== 1 ? 's' : ''} found`}
             {...getTableContainerProps()}
           >
             <TableToolbar>
@@ -252,16 +338,19 @@ export default function ExaminationsPage() {
                   value={searchQuery}
                   aria-label="Search examinations by patient name"
                 />
-                <Button
-                  renderIcon={Add}
-                  onClick={handleCreateExamination}
-                  aria-label="Create new examination"
-                >
-                  Create Examination
-                </Button>
+                {/* TASK-010: hide Create for viewer */}
+                {canCreate && (
+                  <Button
+                    renderIcon={Add}
+                    onClick={handleCreateExamination}
+                    aria-label="Create new ultrasound prenatal test"
+                  >
+                    Create Test
+                  </Button>
+                )}
               </TableToolbarContent>
             </TableToolbar>
-            <Table {...getTableProps()} aria-label="Examinations table">
+            <Table {...getTableProps()} aria-label="Ultrasound Prenatal Tests table">
               <TableHead>
                 <TableRow>
                   {headers.map((header) => (
@@ -277,16 +366,15 @@ export default function ExaminationsPage() {
                     <TableCell colSpan={headers.length}>
                       <div style={{ textAlign: 'center', padding: '2rem', color: '#525252' }}>
                         {searchQuery
-                          ? `No examinations found matching "${searchQuery}"`
+                          ? `No tests found matching "${searchQuery}"`
                           : selectedPatientId
-                          ? 'No examinations found for this patient.'
-                          : 'No examinations yet. Click "Create Examination" to get started.'}
+                          ? 'No tests found for this patient.'
+                          : 'No ultrasound prenatal tests yet. Click "Create Test" to get started.'}
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : (
                   rows.map((row, rowIndex) => {
-                    // Find the original examination to get patientId
                     const originalRow = allRows.find((r) => r.id === row.id);
                     return (
                       <TableRow
@@ -338,7 +426,7 @@ export default function ExaminationsPage() {
                                     e.stopPropagation();
                                     handleRowClick(row.id);
                                   }}
-                                  aria-label={`View details for examination`}
+                                  aria-label="View details for test"
                                 >
                                   View Details
                                 </Button>
@@ -371,6 +459,19 @@ export default function ExaminationsPage() {
         }}
         style={{ marginTop: '1rem' }}
       />
+
+      {/* TASK-013: Load More button for server-side pagination */}
+      {hasMore && (
+        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+          <Button
+            kind="tertiary"
+            onClick={handleLoadMore}
+            disabled={isLoading}
+          >
+            Load More Tests
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

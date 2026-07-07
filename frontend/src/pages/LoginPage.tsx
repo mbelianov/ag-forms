@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [isLocked, setIsLocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
   
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -26,6 +27,14 @@ export default function LoginPage() {
       navigate('/dashboard');
     }
   }, [isAuthenticated, navigate]);
+
+  // TASK-019: Check for session-expired flag set by the 401 interceptor
+  useEffect(() => {
+    if (sessionStorage.getItem('session_expired') === 'true') {
+      sessionStorage.removeItem('session_expired');
+      setSessionExpired(true);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +60,16 @@ export default function LoginPage() {
   return (
     <div style={{ maxWidth: '400px', margin: '4rem auto', padding: '2rem' }}>
       <h1 style={{ marginBottom: '2rem' }}>Login to AG Forms</h1>
+
+      {sessionExpired && (
+        <InlineNotification
+          kind="warning"
+          title="Session Expired"
+          subtitle="Your session has expired. Please log in again."
+          onCloseButtonClick={() => setSessionExpired(false)}
+          style={{ marginBottom: '1rem', minWidth: '100%' }}
+        />
+      )}
       
       {isLocked && (
         <InlineNotification

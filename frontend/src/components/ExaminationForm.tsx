@@ -71,12 +71,25 @@ export default function ExaminationForm({
     patientId: examination?.patientId || preselectedPatientId || '',
     examDate: examination?.examDate ? examDateToYMD(examination.examDate) : toISODate(new Date()),
     status: (examination?.status || 'draft') as 'draft' | 'completed' | 'reviewed',
+    examinationType: examination?.examinationType || 'ultrasound_prenatal', // TASK-033
     // Biometry (integers only)
     bpd: examination?.biometry?.bpd?.toString() || '',
     hc: examination?.biometry?.hc?.toString() || '',
     ac: examination?.biometry?.ac?.toString() || '',
     fl: examination?.biometry?.fl?.toString() || '',
     efw: examination?.biometry?.efw?.toString() || '',
+    // TASK-034: Extended biometry
+    ofd: examination?.biometry?.ofd?.toString() || '',
+    vp: examination?.biometry?.vp?.toString() || '',
+    tcd: examination?.biometry?.tcd?.toString() || '',
+    cm: examination?.biometry?.cm?.toString() || '',
+    nuchalFold: examination?.biometry?.nuchalFold?.toString() || '',
+    nb: examination?.biometry?.nb?.toString() || '',
+    apad: examination?.biometry?.apad?.toString() || '',
+    tad: examination?.biometry?.tad?.toString() || '',
+    // TASK-035: LA and LC
+    la: examination?.biometry?.la?.toString() || '',
+    lc: examination?.biometry?.lc?.toString() || '',
     // GA fields (both stored separately)
     gestationalAge: examination?.gestationalAge || '',                         // GA from LMP
     gestationalAgeFromBiometry: examination?.gestationalAgeFromBiometry || '', // GA from Biometry
@@ -84,9 +97,18 @@ export default function ExaminationForm({
     pi: examination?.doppler?.pi?.toString() || '',
     ri: examination?.doppler?.ri?.toString() || '',
     vessel: examination?.doppler?.vessel || '',
+    // TASK-036: Extended vascular fields
+    utADexPI: examination?.doppler?.utADexPI?.toString() || '',
+    utADexRI: examination?.doppler?.utADexRI?.toString() || '',
+    utASinPI: examination?.doppler?.utASinPI?.toString() || '',
+    utASinRI: examination?.doppler?.utASinRI?.toString() || '',
+    cma: examination?.doppler?.cma?.toString() || '',
+    psv: examination?.doppler?.psv?.toString() || '',
+    cpr: examination?.doppler?.cpr?.toString() || '',
+    ducVen: examination?.doppler?.ducVen || '',
     notes: examination?.notes || '',
     findings: examination?.findings || '',
-    // Pregnancy data (ultrasound_date intentionally omitted — irrelevant, same as exam date)
+    // Pregnancy data
     last_menstrual_period: examination?.data?.pregnancy_data?.last_menstrual_period || '',
     obstetric_history: examination?.data?.pregnancy_data?.obstetric_history || '',
     family_history: examination?.data?.pregnancy_data?.family_history || '',
@@ -105,6 +127,11 @@ export default function ExaminationForm({
     anat_kidneys: examination?.data?.anatomy?.kidneys || '',
     anat_limbs: examination?.data?.anatomy?.limbs || '',
     anat_skeleton: examination?.data?.anatomy?.skeleton || '',
+    // TASK-036: Extended anatomy
+    anat_face: examination?.data?.anatomy?.face || '',
+    anat_neckSkin: examination?.data?.anatomy?.neckSkin || '',
+    anat_spine: examination?.data?.anatomy?.spine || '',
+    anat_thorax: examination?.data?.anatomy?.thorax || '',
     // Top-level data comment
     comments: examination?.data?.comments || '',
   });
@@ -121,16 +148,35 @@ export default function ExaminationForm({
         patientId: examination.patientId,
         examDate: examDateToYMD(examination.examDate),
         status: examination.status,
+        examinationType: examination.examinationType || 'ultrasound_prenatal',
         bpd: examination.biometry?.bpd?.toString() || '',
         hc: examination.biometry?.hc?.toString() || '',
         ac: examination.biometry?.ac?.toString() || '',
         fl: examination.biometry?.fl?.toString() || '',
         efw: examination.biometry?.efw?.toString() || '',
+        ofd: examination.biometry?.ofd?.toString() || '',
+        vp: examination.biometry?.vp?.toString() || '',
+        tcd: examination.biometry?.tcd?.toString() || '',
+        cm: examination.biometry?.cm?.toString() || '',
+        nuchalFold: examination.biometry?.nuchalFold?.toString() || '',
+        nb: examination.biometry?.nb?.toString() || '',
+        apad: examination.biometry?.apad?.toString() || '',
+        tad: examination.biometry?.tad?.toString() || '',
+        la: examination.biometry?.la?.toString() || '',
+        lc: examination.biometry?.lc?.toString() || '',
         gestationalAge: examination.gestationalAge || '',
         gestationalAgeFromBiometry: examination.gestationalAgeFromBiometry || '',
         pi: examination.doppler?.pi?.toString() || '',
         ri: examination.doppler?.ri?.toString() || '',
         vessel: examination.doppler?.vessel || '',
+        utADexPI: examination.doppler?.utADexPI?.toString() || '',
+        utADexRI: examination.doppler?.utADexRI?.toString() || '',
+        utASinPI: examination.doppler?.utASinPI?.toString() || '',
+        utASinRI: examination.doppler?.utASinRI?.toString() || '',
+        cma: examination.doppler?.cma?.toString() || '',
+        psv: examination.doppler?.psv?.toString() || '',
+        cpr: examination.doppler?.cpr?.toString() || '',
+        ducVen: examination.doppler?.ducVen || '',
         notes: examination.notes || '',
         findings: examination.findings || '',
         last_menstrual_period: examination.data?.pregnancy_data?.last_menstrual_period || '',
@@ -149,6 +195,10 @@ export default function ExaminationForm({
         anat_kidneys: examination.data?.anatomy?.kidneys || '',
         anat_limbs: examination.data?.anatomy?.limbs || '',
         anat_skeleton: examination.data?.anatomy?.skeleton || '',
+        anat_face: examination.data?.anatomy?.face || '',
+        anat_neckSkin: examination.data?.anatomy?.neckSkin || '',
+        anat_spine: examination.data?.anatomy?.spine || '',
+        anat_thorax: examination.data?.anatomy?.thorax || '',
         comments: examination.data?.comments || '',
       });
     }
@@ -259,8 +309,8 @@ export default function ExaminationForm({
       newErrors.gestationalAgeFromBiometry = 'Format must be "28w 3d"';
     }
 
-    // Biometry validation (integers, > 0 if provided)
-    const biometryFields = ['bpd', 'hc', 'ac', 'fl', 'efw'];
+    // Biometry validation (integers, > 0 if provided) — TASK-034/035 extended fields
+    const biometryFields = ['bpd', 'hc', 'ac', 'fl', 'efw', 'ofd', 'vp', 'tcd', 'cm', 'nuchalFold', 'nb', 'apad', 'tad', 'la', 'lc'];
     biometryFields.forEach(field => {
       const value = formData[field as keyof typeof formData] as string;
       if (value && value.trim()) {
@@ -273,8 +323,8 @@ export default function ExaminationForm({
       }
     });
 
-    // Doppler validation (floats, >= 0 if provided)
-    const dopplerFields = ['pi', 'ri'];
+    // Doppler validation (floats, >= 0 if provided) — TASK-036 extended vascular
+    const dopplerFields = ['pi', 'ri', 'utADexPI', 'utADexRI', 'utASinPI', 'utASinRI', 'cma', 'psv', 'cpr'];
     dopplerFields.forEach(field => {
       const value = formData[field as keyof typeof formData] as string;
       if (value && value.trim()) {
@@ -314,18 +364,47 @@ export default function ExaminationForm({
     setIsSubmitting(true);
 
     try {
-      const biometry = (formData.bpd || formData.hc || formData.ac || formData.fl || formData.efw) ? {
-        bpd: formData.bpd ? parseInt(formData.bpd) : undefined,
-        hc: formData.hc ? parseInt(formData.hc) : undefined,
-        ac: formData.ac ? parseInt(formData.ac) : undefined,
-        fl: formData.fl ? parseInt(formData.fl) : undefined,
-        efw: formData.efw ? parseInt(formData.efw) : undefined,
+      const intOrUndef = (v: string) => (v && v.trim() ? parseInt(v) : undefined);
+      const floatOrUndef = (v: string) => (v && v.trim() ? parseFloat(v) : undefined);
+
+      const biometry = (
+        formData.bpd || formData.hc || formData.ac || formData.fl || formData.efw ||
+        formData.ofd || formData.vp || formData.tcd || formData.cm || formData.nuchalFold ||
+        formData.nb || formData.apad || formData.tad || formData.la || formData.lc
+      ) ? {
+        bpd: intOrUndef(formData.bpd),
+        hc: intOrUndef(formData.hc),
+        ac: intOrUndef(formData.ac),
+        fl: intOrUndef(formData.fl),
+        efw: intOrUndef(formData.efw),
+        ofd: intOrUndef(formData.ofd),
+        vp: intOrUndef(formData.vp),
+        tcd: intOrUndef(formData.tcd),
+        cm: intOrUndef(formData.cm),
+        nuchalFold: intOrUndef(formData.nuchalFold),
+        nb: intOrUndef(formData.nb),
+        apad: intOrUndef(formData.apad),
+        tad: intOrUndef(formData.tad),
+        la: intOrUndef(formData.la),
+        lc: intOrUndef(formData.lc),
       } : undefined;
 
-      const doppler = (formData.pi || formData.ri || formData.vessel) ? {
-        pi: formData.pi ? parseFloat(formData.pi) : undefined,
-        ri: formData.ri ? parseFloat(formData.ri) : undefined,
+      const doppler = (
+        formData.pi || formData.ri || formData.vessel ||
+        formData.utADexPI || formData.utADexRI || formData.utASinPI || formData.utASinRI ||
+        formData.cma || formData.psv || formData.cpr || formData.ducVen
+      ) ? {
+        pi: floatOrUndef(formData.pi),
+        ri: floatOrUndef(formData.ri),
         vessel: formData.vessel.trim() || undefined,
+        utADexPI: floatOrUndef(formData.utADexPI),
+        utADexRI: floatOrUndef(formData.utADexRI),
+        utASinPI: floatOrUndef(formData.utASinPI),
+        utASinRI: floatOrUndef(formData.utASinRI),
+        cma: floatOrUndef(formData.cma),
+        psv: floatOrUndef(formData.psv),
+        cpr: floatOrUndef(formData.cpr),
+        ducVen: formData.ducVen.trim() || undefined,
       } : undefined;
 
       // Build the nested `data` object — ultrasound_date intentionally excluded
@@ -358,7 +437,8 @@ export default function ExaminationForm({
       const anatomy = (
         formData.anat_head || formData.anat_brain || formData.anat_heart ||
         formData.anat_abdomen || formData.anat_kidneys || formData.anat_limbs ||
-        formData.anat_skeleton
+        formData.anat_skeleton || formData.anat_face || formData.anat_neckSkin ||
+        formData.anat_spine || formData.anat_thorax
       ) ? {
         head: formData.anat_head.trim() || undefined,
         brain: formData.anat_brain.trim() || undefined,
@@ -367,6 +447,10 @@ export default function ExaminationForm({
         kidneys: formData.anat_kidneys.trim() || undefined,
         limbs: formData.anat_limbs.trim() || undefined,
         skeleton: formData.anat_skeleton.trim() || undefined,
+        face: formData.anat_face.trim() || undefined,
+        neckSkin: formData.anat_neckSkin.trim() || undefined,
+        spine: formData.anat_spine.trim() || undefined,
+        thorax: formData.anat_thorax.trim() || undefined,
       } : undefined;
 
       const data: ExaminationData | undefined = (pregnancy_data || ultrasound_findings || anatomy || formData.comments.trim()) ? {
@@ -382,6 +466,7 @@ export default function ExaminationForm({
         gestationalAge: formData.gestationalAge.trim() || undefined,
         gestationalAgeFromBiometry: formData.gestationalAgeFromBiometry.trim() || undefined,
         status: formData.status,
+        examinationType: formData.examinationType || 'ultrasound_prenatal', // TASK-033
         biometry,
         doppler,
         notes: formData.notes.trim() || undefined,
@@ -422,7 +507,7 @@ export default function ExaminationForm({
   };
 
   return (
-    <Form onSubmit={handleSubmit}>
+    <Form onSubmit={handleSubmit} autoComplete="off">
       <Stack gap={6}>
         {submitError && (
           <InlineNotification
@@ -466,7 +551,20 @@ export default function ExaminationForm({
           />
         )}
 
-        {/* ── Exam Date | Status — two columns (GA moved into Pregnancy Data) ── */}
+        {/* ── Exam Type (read-only selector) | Status — TASK-033 ── */}
+        <div style={row2}>
+          <Select
+            id="examinationType"
+            labelText="Examination Type"
+            value={formData.examinationType}
+            onChange={(e) => handleChange('examinationType', e.target.value)}
+            disabled={isSubmitting}
+          >
+            <SelectItem value="ultrasound_prenatal" text="Ultrasound Prenatal Test" />
+          </Select>
+        </div>
+
+        {/* ── Exam Date | Status ── */}
         <div style={row2}>
           <DatePicker
             datePickerType="single"
@@ -693,9 +791,16 @@ export default function ExaminationForm({
                 <TextInput id="anat_kidneys" labelText="Kidneys" placeholder="e.g., normal" value={formData.anat_kidneys} onChange={(e) => handleChange('anat_kidneys', e.target.value)} disabled={isSubmitting} />
                 <TextInput id="anat_limbs"   labelText="Limbs"   placeholder="e.g., normal" value={formData.anat_limbs}   onChange={(e) => handleChange('anat_limbs',   e.target.value)} disabled={isSubmitting} />
               </div>
-              {/* Skeleton (half width) */}
+              {/* Skeleton | Face | Neck Skin */}
+              <div style={row3}>
+                <TextInput id="anat_skeleton"  labelText="Skeleton"  placeholder="e.g., normal" value={formData.anat_skeleton}  onChange={(e) => handleChange('anat_skeleton',  e.target.value)} disabled={isSubmitting} />
+                <TextInput id="anat_face"      labelText="Face"      placeholder="e.g., normal" value={formData.anat_face}      onChange={(e) => handleChange('anat_face',      e.target.value)} disabled={isSubmitting} />
+                <TextInput id="anat_neckSkin"  labelText="Neck Skin" placeholder="e.g., normal" value={formData.anat_neckSkin}  onChange={(e) => handleChange('anat_neckSkin',  e.target.value)} disabled={isSubmitting} />
+              </div>
+              {/* Spine | Thorax */}
               <div style={row2}>
-                <TextInput id="anat_skeleton" labelText="Skeleton" placeholder="e.g., normal" value={formData.anat_skeleton} onChange={(e) => handleChange('anat_skeleton', e.target.value)} disabled={isSubmitting} />
+                <TextInput id="anat_spine"  labelText="Spine"  placeholder="e.g., normal" value={formData.anat_spine}  onChange={(e) => handleChange('anat_spine',  e.target.value)} disabled={isSubmitting} />
+                <TextInput id="anat_thorax" labelText="Thorax" placeholder="e.g., normal" value={formData.anat_thorax} onChange={(e) => handleChange('anat_thorax', e.target.value)} disabled={isSubmitting} />
               </div>
             </Stack>
           </AccordionItem>
@@ -857,43 +962,101 @@ export default function ExaminationForm({
               />
             </div>
 
+            {/* TASK-034: Extended biometry — second row */}
+            <div style={rowAuto}>
+              {(['ofd', 'vp', 'tcd', 'cm', 'nuchalFold', 'nb', 'apad', 'tad'] as const).map((field) => {
+                const labels: Record<string, string> = {
+                  ofd: 'OFD (mm)', vp: 'Vp (mm)', tcd: 'TCD (mm)', cm: 'CM (mm)',
+                  nuchalFold: 'Nuchal Fold (mm)', nb: 'NB (mm)', apad: 'APAD (mm)', tad: 'TAD (mm)',
+                };
+                return (
+                  <TextInput
+                    key={field}
+                    id={field}
+                    labelText={labels[field]}
+                    placeholder="e.g., 0"
+                    value={formData[field] ?? ''}
+                    onChange={(e) => handleChange(field, e.target.value)}
+                    invalid={!!errors[field]}
+                    invalidText={errors[field]}
+                    disabled={isSubmitting}
+                    autoComplete="off"
+                  />
+                );
+              })}
+            </div>
+            {/* TASK-035: LA and LC */}
+            <div style={row2}>
+              <TextInput id="la" labelText="LA — Left Atrium (mm)" placeholder="e.g., 0" value={formData.la} onChange={(e) => handleChange('la', e.target.value)} invalid={!!errors.la} invalidText={errors.la} disabled={isSubmitting} autoComplete="off" />
+              <TextInput id="lc" labelText="LC — Left Cardiac (mm)" placeholder="e.g., 0" value={formData.lc} onChange={(e) => handleChange('lc', e.target.value)} invalid={!!errors.lc} invalidText={errors.lc} disabled={isSubmitting} autoComplete="off" />
+            </div>
           </Stack>
         </FormGroup>
 
         {/* ── Doppler — PI | RI | Vessel on one row ── */}
         <FormGroup legendText="Doppler (floats allowed)">
-          <div style={row3}>
-            <TextInput
-              id="pi"
-              labelText="PI (Pulsatility Index)"
-              placeholder="e.g., 1.25"
-              value={formData.pi}
-              onChange={(e) => handleChange('pi', e.target.value)}
-              invalid={!!errors.pi}
-              invalidText={errors.pi}
-              disabled={isSubmitting}
-            />
+          <Stack gap={4}>
+            <div style={row3}>
+              <TextInput
+                id="pi"
+                labelText="PI (Pulsatility Index)"
+                placeholder="e.g., 1.25"
+                value={formData.pi}
+                onChange={(e) => handleChange('pi', e.target.value)}
+                invalid={!!errors.pi}
+                invalidText={errors.pi}
+                disabled={isSubmitting}
+                autoComplete="off"
+              />
 
-            <TextInput
-              id="ri"
-              labelText="RI (Resistance Index)"
-              placeholder="e.g., 0.65"
-              value={formData.ri}
-              onChange={(e) => handleChange('ri', e.target.value)}
-              invalid={!!errors.ri}
-              invalidText={errors.ri}
-              disabled={isSubmitting}
-            />
+              <TextInput
+                id="ri"
+                labelText="RI (Resistance Index)"
+                placeholder="e.g., 0.65"
+                value={formData.ri}
+                onChange={(e) => handleChange('ri', e.target.value)}
+                invalid={!!errors.ri}
+                invalidText={errors.ri}
+                disabled={isSubmitting}
+                autoComplete="off"
+              />
 
-            <TextInput
-              id="vessel"
-              labelText="Vessel"
-              placeholder="e.g., Umbilical artery"
-              value={formData.vessel}
-              onChange={(e) => handleChange('vessel', e.target.value)}
-              disabled={isSubmitting}
-            />
-          </div>
+              <TextInput
+                id="vessel"
+                labelText="Vessel"
+                placeholder="e.g., Umbilical artery"
+                value={formData.vessel}
+                onChange={(e) => handleChange('vessel', e.target.value)}
+                disabled={isSubmitting}
+                autoComplete="off"
+              />
+            </div>
+            {/* TASK-036: Extended vascular fields */}
+            <div style={rowAuto}>
+              {(['utADexPI', 'utADexRI', 'utASinPI', 'utASinRI', 'cma', 'psv', 'cpr'] as const).map((field) => {
+                const labels: Record<string, string> = {
+                  utADexPI: 'A.ut. Dex PI', utADexRI: 'A.ut. Dex RI',
+                  utASinPI: 'A.ut. Sin PI', utASinRI: 'A.ut. Sin RI',
+                  cma: 'CMA', psv: 'PSV', cpr: 'CPR',
+                };
+                return (
+                  <TextInput
+                    key={field}
+                    id={field}
+                    labelText={labels[field]}
+                    placeholder="e.g., 0.0"
+                    value={formData[field] ?? ''}
+                    onChange={(e) => handleChange(field, e.target.value)}
+                    invalid={!!errors[field]}
+                    invalidText={errors[field]}
+                    disabled={isSubmitting}
+                    autoComplete="off"
+                  />
+                );
+              })}
+              <TextInput id="ducVen" labelText="Duc.Ven" placeholder="e.g., normal" value={formData.ducVen} onChange={(e) => handleChange('ducVen', e.target.value)} disabled={isSubmitting} autoComplete="off" />
+            </div>
+          </Stack>
         </FormGroup>
 
         {/* ── Narrative fields ── */}
@@ -932,7 +1095,7 @@ export default function ExaminationForm({
 
         <Stack orientation="horizontal" gap={4}>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : isEdit ? 'Update Examination' : 'Create Examination'}
+            {isSubmitting ? 'Saving...' : isEdit ? 'Update Ultrasound Prenatal Test' : 'Create Ultrasound Prenatal Test'}
           </Button>
           <Button kind="secondary" onClick={onCancel} disabled={isSubmitting}>
             Cancel

@@ -46,9 +46,9 @@ export async function createPatient(request: HttpRequest, context: InvocationCon
         }
 
         const body = await request.json() as any;
-        const { name, age, phone, email, address } = body;
+        const { name, age, birthDate, phone, email, address } = body;
 
-        const validation = validatePatient({ name, age, phone, email, address });
+        const validation = validatePatient({ name, age, birthDate, phone, email, address });
         if (!validation.valid) {
             return errorResponse(validation.errors.join(', '), 400);
         }
@@ -64,7 +64,9 @@ export async function createPatient(request: HttpRequest, context: InvocationCon
             rowKey: patientId,
             patientId,
             name: name.trim(),
-            age,
+            // TASK-038: store birthDate when provided; fall back to legacy age
+            birthDate: birthDate || undefined,
+            age: age !== undefined ? age : undefined,
             phone: phone.trim(),
             email: email ? email.trim() : undefined,
             address: address ? address.trim() : undefined,

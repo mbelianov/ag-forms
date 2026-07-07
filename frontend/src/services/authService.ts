@@ -1,6 +1,12 @@
 import api from './api';
 import type { User, LoginRequest } from '../types';
 
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
 /**
  * Authentication service for handling user authentication operations
  */
@@ -64,6 +70,28 @@ class AuthService {
       }
       console.error('Get current user error:', error);
       return null;
+    }
+  }
+  /**
+   * Change the current user's password
+   * @param currentPassword - The current password
+   * @param newPassword - The new password
+   * @param confirmPassword - Confirmation of the new password
+   */
+  async changePassword(currentPassword: string, newPassword: string, confirmPassword: string): Promise<void> {
+    try {
+      await api.post(`${this.AUTH_BASE_URL}/change-password`, {
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      });
+    } catch (error: any) {
+      const status = error.response?.status;
+      if (status === 401) {
+        throw new Error('Current password is incorrect.');
+      }
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to change password';
+      throw new Error(message);
     }
   }
 }

@@ -2,6 +2,11 @@ import {
   calcEDD,
   calcBiometryPercentiles,
   calcEFWPercentile,
+  calcOFDPercentile,
+  calcTCDPercentile,
+  calcNuchalFoldPercentile,
+  calcAPADPercentile,
+  calcTADPercentile,
 } from '../utils/calculations';
 import type { Examination } from '../types';
 
@@ -12,23 +17,47 @@ export interface ExamPdfViewModel {
   mrn: string;
   examDate: string;
   status: string;
+  examinationType?: string;        // TASK-033
+  patientAgeAtExam?: number;       // TASK-037
 
   gestationalAge?: string;
   gestationalAgeFromBiometry?: string;
   expectedDeliveryDate?: string;
 
   biometry: {
+    // Core
     bpd?: string;
     hc?: string;
     ac?: string;
     fl?: string;
     efw?: string;
+    // TASK-034: Extended biometry
+    ofd?: string;
+    vp?: string;
+    tcd?: string;
+    cm?: string;
+    nuchalFold?: string;
+    nb?: string;
+    apad?: string;
+    tad?: string;
+    // TASK-035: LA/LC
+    la?: string;
+    lc?: string;
   };
 
   doppler: {
     pi?: string;
     ri?: string;
     vessel?: string;
+    // TASK-036: Extended vascular
+    utADexPI?: string;
+    utADexRI?: string;
+    utASinPI?: string;
+    utASinRI?: string;
+    cma?: string;
+    psv?: string;
+    cpr?: string;
+    ducVen?: string;
   };
 
   pregnancy: {
@@ -54,6 +83,11 @@ export interface ExamPdfViewModel {
     kidneys?: string;
     limbs?: string;
     skeleton?: string;
+    // TASK-036: Extended anatomy
+    face?: string;
+    neckSkin?: string;
+    spine?: string;
+    thorax?: string;
   };
 
   findings?: string;
@@ -104,11 +138,21 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
       ? calcEFWPercentile(exam.biometry.efw, gaForPct)
       : undefined;
 
+  // TASK-034: Extended biometry percentiles
+  const ga = gaForPct ?? '';
+  const ofdPct  = calcOFDPercentile(exam.biometry?.ofd, ga);
+  const tcdPct  = calcTCDPercentile(exam.biometry?.tcd, ga);
+  const nfPct   = calcNuchalFoldPercentile(exam.biometry?.nuchalFold, ga);
+  const apadPct = calcAPADPercentile(exam.biometry?.apad, ga);
+  const tadPct  = calcTADPercentile(exam.biometry?.tad, ga);
+
   return {
     patientName: exam.patientName,
     mrn: exam.mrn,
     examDate: fmtDate(exam.examDate),
     status: exam.status.charAt(0).toUpperCase() + exam.status.slice(1),
+    examinationType: exam.examinationType,
+    patientAgeAtExam: exam.patientAgeAtExam,
 
     gestationalAge: exam.gestationalAge,
     gestationalAgeFromBiometry: exam.gestationalAgeFromBiometry,
@@ -116,18 +160,39 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
 
     biometry: {
       bpd: exam.biometry?.bpd != null ? withPct(exam.biometry.bpd, percentiles?.bpd) : undefined,
-      hc: exam.biometry?.hc != null ? withPct(exam.biometry.hc, percentiles?.hc) : undefined,
-      ac: exam.biometry?.ac != null ? withPct(exam.biometry.ac, percentiles?.ac) : undefined,
-      fl: exam.biometry?.fl != null ? withPct(exam.biometry.fl, percentiles?.fl) : undefined,
+      hc:  exam.biometry?.hc  != null ? withPct(exam.biometry.hc,  percentiles?.hc)  : undefined,
+      ac:  exam.biometry?.ac  != null ? withPct(exam.biometry.ac,  percentiles?.ac)  : undefined,
+      fl:  exam.biometry?.fl  != null ? withPct(exam.biometry.fl,  percentiles?.fl)  : undefined,
       efw: exam.biometry?.efw != null
         ? (efwPct !== undefined ? `${exam.biometry.efw} g (${ordinal(efwPct)} %ile)` : `${exam.biometry.efw} g`)
         : undefined,
+      // TASK-034
+      ofd:       exam.biometry?.ofd       != null ? withPct(exam.biometry.ofd,       ofdPct)  : undefined,
+      vp:        exam.biometry?.vp        != null ? `${exam.biometry.vp} mm`                  : undefined,
+      tcd:       exam.biometry?.tcd       != null ? withPct(exam.biometry.tcd,       tcdPct)  : undefined,
+      cm:        exam.biometry?.cm        != null ? `${exam.biometry.cm} mm`                  : undefined,
+      nuchalFold: exam.biometry?.nuchalFold != null ? withPct(exam.biometry.nuchalFold, nfPct)  : undefined,
+      nb:        exam.biometry?.nb        != null ? `${exam.biometry.nb} mm`                  : undefined,
+      apad:      exam.biometry?.apad      != null ? withPct(exam.biometry.apad,     apadPct)  : undefined,
+      tad:       exam.biometry?.tad       != null ? withPct(exam.biometry.tad,      tadPct)   : undefined,
+      // TASK-035
+      la: exam.biometry?.la != null ? `${exam.biometry.la} mm` : undefined,
+      lc: exam.biometry?.lc != null ? `${exam.biometry.lc} mm` : undefined,
     },
 
     doppler: {
-      pi: exam.doppler?.pi != null ? String(exam.doppler.pi) : undefined,
-      ri: exam.doppler?.ri != null ? String(exam.doppler.ri) : undefined,
+      pi:     exam.doppler?.pi     != null ? String(exam.doppler.pi)     : undefined,
+      ri:     exam.doppler?.ri     != null ? String(exam.doppler.ri)     : undefined,
       vessel: exam.doppler?.vessel ?? undefined,
+      // TASK-036
+      utADexPI: exam.doppler?.utADexPI != null ? String(exam.doppler.utADexPI) : undefined,
+      utADexRI: exam.doppler?.utADexRI != null ? String(exam.doppler.utADexRI) : undefined,
+      utASinPI: exam.doppler?.utASinPI != null ? String(exam.doppler.utASinPI) : undefined,
+      utASinRI: exam.doppler?.utASinRI != null ? String(exam.doppler.utASinRI) : undefined,
+      cma:     exam.doppler?.cma     != null ? String(exam.doppler.cma)     : undefined,
+      psv:     exam.doppler?.psv     != null ? String(exam.doppler.psv)     : undefined,
+      cpr:     exam.doppler?.cpr     != null ? String(exam.doppler.cpr)     : undefined,
+      ducVen:  exam.doppler?.ducVen  ?? undefined,
     },
 
     pregnancy: {
@@ -148,13 +213,18 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
     },
 
     anatomy: {
-      head: exam.data?.anatomy?.head,
-      brain: exam.data?.anatomy?.brain,
-      heart: exam.data?.anatomy?.heart,
-      abdomen: exam.data?.anatomy?.abdomen,
-      kidneys: exam.data?.anatomy?.kidneys,
-      limbs: exam.data?.anatomy?.limbs,
+      head:     exam.data?.anatomy?.head,
+      brain:    exam.data?.anatomy?.brain,
+      heart:    exam.data?.anatomy?.heart,
+      abdomen:  exam.data?.anatomy?.abdomen,
+      kidneys:  exam.data?.anatomy?.kidneys,
+      limbs:    exam.data?.anatomy?.limbs,
       skeleton: exam.data?.anatomy?.skeleton,
+      // TASK-036
+      face:     exam.data?.anatomy?.face,
+      neckSkin: exam.data?.anatomy?.neckSkin,
+      spine:    exam.data?.anatomy?.spine,
+      thorax:   exam.data?.anatomy?.thorax,
     },
 
     findings: exam.findings,
@@ -175,6 +245,13 @@ class PrintService {
     const vm = buildViewModel(exam);
     const doc = await buildExaminationPDF(vm);
     doc.save(`${exam.mrn}_${exam.examDate}.pdf`);
+  }
+
+  /** Generate the PDF and return it as a Blob (for email delivery). */
+  async getPdfBlob(exam: Examination): Promise<Blob> {
+    const vm = buildViewModel(exam);
+    const doc = await buildExaminationPDF(vm);
+    return doc.output('blob');
   }
 
   /** Open the browser print dialog for the PDF. */

@@ -6,6 +6,14 @@ import type {
   ExaminationsListResponse 
 } from '../types';
 
+export interface GetExaminationsOptions {
+  patientId?: string;
+  status?: string;
+  from_date?: string;
+  to_date?: string;
+  continuationToken?: string;
+}
+
 /**
  * Examination service for handling examination-related API operations
  */
@@ -13,16 +21,38 @@ class ExaminationService {
   private readonly EXAMINATIONS_BASE_URL = '/v1/examinations';
 
   /**
-   * Get list of examinations, optionally filtered by patient
-   * @param patientId - Optional patient ID to filter examinations
-   * @returns List of examinations
+   * Get list of examinations with optional filters and pagination.
+   * Accepts either a plain patientId string (legacy callers) or an options object.
    */
-  async getExaminations(patientId?: string): Promise<Examination[]> {
+  async getExaminations(
+    optsOrPatientId?: string | GetExaminationsOptions
+  ): Promise<ExaminationsListResponse> {
     try {
-      const params = patientId ? { patientId } : {};
-      // Interceptor unwraps envelope; response.data is now { examinations: [...] }
+      let params: Record<string, string | undefined> = {};
+      if (typeof optsOrPatientId === 'string') {
+        // Legacy call: getExaminations(patientId)
+        if (optsOrPatientId) params.patient_id = optsOrPatientId;
+      } else if (optsOrPatientId) {
+        const opts = optsOrPatientId;
+        // TASK-017: query param is patient_id, not patientId
+        if (opts.patientId) params.patient_id = opts.patientId;
+        if (opts.status)    params.status = opts.status;
+        if (opts.from_date) params.from_date = opts.from_date;
+        if (opts.to_date)   params.to_date = opts.to_date;
+        if (opts.continuationToken) params.continuationToken = opts.continuationToken;
+      }
       const response = await api.get<ExaminationsListResponse>(this.EXAMINATIONS_BASE_URL, { params });
-      return response.data.examinations;
+      // Backend returns { examinations: [...], continuationToken?: string }
+      // After envelope unwrap, response.data is that inner object
+      const data = response.data as any;
+      if (data && Array.isArray(data.examinations)) {
+        return { examinations: data.examinations, continuationToken: data.continuationToken };
+      }
+      // Fallback for legacy responses that return an array directly
+      if (Array.isArray(data)) {
+        return { examinations: data };
+      }
+      return { examinations: [] };
     } catch (error: any) {
       const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch examinations';
       throw new Error(message);
@@ -85,6 +115,19 @@ class ExaminationService {
         throw conflictError;
       }
       const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to update examination';
+      throw new Error(message);
+    }
+  }
+
+  /**
+   * Delete an examination (admin and doctor roles)
+   * @param id - Examination ID
+   */
+  async deleteExamination(id: string): Promise<void> {
+    try {
+      await api.delete(`${this.EXAMINATIONS_BASE_URL}/${id}`);
+    } catch (error: any) {
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to delete examination';
       throw new Error(message);
     }
   }

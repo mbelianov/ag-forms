@@ -49,7 +49,8 @@ export interface UsernameLookup extends BaseEntity {
 export interface Patient extends BaseEntity {
     patientId: string;
     name: string;
-    age: number;
+    age?: number;        // legacy — still stored for old records
+    birthDate?: string;  // TASK-038: YYYY-MM-DD — replaces age
     phone: string;
     email?: string;
     address?: string;
@@ -96,6 +97,11 @@ export interface AnatomyFindings {
     kidneys?: string;
     limbs?: string;
     skeleton?: string;
+    // TASK-036: Extended anatomy fields
+    face?: string;
+    neckSkin?: string;
+    spine?: string;
+    thorax?: string;
 }
 
 export interface ExaminationData {
@@ -114,15 +120,36 @@ export interface BiometryData {
     ac?: number;  // Abdominal Circumference (integer, mm)
     fl?: number;  // Femur Length (integer, mm)
     efw?: number; // Estimated Fetal Weight (integer, grams)
+    // TASK-034: Extended biometry parameters
+    ofd?: number;         // Occipito-frontal Diameter (integer, mm)
+    vp?: number;          // Vermis (integer, mm)
+    tcd?: number;         // Transcerebellar Diameter (integer, mm)
+    cm?: number;          // Cisterna Magna (integer, mm)
+    nuchalFold?: number;  // Nuchal Fold (integer, mm)
+    nb?: number;          // Nasal Bone (integer, mm)
+    apad?: number;        // Antero-Posterior Abdominal Diameter (integer, mm)
+    tad?: number;         // Transverse Abdominal Diameter (integer, mm)
+    // TASK-035: LA and LC
+    la?: number;          // Left Atrium (integer, mm)
+    lc?: number;          // Left Cardiac (integer, mm)
 }
 
 /**
  * Doppler measurements for ultrasound examination
  */
 export interface DopplerData {
-    pi?: number; // Pulsatility Index (float)
-    ri?: number; // Resistance Index (float)
+    pi?: number;     // Pulsatility Index (float)
+    ri?: number;     // Resistance Index (float)
     vessel?: string; // Vessel name (e.g., "Umbilical Artery")
+    // TASK-036: Extended vascular parameters
+    utADexPI?: number;  // A.ut. Dex PI
+    utADexRI?: number;  // A.ut. Dex RI
+    utASinPI?: number;  // A.ut. Sin PI
+    utASinRI?: number;  // A.ut. Sin RI
+    cma?: number;       // CMA
+    psv?: number;       // PSV
+    cpr?: number;       // CPR
+    ducVen?: string;    // Duc.Ven (free-text)
 }
 
 /**
@@ -139,11 +166,13 @@ export interface Examination extends BaseEntity {
     gestationalAge?: string; // e.g., "28w 3d" — GA from LMP
     gestationalAgeFromBiometry?: string; // e.g., "28w 3d" — GA derived from biometry
     status: 'draft' | 'completed' | 'reviewed';
+    examinationType?: string; // TASK-033: e.g. "ultrasound_prenatal"
     biometry?: BiometryData;
     doppler?: DopplerData;
     notes?: string;
     findings?: string;
     data?: ExaminationData; // nested clinical sub-data (serialized as JSON in Table Storage)
+    patientAgeAtExam?: number; // TASK-037: patient age (whole years) at exam date
     createdAt: string;
     updatedAt: string;
     createdBy: string; // userId
