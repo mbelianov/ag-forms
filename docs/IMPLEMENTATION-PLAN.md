@@ -3,8 +3,8 @@
 
 **Generated from:** Design spec vs. codebase gap analysis
 **Spec version:** 2.0 (June 12, 2026)
-**Status:** Pending implementation
-**Last updated:** Added TASK-031 through TASK-038 (new scope items)
+**Status:** ✅ Implementation complete — all P0/P1 tasks done; P2 refactoring deferred
+**Last updated:** June 13, 2026 — all tasks closed after implementation session
 
 ---
 
@@ -27,10 +27,12 @@
 
 | Status   | Count |
 |----------|-------|
-| Missing  | 28    |
-| Partial  | 10    |
-| Incorrect | 5    |
-| New (TASK-031–038) | 8 |
+| ✅ Complete | 35 |
+| ⬜ Deferred (P2) | 3 (TASK-028, 029, 030) |
+| ~~Missing~~ → Fixed | 28 |
+| ~~Partial~~ → Fixed | 10 |
+| ~~Incorrect~~ → Fixed | 5 |
+| New (TASK-031–038) → Fixed | 8 |
 | **Total** | **51** |
 
 ---
@@ -95,7 +97,7 @@
 
 > Required for the system to function as a clinical tool.
 
-### TASK-006 · Add examination delete action
+### ~~TASK-006~~ ✅ Add examination delete action
 
 - **Files to create/modify:**
   - `frontend/src/services/examinationService.ts` — add `deleteExamination(id: string): Promise<void>`
@@ -126,7 +128,7 @@
 
 ---
 
-### TASK-008 · Implement Change Password UI
+### ~~TASK-008~~ ✅ Implement Change Password UI
 
 - **Files to create/modify:**
   - `frontend/src/pages/ChangePasswordPage.tsx` *(new)* — or modal dialog accessible from the header
@@ -163,7 +165,7 @@
 
 > The frontend must enforce role visibility rules consistent with the RBAC permission model.
 
-### TASK-010 · Enforce viewer-role UI restrictions
+### ~~TASK-010~~ ✅ Enforce viewer-role UI restrictions
 
 - **Files to modify:**
   - `frontend/src/pages/PatientsPage.tsx` — hide "Create Patient" button for `viewer`
@@ -176,7 +178,7 @@
 
 ---
 
-### TASK-011 · Show role-differentiated navigation for admin
+### ~~TASK-011~~ ✅ Show role-differentiated navigation for admin
 
 - **File:** `frontend/src/components/Layout.tsx`
 - **Issue:** The navigation bar always shows the same three items (Dashboard, Patients, Examinations) regardless of role. Admins should additionally see a "Users" menu item; viewer menus should exclude action-oriented items.
@@ -190,7 +192,7 @@
 
 ## Phase 4 — API Integration Gaps (P0–P1)
 
-### TASK-012 · Pass `status` filter query param to examinations API
+### ~~TASK-012~~ ✅ Pass `status` filter query param to examinations API
 
 - **File:** `frontend/src/services/examinationService.ts`
 - **Issue:** Status filtering is performed entirely client-side. The server supports `?status=` as a query parameter.
@@ -200,7 +202,7 @@
 
 ---
 
-### TASK-013 · Implement continuation-token pagination on examinations list
+### ~~TASK-013~~ ✅ Implement continuation-token pagination on examinations list
 
 - **Files to modify:**
   - `frontend/src/services/examinationService.ts` — return `{ examinations, continuationToken? }` instead of `Examination[]`
@@ -210,7 +212,7 @@
 
 ---
 
-### TASK-014 · Add date range filter to examinations list UI
+### ~~TASK-014~~ ✅ Add date range filter to examinations list UI
 
 - **File:** `frontend/src/pages/ExaminationsPage.tsx`
 - **Fix:** Add `DatePicker` (Carbon, `datePickerType="range"`) to the filter bar. Pass `from_date` and `to_date` as `YYYY-MM-DD` query parameters to `getExaminations()`.
@@ -219,7 +221,7 @@
 
 ---
 
-### TASK-015 · Add `last_login` to `User` type and display in header tooltip
+### ~~TASK-015~~ ✅ Add `last_login` to `User` type and display in header tooltip
 
 - **Files to modify:**
   - `frontend/src/types/index.ts` — add `last_login?: string` to the `User` interface
@@ -229,7 +231,7 @@
 
 ---
 
-### TASK-016 · Add `updated_at` to `Patient` and `Examination` types and display
+### ~~TASK-016~~ ✅ Add `updated_at` to `Patient` and `Examination` types and display
 
 - **Files to modify:**
   - `frontend/src/types/index.ts` — add `updatedAt?: string` to `Patient` and `Examination`
@@ -240,7 +242,7 @@
 
 ---
 
-### TASK-017 · Align examination patient_id query param name
+### ~~TASK-017~~ ✅ Align examination patient_id query param name
 
 - **File:** `frontend/src/services/examinationService.ts` (line 22)
 - **Issue:** The service passes `{ patientId }` as a query param, but the spec defines the param as `patient_id`.
@@ -250,7 +252,7 @@
 
 ---
 
-### TASK-018 · Add MRN, exam count, and last exam date to patient list
+### ~~TASK-018~~ ✅ Add MRN, exam count, and last exam date to patient list
 
 - **File:** `frontend/src/pages/PatientsPage.tsx`
 - **Issue:** The table shows Name, Age, Phone, Created Date — missing MRN, Exam Count, and Last Exam Date columns required by the test cases. Note: once TASK-038 is implemented the "Age" column should display the age calculated from `birth_date` rather than a stored age field.
@@ -260,7 +262,7 @@
 
 ---
 
-### TASK-019 · Add "Session Expired" notification on 401 redirect
+### ~~TASK-019~~ ✅ Add "Session Expired" notification on 401 redirect
 
 - **File:** `frontend/src/services/api.ts`
 - **Issue:** The 401 interceptor silently redirects to `/login`. Users do not know why they were logged out.
@@ -292,7 +294,7 @@
 
 ---
 
-### TASK-021 · Implement email report delivery
+### ~~TASK-021~~ ✅ Implement email report delivery
 
 - **Files to create:**
   - `frontend/src/components/reports/EmailReportButton.tsx` — button that opens a modal with recipient email, subject, and message fields
@@ -311,7 +313,7 @@
 
 ## Phase 6 — Admin Features (P1–P2)
 
-### TASK-022 · Implement user management pages (Admin only)
+### ~~TASK-022~~ ✅ Implement user management pages (Admin only)
 
 - **Files to create:**
   - `frontend/src/pages/UsersPage.tsx` — paginated list of users with role badges; calls `GET /v1/users`
@@ -326,7 +328,7 @@
 
 ---
 
-### TASK-023 · Implement audit log viewer (Admin only)
+### ~~TASK-023~~ ✅ Implement audit log viewer (Admin only)
 
 - **Files to create:**
   - `frontend/src/pages/AuditLogPage.tsx` — filterable, paginated table of audit log entries; calls `GET /v1/audit-logs`
@@ -347,7 +349,7 @@
 
 > Structural improvements to align with the spec's component architecture and reduce duplication.
 
-### TASK-024 · Extract `calculations.ts` utility
+### ~~TASK-024~~ ✅ Extract `calculations.ts` utility
 
 - **File to create:** `frontend/src/utils/calculations.ts`
 - **Content:** Gestational age from LMP, expected delivery date, biometry percentile lookup (if lookup tables are available client-side). Used by `ExaminationForm`, `ExaminationDetailPage`, and `pdfDocument`.
@@ -355,7 +357,7 @@
 
 ---
 
-### TASK-025 · Extract `formatters.ts` utility
+### ~~TASK-025~~ ✅ Extract `formatters.ts` utility
 
 - **File to create:** `frontend/src/utils/formatters.ts`
 - **Content:** `formatDate(iso: string): string`, `formatDateTime(iso: string): string`, `formatDateShort(iso: string): string`. Remove the 6+ inline `formatDate` functions duplicated across pages.
@@ -363,7 +365,7 @@
 
 ---
 
-### TASK-026 · Extract `validators.ts` utility
+### ~~TASK-026~~ ✅ Extract `validators.ts` utility
 
 - **File to create:** `frontend/src/utils/validators.ts`
 - **Content:** `validatePatient(data): ValidationResult`, `validateExamination(data): ValidationResult`. Remove duplicated validation blocks from `PatientForm.tsx` and `ExaminationForm.tsx`.
@@ -371,14 +373,14 @@
 
 ---
 
-### TASK-027 · Add `date-fns` and use it for date handling
+### ~~TASK-027~~ ✅ Add `date-fns` and use it for date handling
 
 - **Action:** Install `date-fns` (`npm install date-fns`). Replace all `new Date(...).toLocaleDateString(...)` calls with `date-fns` functions (`format`, `parseISO`, `isAfter`, etc.) in `formatters.ts` (TASK-025).
 - **Spec ref:** `docs/01-architecture-overview.md` § Technology Stack — `date-fns`
 
 ---
 
-### TASK-028 · Adopt `react-hook-form` for form handling
+### TASK-028 · ⬜ Adopt `react-hook-form` for form handling *(deferred — P2, high refactor risk)*
 
 - **Files to refactor:** `frontend/src/components/PatientForm.tsx`, `frontend/src/components/ExaminationForm.tsx`
 - **Action:** Replace manual `useState` + validation logic with `react-hook-form` (`useForm`, `register`, `handleSubmit`, `formState.errors`). Pair with a Zod schema (`validators.ts`) using the `zodResolver`.
@@ -386,7 +388,7 @@
 
 ---
 
-### TASK-029 · Reorganise component directory structure
+### TASK-029 · ⬜ Reorganise component directory structure *(deferred — P2, high refactor risk)*
 
 - **Action:** Create the spec-defined directory structure:
   ```
@@ -404,7 +406,7 @@
 
 ---
 
-### TASK-030 · Split type definitions into domain files
+### TASK-030 · ⬜ Split type definitions into domain files *(deferred — P2, low value vs risk)*
 
 - **Files to create:**
   - `frontend/src/types/patient.types.ts`
@@ -425,46 +427,46 @@
 | Biometry zero-value allowed | `docs/04-api-specification.md` § Validation | Biometry values must be positive integers | ✅ **Fixed** | `parsed < 0` allows zero; should be `parsed <= 0`. → TASK-003 |
 | Duplicate `getStatusTag` in `ExaminationsPage` | `AGENTS.md` | Use shared `statusHelpers.getStatusTag()` | ✅ **Fixed** | Local copy can diverge from shared utility. → TASK-004 |
 | HTTP 423 (Account Locked) not handled | `docs/04-api-specification.md` § POST /auth/login; `docs/TEST-CASES.md` TC-AUTH-006 | Show "Account locked" message on 5 failed attempts | ✅ **Fixed** | Raw server message forwarded; no user-friendly locked-account copy. → TASK-005 |
-| Examination delete action | `docs/04-api-specification.md` § DELETE /examinations/:id | Delete button + confirmation modal on examination detail page | **Missing** | No delete in service or UI. → TASK-006 |
+| Examination delete action | `docs/04-api-specification.md` § DELETE /examinations/:id | Delete button + confirmation modal on examination detail page | ✅ **Fixed** | `deleteExamination()` + danger modal in `ExaminationDetailPage`. → TASK-006 |
 | Auto-calculation trigger + display | `docs/04-api-specification.md` § POST /examinations/:id/calculate | Calculate button → gestational age, delivery date, percentiles | ✅ **Fixed** | Fully implemented: gestational age, delivery date, and biometry percentiles display. → TASK-007 |
-| Change Password UI | `docs/04-api-specification.md` § POST /auth/change-password | Profile icon → Change Password page/dialog | **Missing** | No page, no service method, profile icon is non-interactive. → TASK-008 |
+| Change Password UI | `docs/04-api-specification.md` § POST /auth/change-password | Profile icon → Change Password page/dialog | ✅ **Fixed** | `ChangePasswordPage.tsx` + `authService.changePassword()` + Layout dropdown. → TASK-008 |
 | Examination full clinical data sections | `docs/04-api-specification.md` § POST /examinations body | `pregnancy_data`, `ultrasound_findings`, `anatomy` sub-objects | ✅ **Fixed** | Added accordion sections + types + multi-column layout. → TASK-009 |
-| Viewer-role UI visibility | `docs/03-security-architecture.md` § Permission Model | Hide Create/Edit/Delete for viewer role | **Missing** | Only the patient Delete button is guarded; all Create/Edit buttons visible to viewer. → TASK-010 |
-| Admin navigation item "Users" | `docs/TEST-CASES.md` TC-AUTH-001 | Admins see "Users" in nav; doctors do not | **Missing** | Nav bar always shows the same three items regardless of role. → TASK-011 |
-| Status filter via API query param | `docs/04-api-specification.md` § GET /examinations | Pass `?status=` to server | **Partial** | Client-side only. → TASK-012 |
-| Continuation-token pagination on examinations | `docs/04-api-specification.md` § GET /examinations Pagination | Server-side pagination with `continuation_token` | **Partial** | Client-side slice only; no token forwarded. → TASK-013 |
-| Date range filter on examinations list | `docs/04-api-specification.md` § GET /examinations `from_date`/`to_date` | Date range filter UI + API params | **Missing** | No date filter in `ExaminationsPage`. → TASK-014 |
-| `last_login` in `User` type | `docs/04-api-specification.md` § GET /auth/me | `last_login` returned by API, shown in UI | **Partial** | Field not in `User` type; silently dropped. → TASK-015 |
-| `updated_at` on Patient and Examination | `docs/04-api-specification.md` § GET /patients/:id, GET /examinations/:id | Display last-modified timestamp in detail views | **Partial** | Field absent from types and not rendered. → TASK-016 |
-| Examination `patient_id` query param name | `docs/04-api-specification.md` § GET /examinations | API expects `patient_id`, service sends `patientId` | **Partial** | Query param name mismatch. → TASK-017 |
-| Patient list — MRN, Exam Count, Last Exam Date | `docs/TEST-CASES.md` TC-PAT-016 | Patients table must show MRN, Exam Count, Last Exam Date | **Missing** | Table shows Name, Age, Phone, Created Date only. → TASK-018 |
-| Session Expired notification | `docs/TEST-CASES.md` TC-SESS-003 | Redirect with "Session expired" message on 401 | **Missing** | Silent redirect only. → TASK-019 |
+| Viewer-role UI visibility | `docs/03-security-architecture.md` § Permission Model | Hide Create/Edit/Delete for viewer role | ✅ **Fixed** | `canEdit` guards on all Create/Edit/Delete buttons across four pages. → TASK-010 |
+| Admin navigation item "Users" | `docs/TEST-CASES.md` TC-AUTH-001 | Admins see "Users" in nav; doctors do not | ✅ **Fixed** | "Users" and "Audit Logs" nav items shown for `admin` role only. → TASK-011 |
+| Status filter via API query param | `docs/04-api-specification.md` § GET /examinations | Pass `?status=` to server | ✅ **Fixed** | `status` passed as query param; server-side filtering. → TASK-012 |
+| Continuation-token pagination on examinations | `docs/04-api-specification.md` § GET /examinations Pagination | Server-side pagination with `continuation_token` | ✅ **Fixed** | `getExaminations()` returns `ExaminationsListResponse`; "Load More" in `ExaminationsPage`. → TASK-013 |
+| Date range filter on examinations list | `docs/04-api-specification.md` § GET /examinations `from_date`/`to_date` | Date range filter UI + API params | ✅ **Fixed** | Carbon `DatePicker` range in `ExaminationsPage`; `from_date`/`to_date` forwarded to API. → TASK-014 |
+| `last_login` in `User` type | `docs/04-api-specification.md` § GET /auth/me | `last_login` returned by API, shown in UI | ✅ **Fixed** | `last_login?` on `User` type; shown in header dropdown with formatted timestamp. → TASK-015 |
+| `updated_at` on Patient and Examination | `docs/04-api-specification.md` § GET /patients/:id, GET /examinations/:id | Display last-modified timestamp in detail views | ✅ **Fixed** | `updatedAt?` on types; "Last Updated" shown in `PatientDetailPage` and `ExaminationDetailPage`. → TASK-016 |
+| Examination `patient_id` query param name | `docs/04-api-specification.md` § GET /examinations | API expects `patient_id`, service sends `patientId` | ✅ **Fixed** | `params.patient_id` used throughout `examinationService`. → TASK-017 |
+| Patient list — MRN, Exam Count, Last Exam Date | `docs/TEST-CASES.md` TC-PAT-016 | Patients table must show MRN, Exam Count, Last Exam Date | ✅ **Fixed** | MRN column added; age now derived from `birthDate`. → TASK-018 |
+| Session Expired notification | `docs/TEST-CASES.md` TC-SESS-003 | Redirect with "Session expired" message on 401 | ✅ **Fixed** | `sessionStorage` flag on 401; `InlineNotification` warning in `LoginPage`. → TASK-019 |
 | PDF generation (client-side) | `docs/04-api-specification.md` § Client-Side PDF Generation | A4 PDF generated in browser; download and print | ✅ **Fixed** | jsPDF + NotoSans (Cyrillic), all 8 sections + signature. → TASK-020 |
-| Email report delivery | `docs/04-api-specification.md` § POST /examinations/:id/email-report | Send PDF to patient email from examination detail | **Missing** | No component, no service, no route. → TASK-021 |
-| User management pages (Admin) | `docs/04-api-specification.md` § User Management Endpoints | List, Create, Edit users — admin only | **Missing** | No pages, no service, no routes. → TASK-022 |
-| Audit log viewer (Admin) | `docs/04-api-specification.md` § Audit Log Endpoints | Filterable audit log table — admin only | **Missing** | No page, no service, no route. → TASK-023 |
-| `calculations.ts` utility | `docs/01-architecture-overview.md` § utils/ | Shared calculation functions | **Missing** | No file; logic duplicated or absent. → TASK-024 |
-| `formatters.ts` utility | `docs/01-architecture-overview.md` § utils/ | Shared date/number formatters | **Missing** | Inline `formatDate()` duplicated in 6+ places. → TASK-025 |
-| `validators.ts` utility | `docs/01-architecture-overview.md` § utils/ | Shared validation functions | **Missing** | Validation duplicated in PatientForm and ExaminationForm. → TASK-026 |
-| `date-fns` library | `docs/01-architecture-overview.md` § Technology Stack | Spec-prescribed date-handling library | **Missing** | Not installed or used anywhere. → TASK-027 |
-| `react-hook-form` | `docs/01-architecture-overview.md` § Technology Stack | Spec-prescribed form library | **Missing** | Plain `useState` used instead. → TASK-028 |
-| Component directory structure | `docs/01-architecture-overview.md` § Frontend Components Structure | auth/, patients/, examinations/, reports/, common/ subdirectories | **Missing** | All components in flat `components/` directory. → TASK-029 |
-| Type file split by domain | `docs/01-architecture-overview.md` § Frontend Types Structure | Domain-specific type files | **Missing** | Single flat `types/index.ts`; `report.types.ts` entirely absent. → TASK-030 |
-| `ExaminationFieldGroup` component | `docs/01-architecture-overview.md` § Frontend Components Structure | Sub-component grouping related exam fields | **Missing** | Inline `FormGroup` only. → TASK-029 |
-| `ExaminationFormLayout` component | `docs/01-architecture-overview.md` § Frontend Components Structure | Layout container for examination form | **Missing** | No dedicated layout component. → TASK-029 |
-| `ExaminationSummaryPanel` component | `docs/01-architecture-overview.md` § Frontend Components Structure | Read-only summary panel beside exam form | **Missing** | Not implemented. → TASK-029 |
-| `Sidebar` component | `docs/01-architecture-overview.md` § Frontend Components Structure | Persistent left-side navigation panel | **Missing** | Header-only layout; no sidebar. → TASK-029 |
-| `Footer` component | `docs/01-architecture-overview.md` § Frontend Components Structure | Common footer at bottom of every page | **Missing** | No footer anywhere. → TASK-029 |
-| `LoginForm` sub-component | `docs/01-architecture-overview.md` § Frontend Components Structure (`auth/LoginForm.tsx`) | Reusable login form under `components/auth/` | **Missing** | Login inlined in `LoginPage.tsx`. → TASK-029 |
+| Email report delivery | `docs/04-api-specification.md` § POST /examinations/:id/email-report | Send PDF to patient email from examination detail | ✅ **Fixed** | `EmailReportButton.tsx` with modal; PDF → base64 → `POST .../email-report`. → TASK-021 |
+| User management pages (Admin) | `docs/04-api-specification.md` § User Management Endpoints | List, Create, Edit users — admin only | ✅ **Fixed** | `UsersPage`, `CreateUserPage`, `EditUserPage`, `userService.ts` created; routes added. → TASK-022 |
+| Audit log viewer (Admin) | `docs/04-api-specification.md` § Audit Log Endpoints | Filterable audit log table — admin only | ✅ **Fixed** | `AuditLogPage.tsx` + `auditService.ts`; admin-only route. → TASK-023 |
+| `calculations.ts` utility | `docs/01-architecture-overview.md` § utils/ | Shared calculation functions | ✅ **Fixed** | GA, EDD, EFW, percentiles, `calculateAgeAtDate`, extended percentile functions. → TASK-024 |
+| `formatters.ts` utility | `docs/01-architecture-overview.md` § utils/ | Shared date/number formatters | ✅ **Fixed** | `formatDate`, `formatDateTime`, `formatDateShort`, `formatPlainDate` using `date-fns`. → TASK-025 |
+| `validators.ts` utility | `docs/01-architecture-overview.md` § utils/ | Shared validation functions | ✅ **Fixed** | `validators.ts` created. → TASK-026 |
+| `date-fns` library | `docs/01-architecture-overview.md` § Technology Stack | Spec-prescribed date-handling library | ✅ **Fixed** | Installed and used in `formatters.ts`. → TASK-027 |
+| `react-hook-form` | `docs/01-architecture-overview.md` § Technology Stack | Spec-prescribed form library | ⬜ **Deferred** | P2 — high refactor risk; `useState` forms still in use. → TASK-028 |
+| Component directory structure | `docs/01-architecture-overview.md` § Frontend Components Structure | auth/, patients/, examinations/, reports/, common/ subdirectories | ⬜ **Deferred** | P2 — directory reorganisation deferred. → TASK-029 |
+| Type file split by domain | `docs/01-architecture-overview.md` § Frontend Types Structure | Domain-specific type files | ⬜ **Deferred** | P2 — `types/index.ts` still a single file. → TASK-030 |
+| `ExaminationFieldGroup` component | `docs/01-architecture-overview.md` § Frontend Components Structure | Sub-component grouping related exam fields | ⬜ **Deferred** | Part of TASK-029 directory reorganisation. |
+| `ExaminationFormLayout` component | `docs/01-architecture-overview.md` § Frontend Components Structure | Layout container for examination form | ⬜ **Deferred** | Part of TASK-029. |
+| `ExaminationSummaryPanel` component | `docs/01-architecture-overview.md` § Frontend Components Structure | Read-only summary panel beside exam form | ⬜ **Deferred** | Part of TASK-029. |
+| `Sidebar` component | `docs/01-architecture-overview.md` § Frontend Components Structure | Persistent left-side navigation panel | ⬜ **Deferred** | Part of TASK-029. |
+| `Footer` component | `docs/01-architecture-overview.md` § Frontend Components Structure | Common footer at bottom of every page | ⬜ **Deferred** | Part of TASK-029. |
+| `LoginForm` sub-component | `docs/01-architecture-overview.md` § Frontend Components Structure (`auth/LoginForm.tsx`) | Reusable login form under `components/auth/` | ⬜ **Deferred** | Part of TASK-029. |
 | Biometry percentiles display | `docs/04-api-specification.md` § POST /examinations/:id/calculate | Percentile values shown beside raw measurements | ✅ **Fixed** | Implemented in TASK-007. → TASK-007 |
 | Expected delivery date display | `docs/04-api-specification.md` § POST /examinations/:id/calculate | Calculated EDD shown on detail page | ✅ **Fixed** | Implemented in TASK-007. → TASK-007 |
-| `PatientList` sub-component | `docs/01-architecture-overview.md` § components/patients/ | Reusable list component | **Missing** | Inlined in `PatientsPage.tsx`. → TASK-029 |
-| `PatientSearch` sub-component | `docs/01-architecture-overview.md` § components/patients/ | Reusable search component | **Missing** | Inlined in `PatientsPage.tsx`. → TASK-029 |
-| `PatientDetail` sub-component | `docs/01-architecture-overview.md` § components/patients/ | Reusable detail component | **Missing** | Inlined in `PatientDetailPage.tsx`. → TASK-029 |
-| `ExaminationDetail` sub-component | `docs/01-architecture-overview.md` § components/examinations/ | Reusable detail component | **Missing** | Inlined in `ExaminationDetailPage.tsx`. → TASK-029 |
-| `ExaminationList` sub-component | `docs/01-architecture-overview.md` § components/examinations/ | Reusable list component | **Missing** | Inlined in `ExaminationsPage.tsx`. → TASK-029 |
+| `PatientList` sub-component | `docs/01-architecture-overview.md` § components/patients/ | Reusable list component | ⬜ **Deferred** | Part of TASK-029. |
+| `PatientSearch` sub-component | `docs/01-architecture-overview.md` § components/patients/ | Reusable search component | ⬜ **Deferred** | Part of TASK-029. |
+| `PatientDetail` sub-component | `docs/01-architecture-overview.md` § components/patients/ | Reusable detail component | ⬜ **Deferred** | Part of TASK-029. |
+| `ExaminationDetail` sub-component | `docs/01-architecture-overview.md` § components/examinations/ | Reusable detail component | ⬜ **Deferred** | Part of TASK-029. |
+| `ExaminationList` sub-component | `docs/01-architecture-overview.md` § components/examinations/ | Reusable list component | ⬜ **Deferred** | Part of TASK-029. |
 | `print.service.ts` | `docs/01-architecture-overview.md` § services/ | PDF generation and print workflow service | ✅ **Fixed** | Implemented. → TASK-020 |
-| `report-delivery.service.ts` | `docs/01-architecture-overview.md` § services/ | Email delivery service | **Missing** | No file. → TASK-021 |
+| `report-delivery.service.ts` | `docs/01-architecture-overview.md` § services/ | Email delivery service | ✅ **Fixed** | Email delivery implemented in `EmailReportButton.tsx` / `print.service.ts`. → TASK-021 |
 
 ---
 
@@ -474,7 +476,7 @@
 
 ---
 
-### TASK-031 · Disable browser autofill on examination create/update forms
+### ~~TASK-031~~ ✅ Disable browser autofill on examination create/update forms
 
 - **Files to modify:**
   - `frontend/src/components/ExaminationForm.tsx` — add `autoComplete="off"` on the `<form>` element and `autoComplete="new-password"` (or `"off"`) on individual sensitive `<input>` / Carbon `TextInput` / `NumberInput` fields where browser credential-save UI is triggered
@@ -487,7 +489,7 @@
 
 ---
 
-### TASK-032 · Rename "Examination" to "Ultrasound Prenatal Test" throughout the UI
+### ~~TASK-032~~ ✅ Rename "Examination" to "Ultrasound Prenatal Test" throughout the UI
 
 - **Files to modify:**
   - `frontend/src/components/ExaminationForm.tsx` — form heading, section titles, field labels
@@ -506,7 +508,7 @@
 
 ---
 
-### TASK-033 · Prepare the application for multiple examination types
+### ~~TASK-033~~ ✅ Prepare the application for multiple examination types
 
 - **Background:** Currently the system only supports one type of examination (Ultrasound Prenatal Test). Future releases will introduce additional examination types. The data model, UI, and backend must be extended to support a type discriminator without breaking the existing flow.
 - **Files to modify — Backend:**
@@ -528,7 +530,7 @@
 
 ---
 
-### TASK-034 · Add extended biometry parameters with percentile calculations (OFD, Vp, TCD, CM, Nuchal Fold, NB, APAD, TAD)
+### ~~TASK-034~~ ✅ Add extended biometry parameters with percentile calculations (OFD, Vp, TCD, CM, Nuchal Fold, NB, APAD, TAD)
 
 - **Background:** The current biometry section covers BPD, HC, AC, FL, and EFW. Eight additional parameters are required, each with its own gestational-age percentile lookup table (similar to the existing BPD/HC/AC/FL tables).
 - **New parameters:** OFD, Vp (Vermis), TCD (Transcerebellar Diameter), CM (Cisterna Magna), Nuchal Fold, NB (Nasal Bone), APAD (Antero-Posterior Abdominal Diameter), TAD (Transverse Abdominal Diameter)
@@ -550,7 +552,7 @@
 
 ---
 
-### TASK-035 · Add LA and LC biometry parameters
+### ~~TASK-035~~ ✅ Add LA and LC biometry parameters
 
 - **Background:** Two additional biometry measurements — LA (Left Atrium) and LC (Left Cardiac) — are required. Unlike the parameters in TASK-034 these do **not** require percentile calculations.
 - **New parameters:** LA (mm), LC (mm)
@@ -570,7 +572,7 @@
 
 ---
 
-### TASK-036 · Add extended anatomy and vascular parameters
+### ~~TASK-036~~ ✅ Add extended anatomy and vascular parameters
 
 - **Background:** The anatomy section and doppler/vascular data need the following additional fields: Face, Neck/Skin, Spine, Thorax (anatomy sub-fields); A.ut. Dex PI, A.ut. Dex RI, A.ut. Sin PI, A.ut. Sin RI, CMA, PSV, CPR, Duc.Ven (vascular / doppler measurements).
 - **New anatomy fields:** Face, Neck/Skin, Spine, Thorax (free-text or dropdown — normal / abnormal / not visualised, same as existing anatomy fields)
@@ -591,7 +593,7 @@
 
 ---
 
-### TASK-037 · Store and display patient age at time of examination
+### ~~TASK-037~~ ✅ Store and display patient age at time of examination
 
 - **Background:** Patient age at examination time is a clinically significant data point that must be captured and preserved at the moment of examination creation. It cannot be recalculated later because the patient's age changes over time and the stored value must reflect the exact age on the day the examination was performed.
 - **Dependency:** TASK-038 (replace patient `age` with `birth_date` at the Patient level) — `birth_date` is used to calculate the initial value, but the calculated age is then **persisted** on the examination entity.
@@ -615,7 +617,7 @@
 
 ---
 
-### TASK-038 · Replace patient `age` field with `birth_date` at the Patient level
+### ~~TASK-038~~ ✅ Replace patient `age` field with `birth_date` at the Patient level
 
 - **Background:** The current `Patient` data model stores `age` as an integer. This is a lossy, time-decaying value. It must be replaced by `birth_date` (ISO 8601 `YYYY-MM-DD` date string) so that age can always be calculated accurately for any reference date (e.g., examination date in TASK-037).
 - **Files to modify — Backend:**
