@@ -1,9 +1,10 @@
 # Implementation Plan
 ## Prenatal Ultrasound Documentation System — Frontend Gap Closure
 
-**Generated from:** Design spec vs. codebase gap analysis  
-**Spec version:** 2.0 (June 12, 2026)  
+**Generated from:** Design spec vs. codebase gap analysis
+**Spec version:** 2.0 (June 12, 2026)
 **Status:** Pending implementation
+**Last updated:** Added TASK-031 through TASK-038 (new scope items)
 
 ---
 
@@ -17,7 +18,8 @@
 6. [Phase 5 — PDF & Email Delivery (P0–P1)](#phase-5--pdf--email-delivery-p0p1)
 7. [Phase 6 — Admin Features (P1–P2)](#phase-6--admin-features-p1p2)
 8. [Phase 7 — Code Quality & Architecture (P2)](#phase-7--code-quality--architecture-p2)
-9. [Full Gap Table](#full-gap-table)
+9. [Phase 8 — New Scope Items](#phase-8--new-scope-items)
+10. [Full Gap Table](#full-gap-table)
 
 ---
 
@@ -28,7 +30,8 @@
 | Missing  | 28    |
 | Partial  | 10    |
 | Incorrect | 5    |
-| **Total** | **43** |
+| New (TASK-031–038) | 8 |
+| **Total** | **51** |
 
 ---
 
@@ -250,7 +253,7 @@
 ### TASK-018 · Add MRN, exam count, and last exam date to patient list
 
 - **File:** `frontend/src/pages/PatientsPage.tsx`
-- **Issue:** The table shows Name, Age, Phone, Created Date — missing MRN, Exam Count, and Last Exam Date columns required by the test cases.
+- **Issue:** The table shows Name, Age, Phone, Created Date — missing MRN, Exam Count, and Last Exam Date columns required by the test cases. Note: once TASK-038 is implemented the "Age" column should display the age calculated from `birth_date` rather than a stored age field.
 - **Fix:** Extend the table headers and row data. MRN and exam count may require either a denormalized field from the API or a parallel examinations count query. Coordinate with the backend API response shape.
 - **Spec ref:** `docs/TEST-CASES.md` TC-PAT-016
 - **Priority:** P1
@@ -465,4 +468,175 @@
 
 ---
 
-*Total tasks: 30 | Estimated phases: 7*
+## Phase 8 — New Scope Items
+
+> Newly identified requirements. Not yet assigned to a release milestone.
+
+---
+
+### TASK-031 · Disable browser autofill on examination create/update forms
+
+- **Files to modify:**
+  - `frontend/src/components/ExaminationForm.tsx` — add `autoComplete="off"` on the `<form>` element and `autoComplete="new-password"` (or `"off"`) on individual sensitive `<input>` / Carbon `TextInput` / `NumberInput` fields where browser credential-save UI is triggered
+- **Behaviour:**
+  - Browsers must not offer to save or auto-fill values in the Examination Create and Examination Edit forms
+  - The fix must survive Chrome's heuristics — use `autoComplete="new-password"` on password-adjacent inputs and `autoComplete="off"` on the wrapping `<form>` for remaining fields
+  - No functional change to form data submission or validation
+- **Scope:** UI only (frontend)
+- **Priority:** P1
+
+---
+
+### TASK-032 · Rename "Examination" to "Ultrasound Prenatal Test" throughout the UI
+
+- **Files to modify:**
+  - `frontend/src/components/ExaminationForm.tsx` — form heading, section titles, field labels
+  - `frontend/src/pages/ExaminationsPage.tsx` — page title, "Create Examination" button, table column headers, empty-state text
+  - `frontend/src/pages/ExaminationDetailPage.tsx` — page heading, breadcrumb, action button labels
+  - `frontend/src/pages/PatientDetailPage.tsx` — "Examinations" section heading, "Create Examination" button
+  - `frontend/src/components/Layout.tsx` — navigation item label
+  - `frontend/src/components/reports/pdfDocument.ts` — PDF section header / report title
+  - Any other UI strings referencing "Examination" that are visible to the end user
+- **Behaviour:**
+  - Every user-visible string that currently reads "Examination" or "Examinations" must be updated to "Ultrasound Prenatal Test" / "Ultrasound Prenatal Tests"
+  - Internal code identifiers (variable names, function names, file names, route paths, API endpoints) must **not** be renamed — only display strings change
+  - The change must be consistent across all pages, modals, notifications, PDF output, and navigation
+- **Scope:** UI display strings and PDF output only; no backend or routing changes
+- **Priority:** P1
+
+---
+
+### TASK-033 · Prepare the application for multiple examination types
+
+- **Background:** Currently the system only supports one type of examination (Ultrasound Prenatal Test). Future releases will introduce additional examination types. The data model, UI, and backend must be extended to support a type discriminator without breaking the existing flow.
+- **Files to modify — Backend:**
+  - `api/src/functions/CreateExamination.ts` — accept and persist an `examination_type` field (default `"ultrasound_prenatal"` for backward compatibility)
+  - `api/src/functions/UpdateExamination.ts` — allow `examination_type` to be updated
+  - `api/src/functions/GetExamination.ts` / `GetExaminations.ts` — include `examination_type` in the response; support optional `?examination_type=` query filter
+  - Table entity schema — add `examination_type` string property to all three entity rows (EXAM, PATIENT_timeline, MRN)
+- **Files to modify — Frontend:**
+  - `frontend/src/types/index.ts` — add `examinationType: string` (or a string-union enum) to `Examination`, `CreateExaminationRequest`, `UpdateExaminationRequest`
+  - `frontend/src/components/ExaminationForm.tsx` — add a read-only or selectable `examination_type` field (initially only `"Ultrasound Prenatal Test"` is selectable); when multiple types are available the form sections shown should be conditional on the selected type
+  - `frontend/src/pages/ExaminationsPage.tsx` — add "Type" column to the examinations table; add type filter to the filter bar
+  - `frontend/src/pages/ExaminationDetailPage.tsx` — display the examination type in the metadata tile
+  - `frontend/src/components/reports/pdfDocument.ts` — include examination type in the PDF header
+- **Constraints:**
+  - All existing examinations without `examination_type` stored must be treated as `"ultrasound_prenatal"` (read fallback)
+  - No data migration required — fallback is applied at read time
+- **Scope:** Full stack (backend + frontend + PDF)
+- **Priority:** P1
+
+---
+
+### TASK-034 · Add extended biometry parameters with percentile calculations (OFD, Vp, TCD, CM, Nuchal Fold, NB, APAD, TAD)
+
+- **Background:** The current biometry section covers BPD, HC, AC, FL, and EFW. Eight additional parameters are required, each with its own gestational-age percentile lookup table (similar to the existing BPD/HC/AC/FL tables).
+- **New parameters:** OFD, Vp (Vermis), TCD (Transcerebellar Diameter), CM (Cisterna Magna), Nuchal Fold, NB (Nasal Bone), APAD (Antero-Posterior Abdominal Diameter), TAD (Transverse Abdominal Diameter)
+- **Files to modify — Backend:**
+  - `api/src/functions/CreateExamination.ts` / `UpdateExamination.ts` — accept the 8 new integer fields inside `biometry`; validate as strict positive integers (same rules as BPD/HC/AC/FL)
+  - `api/src/functions/CalculateExamination.ts` (or equivalent calculation handler) — add percentile lookup logic for each new parameter; add gestational-age reference tables (WHO / Hadlock or equivalent) for OFD, Vp, TCD, CM, Nuchal Fold, NB, APAD, TAD
+  - `api/src/types/` (or inline) — extend the biometry type definition
+- **Files to modify — Frontend:**
+  - `frontend/src/types/index.ts` — add the 8 new optional fields to `Biometry` / `CreateExaminationRequest`
+  - `frontend/src/components/ExaminationForm.tsx` — add `NumberInput` fields for each new parameter in the Biometry accordion section; keep the same layout conventions (label + unit suffix "mm")
+  - `frontend/src/utils/calculations.ts` — add client-side percentile lookup functions and reference tables for the 8 new parameters
+  - `frontend/src/pages/ExaminationDetailPage.tsx` — display new parameters alongside existing ones with their percentile values
+  - `frontend/src/components/reports/pdfDocument.ts` — include the 8 new parameters (value + percentile) in the Biometry section of the PDF
+- **Constraints:**
+  - All 8 fields are optional — absence must not break existing examination save or percentile calculation
+  - Percentile tables must reference a named standard (e.g., Hadlock 1984, WHO 2017) and be documented in code comments
+- **Scope:** Full stack (backend + frontend + PDF)
+- **Priority:** P1
+
+---
+
+### TASK-035 · Add LA and LC biometry parameters
+
+- **Background:** Two additional biometry measurements — LA (Left Atrium) and LC (Left Cardiac) — are required. Unlike the parameters in TASK-034 these do **not** require percentile calculations.
+- **New parameters:** LA (mm), LC (mm)
+- **Files to modify — Backend:**
+  - `api/src/functions/CreateExamination.ts` / `UpdateExamination.ts` — accept `la` and `lc` as optional positive-integer fields inside `biometry`
+  - Extend biometry type definition to include `la` and `lc`
+- **Files to modify — Frontend:**
+  - `frontend/src/types/index.ts` — add `la?: number` and `lc?: number` to the `Biometry` type
+  - `frontend/src/components/ExaminationForm.tsx` — add `NumberInput` fields for LA and LC in the Biometry accordion section
+  - `frontend/src/pages/ExaminationDetailPage.tsx` — display LA and LC values (no percentile column needed)
+  - `frontend/src/components/reports/pdfDocument.ts` — include LA and LC in the Biometry section of the PDF (value only, no percentile)
+- **Constraints:**
+  - Fields are optional; omission must not affect existing save or calculation flows
+  - No percentile lookup required for LA or LC
+- **Scope:** Full stack (backend + frontend + PDF)
+- **Priority:** P1
+
+---
+
+### TASK-036 · Add extended anatomy and vascular parameters
+
+- **Background:** The anatomy section and doppler/vascular data need the following additional fields: Face, Neck/Skin, Spine, Thorax (anatomy sub-fields); A.ut. Dex PI, A.ut. Dex RI, A.ut. Sin PI, A.ut. Sin RI, CMA, PSV, CPR, Duc.Ven (vascular / doppler measurements).
+- **New anatomy fields:** Face, Neck/Skin, Spine, Thorax (free-text or dropdown — normal / abnormal / not visualised, same as existing anatomy fields)
+- **New vascular/doppler fields:** A.ut. Dex PI (float), A.ut. Dex RI (float), A.ut. Sin PI (float), A.ut. Sin RI (float), CMA (float), PSV (float), CPR (float), Duc.Ven (free-text or category)
+- **Files to modify — Backend:**
+  - `api/src/functions/CreateExamination.ts` / `UpdateExamination.ts` — accept and persist the 4 new anatomy sub-fields inside `anatomy` and the 8 new vascular fields inside `doppler` (or a new `vascular` sub-object)
+  - Extend `anatomy` and `doppler` type definitions
+- **Files to modify — Frontend:**
+  - `frontend/src/types/index.ts` — add `face`, `neckSkin`, `spine`, `thorax` to the `Anatomy` type; add `utADexPI`, `utADexRI`, `utASinPI`, `utASinRI`, `cma`, `psv`, `cpr`, `ducVen` to the `Doppler` (or new `Vascular`) type
+  - `frontend/src/components/ExaminationForm.tsx` — add the 4 anatomy fields to the Anatomy accordion section (same `Select` pattern as existing anatomy fields); add the 8 vascular fields to the Doppler accordion section (or a new "Vascular" sub-section) using `NumberInput` for float values and `TextInput` / `Select` for Duc.Ven
+  - `frontend/src/pages/ExaminationDetailPage.tsx` — display new anatomy and vascular fields in their respective sections
+  - `frontend/src/components/reports/pdfDocument.ts` — include the new anatomy sub-fields in the Anatomy section and the new vascular fields in the Doppler/Vascular section of the PDF
+- **Constraints:**
+  - All new fields are optional; absence must not break existing save or display flows
+  - Float doppler/vascular values follow the same serialisation rules as existing doppler fields (stored as JSON strings in Table Storage, deserialised before returning)
+- **Scope:** Full stack (backend + frontend + PDF)
+- **Priority:** P1
+
+---
+
+### TASK-037 · Store and display patient age at time of examination
+
+- **Background:** Patient age at examination time is a clinically significant data point that must be captured and preserved at the moment of examination creation. It cannot be recalculated later because the patient's age changes over time and the stored value must reflect the exact age on the day the examination was performed.
+- **Dependency:** TASK-038 (replace patient `age` with `birth_date` at the Patient level) — `birth_date` is used to calculate the initial value, but the calculated age is then **persisted** on the examination entity.
+- **Files to modify — Backend:**
+  - `api/src/functions/CreateExamination.ts` — calculate `patient_age_at_exam` (whole years) from `patient.birth_date` and `exam_date` at creation time; persist it on the examination entity; reject creation if `birth_date` is unavailable and no explicit override is provided
+  - `api/src/functions/UpdateExamination.ts` — do **not** recalculate `patient_age_at_exam` on update (the stored value must remain fixed to the original exam date); accept it from the request only if explicitly overridden
+  - `api/src/functions/GetExamination.ts` / `GetExaminations.ts` — include `patient_age_at_exam` in the response
+  - Table entity schema — add `patientAgeAtExam` (integer) property to the EXAM entity row
+- **Files to modify — Frontend:**
+  - `frontend/src/utils/calculations.ts` — add `calculateAgeAtDate(birthDate: string, referenceDate: string): number` helper (returns whole years)
+  - `frontend/src/types/index.ts` — add `patientAgeAtExam?: number` to `Examination` and `CreateExaminationRequest`
+  - `frontend/src/components/ExaminationForm.tsx` — in the main / header section, show a **read-only** "Patient Age at Exam" field pre-populated by calling `calculateAgeAtDate(patient.birthDate, formData.examDate)`; update the displayed value reactively when `examDate` changes; the calculated value is submitted to the backend as `patient_age_at_exam` on save
+  - `frontend/src/pages/ExaminationDetailPage.tsx` — display the stored `patientAgeAtExam` (not recalculated) in the Patient Information or Examination Metadata tile
+  - `frontend/src/components/reports/pdfDocument.ts` — include the stored `patientAgeAtExam` value in the Patient Information section of the PDF; read directly from the examination entity, do not recalculate
+- **Constraints:**
+  - `patient_age_at_exam` is **computed once at creation** from `birth_date` + `exam_date` and then stored immutably — subsequent updates to the examination must not overwrite it unless explicitly changed
+  - For legacy examinations that predate this field, display gracefully (e.g., "—") rather than crashing or attempting to recalculate
+  - `birth_date` must be present on the patient record before an examination can be created (enforced after TASK-038 is complete); until TASK-038 is deployed, the field is optional
+- **Scope:** Full stack (backend + frontend + PDF)
+- **Priority:** P1
+
+---
+
+### TASK-038 · Replace patient `age` field with `birth_date` at the Patient level
+
+- **Background:** The current `Patient` data model stores `age` as an integer. This is a lossy, time-decaying value. It must be replaced by `birth_date` (ISO 8601 `YYYY-MM-DD` date string) so that age can always be calculated accurately for any reference date (e.g., examination date in TASK-037).
+- **Files to modify — Backend:**
+  - `api/src/functions/CreatePatient.ts` — replace the `age` input field with `birth_date`; validate that `birth_date` is a valid `YYYY-MM-DD` date string and that the resulting age falls in the range 2–99 years at time of creation
+  - `api/src/functions/UpdatePatient.ts` — same replacement; re-validate age range on update
+  - `api/src/functions/GetPatient.ts` / `GetPatients.ts` — return `birth_date` in the response instead of `age`; optionally also return a derived `age` (whole years from today) for convenience, clearly marked as a computed field
+  - `api/src/functions/SearchPatients.ts` — no query change needed; ensure `birth_date` is included in search result rows
+  - Table entity schema — rename the stored property from `age` to `birthDate` (or `birth_date`) on both the `PATIENT` row and the `PATIENT_SEARCH_*` row; add a migration note that old entities storing `age` should be read with a fallback
+- **Files to modify — Frontend:**
+  - `frontend/src/types/index.ts` — replace `age: number` with `birthDate: string` on the `Patient` type; remove `age` from `CreatePatientRequest` / `UpdatePatientRequest` and add `birthDate: string`
+  - `frontend/src/components/PatientForm.tsx` — replace the `NumberInput` age field with a Carbon `DatePicker` (single, `datePickerType="single"`) for birth date; validate the selected date produces an age in the range 2–99 years and is not in the future
+  - `frontend/src/pages/PatientsPage.tsx` — replace the "Age" column value with age calculated from `birth_date` using the `calculateAgeAtDate` helper (TASK-037 / `calculations.ts`)
+  - `frontend/src/pages/PatientDetailPage.tsx` — replace the "Age" display field with "Date of Birth" (formatted) and a derived "Age" (years) shown alongside
+  - `frontend/src/components/reports/pdfDocument.ts` — replace the stored age value in the Patient Information section with the formatted `birth_date` and the derived age
+- **Constraints:**
+  - Existing patient entities that only have `age` (no `birth_date`) must be handled gracefully at read time — display a "—" or omit the field rather than crashing
+  - The `birth_date` value must be transmitted and stored as a plain `YYYY-MM-DD` string (no timezone conversion — same rule as `exam_date` per TASK-002)
+  - `CreatePatient` and `UpdatePatient` must **not** accept a raw `age` integer after this change; the age range guard (2–99) is enforced by validating the derived age from `birth_date`
+- **Scope:** Full stack (backend + frontend + PDF)
+- **Priority:** P1
+
+---
+
+*Total tasks: 38 | Estimated phases: 8*
