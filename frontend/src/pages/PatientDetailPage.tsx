@@ -17,6 +17,8 @@ import {
   TableCell,
   TableContainer,
   Modal,
+  Select,
+  SelectItem,
 } from '@carbon/react';
 import { Edit, Add, ArrowLeft, TrashCan } from '@carbon/icons-react';
 import { patientService } from '../services/patientService';
@@ -29,11 +31,12 @@ import { getStatusTag } from '../utils/statusHelpers';
 import { calculateAgeAtDate } from '../utils/calculations';
 import { formatDateTime, formatDateShort, formatPlainDate } from '../utils/formatters';
 import type { Patient, Examination } from '../types';
+import { EXAM_TYPES, getExamTypeLabel } from '../constants/examinationTypes';
 
 const examinationHeaders = [
   { key: 'examDate', header: 'Exam Date' },
+  { key: 'type', header: 'Type' },
   { key: 'status', header: 'Status' },
-  { key: 'gestationalAge', header: 'Gestational Age' },
 ];
 
 export default function PatientDetailPage() {
@@ -42,6 +45,7 @@ export default function PatientDetailPage() {
   const { user } = useAuth();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [examinations, setExaminations] = useState<Examination[]>([]);
+  const [selectedExamType, setSelectedExamType] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingExaminations, setIsLoadingExaminations] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,29 +82,30 @@ export default function PatientDetailPage() {
     loadPatient();
   }, [loadPatient]);
 
+  const loadExaminations = useCallback(async (patientId: string, examinationType?: string) => {
+    setIsLoadingExaminations(true);
+    setExaminationsError(null);
+    setExaminations([]);
+    try {
+      const result = await examinationService.getExaminations({
+        patientId,
+        examinationType: examinationType || undefined,
+      });
+      const sorted = [...result.examinations].sort(
+        (a, b) => new Date(b.examDate).getTime() - new Date(a.examDate).getTime()
+      );
+      setExaminations(sorted);
+    } catch (err: any) {
+      setExaminationsError(err.message || 'Failed to load examinations');
+    } finally {
+      setIsLoadingExaminations(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const loadExaminations = async () => {
-      if (!id) return;
-
-      setIsLoadingExaminations(true);
-      setExaminationsError(null);
-      try {
-        const result = await examinationService.getExaminations(id);
-        const examinationsData = result.examinations;
-        // Sort newest first by examDate
-        const sorted = [...examinationsData].sort(
-          (a, b) => new Date(b.examDate).getTime() - new Date(a.examDate).getTime()
-        );
-        setExaminations(sorted);
-      } catch (err: any) {
-        setExaminationsError(err.message || 'Failed to load examinations');
-      } finally {
-        setIsLoadingExaminations(false);
-      }
-    };
-
-    loadExaminations();
-  }, [id]);
+    if (!id) return;
+    loadExaminations(id, selectedExamType);
+  }, [id, loadExaminations, selectedExamType]);
 
   const handleEdit = () => {
     navigate(`/patients/${id}/edit`);
@@ -231,7 +236,7 @@ export default function PatientDetailPage() {
                 renderIcon={Add}
                 onClick={handleCreateExamination}
               >
-                Create Test {/* TASK-032 */}
+                Create Exam {/* TASK-032 */}
               </Button>
             )}
             {(user?.role === 'admin' || user?.role === 'doctor') && (
@@ -249,7 +254,7 @@ export default function PatientDetailPage() {
         {/* Patient Information */}
         <Tile>
           <h3 style={{ marginBottom: '1.5rem' }}>Patient Information</h3>
-          <Stack gap={5}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
             <div>
               <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
                 Name
@@ -322,13 +327,12 @@ export default function PatientDetailPage() {
                 </div>
               </div>
             )}
-          </Stack>
+          </div>
         </Tile>
 
-        {/* TASK-032: Ultrasound Prenatal Tests Section */}
         <Tile>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <h3>Ultrasound Prenatal Tests</h3>
+            <h3>Available Exams</h3>
             {(user?.role === 'admin' || user?.role === 'doctor') && (
               <Button
                 kind="tertiary"
@@ -336,11 +340,26 @@ export default function PatientDetailPage() {
                 renderIcon={Add}
                 onClick={handleCreateExamination}
               >
-                Add Test
+                Add Exam
               </Button>
             )}
           </div>
           
+          <div style={{ marginBottom: '1rem', maxWidth: '20rem' }}>
+            <Select
+              id="examTypeFilter"
+              labelText="Filter by Type"
+              value={selectedExamType}
+              onChange={(e) => setSelectedExamType(e.target.value)}
+              disabled={isLoadingExaminations}
+            >
+              <SelectItem value="" text="All Types" />
+              {EXAM_TYPES.map((type) => (
+                <SelectItem key={type.key} value={type.key} text={type.label} />
+              ))}
+            </Select>
+          </div>
+
           {isLoadingExaminations ? (
             <InlineLoading description="Loading tests..." />
           ) : examinationsError ? (
@@ -363,8 +382,8 @@ export default function PatientDetailPage() {
               rows={examinations.map((exam) => ({
                 id: exam.examinationId,
                 examDate: formatDateShort(exam.examDate.includes('T') ? exam.examDate : exam.examDate + 'T00:00:00'),
+                type: getExamTypeLabel(exam.examinationType || '') || '—',
                 status: exam.status,
-                gestationalAge: exam.gestationalAge || '-',
               }))}
               headers={examinationHeaders}
             >

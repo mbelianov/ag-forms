@@ -17,8 +17,14 @@ export async function getExaminations(request: HttpRequest, context: InvocationC
         await ensureTableExists(EXAMINATIONS_TABLE);
 
         // Get query parameters
-        const patientId = request.query.get('patientId');
+        const patientId = request.query.get('patient_id');
+        const examinationType = request.query.get('examination_type') || undefined;
         const continuationToken = request.query.get('continuationToken') || undefined;
+        const status = request.query.get('status') || undefined;
+        const fromDate = request.query.get('from_date') || undefined;
+        const toDate = request.query.get('to_date') || undefined;
+        const patientNameRaw = request.query.get('patient_name') || undefined;
+        const patientName = patientNameRaw ? patientNameRaw.toLowerCase() : undefined;
         const pageSizeParam = request.query.get('pageSize');
         
         // Parse and validate page size (default 50, max 100)
@@ -40,6 +46,27 @@ export async function getExaminations(request: HttpRequest, context: InvocationC
         } else {
             // Query all examinations from EXAM partition
             filter = `PartitionKey eq 'EXAM' and isDeleted eq false`;
+        }
+
+        if (examinationType) {
+            filter += ` and examinationType eq '${examinationType}'`;
+        }
+
+        if (status) {
+            filter += ` and status eq '${status}'`;
+        }
+
+        if (fromDate) {
+            filter += ` and examDate ge '${fromDate}'`;
+        }
+
+        if (toDate) {
+            filter += ` and examDate le '${toDate}'`;
+        }
+
+        // patient_name range filter only applies to EXAM partition (no patient_id given)
+        if (!patientId && patientName) {
+            filter += ` and patientNameLower ge '${patientName}' and patientNameLower lt '${patientName}\uFFFF'`;
         }
 
         const tableClient = getTableClient(EXAMINATIONS_TABLE);
@@ -75,6 +102,11 @@ export async function getExaminations(request: HttpRequest, context: InvocationC
         context.log('Examinations retrieved:', {
             count: examinations.length,
             patientId: patientId || 'all',
+            status: status || undefined,
+            examinationType: examinationType || undefined,
+            fromDate: fromDate || undefined,
+            toDate: toDate || undefined,
+            patientName: patientName || undefined,
             hasMore: !!nextContinuationToken
         });
 

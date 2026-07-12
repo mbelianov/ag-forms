@@ -1,0 +1,31 @@
+- in the Patient Detaisl Page, the exam section is titled "Ultrasound Prenatal Exams"
+  Must be "Available Exams" and must show a list with all available exams for this patient (exam type, 
+  date, status) and allow filter by type
+- in the Patient Detaisl Page, in the exam section, the button "Add Test" to be renamed "Add Exam"
+- in the Patient Detaisl Page, above the Patient Information section, there is button
+  "Create Test" to be renamed "Create Exam"
+- in the Patiens list in the Patients page, remove the MRN field from the table. MRN is all
+  exam level identifier and makes not sense to be visible on Patient level
+- aggresivle tighten the Patient Information section on the Patiend details page to occupy less 
+  space on the screen
+- in the Create Examination form, expand the Examination type field (x2) and shorten Examination
+  Date (by 2)
+- in the Create Examination form, type Ultrasound Prenatal Test:
+  -- align BPD percentile, HC percentile, AC percentile and FL percentile exactly below BPD, HC, AC 
+     and FL field
+  -- move OFD and Vp field on the row with TCD, CM, remaining fields up to LC and reposition
+     all of them as one group wth six columns and 2 rows
+- in the Ultrasound Prenatal Exam Details view
+  -- aggresivle tighten the Patient Information section, show the information over two columns
+  -- merge the Pregnancy Data section with Patient Information section. keep title Patient Information
+  -- in the Biometry Measurements section, show percentile only for BPD, HC, AC, FL and EFW. 
+     remove percentiles for the remaing parameters
+  -- make sure all information that is entered in the input form for Ultrasound Prenatal Test is 
+     also displayed on the details view and pdf, including also any calculated fields. 
+  -- move Clinical Information section before Notes
+
+- in the header of the application there is menu item "Utrasound Prenatal Exams". seem not logical
+  most logical behavior is to show "Exams" and visualize all a page with available exams. 
+  The title of this page must be also changed to "All Exams" (currently "Utrasound Prenatal Exams"). 
+  The tabel section title also chnage to "All Exams"
+

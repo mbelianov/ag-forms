@@ -16,15 +16,18 @@ import PageLoader from '../components/PageLoader';
 import ErrorMessage from '../components/ErrorMessage';
 import { getStatusTag } from '../utils/statusHelpers';
 import { calcEDD, calcBiometryPercentiles, calcEFWPercentile } from '../utils/calculations';
-import { calcOFDPercentile, calcTCDPercentile, calcNuchalFoldPercentile, calcAPADPercentile, calcTADPercentile } from '../utils/calculations';
 import PrintButton from '../components/reports/PrintButton';
 import EmailReportButton from '../components/reports/EmailReportButton';
 import { useAuth } from '../contexts/AuthContext';
 import { useAutoNotification } from '../utils/useAutoNotification';
 import { formatDateTime, formatPlainDate } from '../utils/formatters';
+import { getExamTypeLabel } from '../constants/examinationTypes';
 import type { Examination } from '../types';
 
 export default function ExaminationDetailPage() {
+// DR1 audit: verified detail-page field parity and unconditional field rendering for patient, biometry,
+// doppler, anatomy, ultrasound findings, comments, findings, and notes sections.
+
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -107,7 +110,7 @@ export default function ExaminationDetailPage() {
   };
 
   if (isLoading) {
-    return <PageLoader description="Loading ultrasound prenatal test details..." />;
+    return <PageLoader description="Loading ultrasound prenatal exam details..." />;
   }
 
   if (error || !examination) {
@@ -123,11 +126,18 @@ export default function ExaminationDetailPage() {
           onClick={handleBackToExaminations}
           style={{ marginTop: '1rem' }}
         >
-          Back to Ultrasound Prenatal Tests
+          Back to Ultrasound Prenatal Exams
         </Button>
       </div>
     );
   }
+
+  // ST-01: Derive exam type label for heading and breadcrumb
+  const examTypeLabel = examination.examinationType
+    ? (getExamTypeLabel(examination.examinationType) !== examination.examinationType
+        ? getExamTypeLabel(examination.examinationType)
+        : 'Examination')
+    : 'Examination';
 
   const hasBiometry = examination.biometry && Object.values(examination.biometry).some((v) => v !== undefined);
   const hasDoppler = examination.doppler && Object.values(examination.doppler).some((v) => v !== undefined && v !== '');
@@ -147,15 +157,6 @@ export default function ExaminationDetailPage() {
     ? calcEFWPercentile(examination.biometry.efw, gaForPercentiles)
     : undefined;
 
-  // TASK-034: Extended biometry percentiles
-  const ga = gaForPercentiles ?? '';
-  const ofdPct = calcOFDPercentile(examination.biometry?.ofd, ga);
-  const tcdPct = calcTCDPercentile(examination.biometry?.tcd, ga);
-  const nfPct = calcNuchalFoldPercentile(examination.biometry?.nuchalFold, ga);
-  const apadPct = calcAPADPercentile(examination.biometry?.apad, ga);
-  const tadPct = calcTADPercentile(examination.biometry?.tad, ga);
-
-  const hasPregnancyData = !!(lmp || examination.data?.pregnancy_data?.obstetric_history || examination.data?.pregnancy_data?.family_history);
   const hasUltrasoundFindings = !!(
     examination.data?.ultrasound_findings?.presentation ||
     examination.data?.ultrasound_findings?.gender ||
@@ -196,9 +197,9 @@ export default function ExaminationDetailPage() {
     <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
       <Breadcrumb noTrailingSlash style={{ marginBottom: '1rem' }}>
         <BreadcrumbItem href="/dashboard">Home</BreadcrumbItem>
-        <BreadcrumbItem href="/examinations">Ultrasound Prenatal Tests</BreadcrumbItem>
+        <BreadcrumbItem href="/examinations">Exams</BreadcrumbItem>
         <BreadcrumbItem isCurrentPage>
-          {examination.patientName} — {formatPlainDate(examination.examDate)}
+          {examination.patientName} — {examTypeLabel} — {formatPlainDate(examination.examDate)}
         </BreadcrumbItem>
       </Breadcrumb>
 
@@ -206,7 +207,7 @@ export default function ExaminationDetailPage() {
         {deleteSuccess && (
           <InlineNotification
             kind="success"
-            title="Ultrasound Prenatal Test deleted"
+            title="Ultrasound Prenatal Exam deleted"
             subtitle="Redirecting…"
             lowContrast
             hideCloseButton
@@ -224,7 +225,7 @@ export default function ExaminationDetailPage() {
 
         {/* Header with actions */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-          <h1>Ultrasound Prenatal Test Details</h1>
+          <h1>{examTypeLabel} Details</h1>
           <Stack orientation="horizontal" gap={4} style={{ flexWrap: 'wrap' }}>
             <Button
               kind="tertiary"
@@ -270,7 +271,7 @@ export default function ExaminationDetailPage() {
           </Stack>
         </div>
 
-        {/* Status and Date */}
+        {/* Status, Date and MRN — ST-04: three-column layout */}
         <Tile style={{ backgroundColor: '#f4f4f4', padding: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
@@ -287,6 +288,12 @@ export default function ExaminationDetailPage() {
                 </div>
               )}
             </div>
+            <div>
+              <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.5rem' }}>MRN</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#161616' }}>
+                {examination.mrn || '—'}
+              </div>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
               <div style={{ fontSize: '0.875rem', color: '#525252' }}>Status</div>
               {getStatusTag(examination.status)}
@@ -297,7 +304,7 @@ export default function ExaminationDetailPage() {
         {/* Patient Information */}
         <Tile>
           <h3 style={{ marginBottom: '1.5rem' }}>Patient Information</h3>
-          <Stack gap={4}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             {fieldBlock(
               'Patient Name',
               <Link
@@ -308,25 +315,21 @@ export default function ExaminationDetailPage() {
                 {examination.patientName}
               </Link>
             )}
-            {fieldBlock('MRN', examination.mrn)}
-            {/* TASK-037: Patient age at exam */}
-            {examination.patientAgeAtExam !== undefined &&
-              fieldBlock('Patient Age at Exam', `${examination.patientAgeAtExam} years`)}
-            {examination.gestationalAge &&
-              fieldBlock('Gestational Age (from LMP)', examination.gestationalAge)}
-            {examination.gestationalAgeFromBiometry &&
-              fieldBlock('Gestational Age (from Biometry)', examination.gestationalAgeFromBiometry)}
-            {edd && (
-              <div>
-                <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
-                  Expected Delivery Date (EDD)
-                </div>
-                <div style={{ fontSize: '1rem', fontWeight: 500, color: '#0f62fe' }}>
-                  {edd}
-                </div>
+            {fieldBlock('Patient Age at Exam', examination.patientAgeAtExam !== undefined ? `${examination.patientAgeAtExam} years` : '—')}
+            {fieldBlock('Gestational Age (from LMP)', examination.gestationalAge || '—')}
+            {fieldBlock('Gestational Age (from Biometry)', examination.gestationalAgeFromBiometry || '—')}
+            <div>
+              <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
+                Expected Delivery Date (EDD)
               </div>
-            )}
-          </Stack>
+              <div style={{ fontSize: '1rem', fontWeight: 500, color: '#0f62fe' }}>
+                {edd || '—'}
+              </div>
+            </div>
+            {fieldBlock('Last Menstrual Period (LMP)', lmp ? formatPlainDate(lmp) : '—')}
+            {fieldBlock('Obstetric History', examination.data?.pregnancy_data?.obstetric_history || '—')}
+            {fieldBlock('Family History', examination.data?.pregnancy_data?.family_history || '—')}
+          </div>
         </Tile>
 
         {/* Biometry */}
@@ -378,7 +381,7 @@ export default function ExaminationDetailPage() {
               {examination.biometry!.ofd !== undefined && (
                 <div>
                   <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>OFD (Occipito-frontal Diameter)</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 500 }}>{examination.biometry!.ofd} mm{pctBadge(ofdPct)}</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 500 }}>{examination.biometry!.ofd} mm</div>
                 </div>
               )}
               {examination.biometry!.vp !== undefined && (
@@ -390,7 +393,7 @@ export default function ExaminationDetailPage() {
               {examination.biometry!.tcd !== undefined && (
                 <div>
                   <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>TCD (Transcerebellar Diameter)</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 500 }}>{examination.biometry!.tcd} mm{pctBadge(tcdPct)}</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 500 }}>{examination.biometry!.tcd} mm</div>
                 </div>
               )}
               {examination.biometry!.cm !== undefined && (
@@ -402,7 +405,7 @@ export default function ExaminationDetailPage() {
               {examination.biometry!.nuchalFold !== undefined && (
                 <div>
                   <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>Nuchal Fold</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 500 }}>{examination.biometry!.nuchalFold} mm{pctBadge(nfPct)}</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 500 }}>{examination.biometry!.nuchalFold} mm</div>
                 </div>
               )}
               {examination.biometry!.nb !== undefined && (
@@ -414,13 +417,13 @@ export default function ExaminationDetailPage() {
               {examination.biometry!.apad !== undefined && (
                 <div>
                   <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>APAD</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 500 }}>{examination.biometry!.apad} mm{pctBadge(apadPct)}</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 500 }}>{examination.biometry!.apad} mm</div>
                 </div>
               )}
               {examination.biometry!.tad !== undefined && (
                 <div>
                   <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>TAD</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 500 }}>{examination.biometry!.tad} mm{pctBadge(tadPct)}</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 500 }}>{examination.biometry!.tad} mm</div>
                 </div>
               )}
               {/* TASK-035: LA and LC */}
@@ -447,47 +450,35 @@ export default function ExaminationDetailPage() {
           <h3 style={{ marginBottom: '1.5rem' }}>Doppler Measurements</h3>
           {hasDoppler || hasVascular ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-              {examination.doppler!.pi !== undefined && fieldBlock('PI (Pulsatility Index)', examination.doppler!.pi)}
-              {examination.doppler!.ri !== undefined && fieldBlock('RI (Resistance Index)', examination.doppler!.ri)}
-              {examination.doppler!.vessel && fieldBlock('Vessel', examination.doppler!.vessel)}
-              {/* TASK-036: Extended vascular */}
-              {examination.doppler?.utADexPI !== undefined && fieldBlock('A.ut. Dex PI', examination.doppler.utADexPI)}
-              {examination.doppler?.utADexRI !== undefined && fieldBlock('A.ut. Dex RI', examination.doppler.utADexRI)}
-              {examination.doppler?.utASinPI !== undefined && fieldBlock('A.ut. Sin PI', examination.doppler.utASinPI)}
-              {examination.doppler?.utASinRI !== undefined && fieldBlock('A.ut. Sin RI', examination.doppler.utASinRI)}
-              {examination.doppler?.cma !== undefined && fieldBlock('CMA', examination.doppler.cma)}
-              {examination.doppler?.psv !== undefined && fieldBlock('PSV', examination.doppler.psv)}
-              {examination.doppler?.cpr !== undefined && fieldBlock('CPR', examination.doppler.cpr)}
-              {examination.doppler?.ducVen && fieldBlock('Duc.Ven', examination.doppler.ducVen)}
+              {fieldBlock('PI (Pulsatility Index)', examination.doppler?.pi !== undefined ? examination.doppler.pi : '—')}
+              {fieldBlock('RI (Resistance Index)', examination.doppler?.ri !== undefined ? examination.doppler.ri : '—')}
+              {fieldBlock('Vessel', examination.doppler?.vessel || '—')}
+              {fieldBlock('A.ut. Dex PI', examination.doppler?.utADexPI !== undefined ? examination.doppler.utADexPI : '—')}
+              {fieldBlock('A.ut. Dex RI', examination.doppler?.utADexRI !== undefined ? examination.doppler.utADexRI : '—')}
+              {fieldBlock('A.ut. Sin PI', examination.doppler?.utASinPI !== undefined ? examination.doppler.utASinPI : '—')}
+              {fieldBlock('A.ut. Sin RI', examination.doppler?.utASinRI !== undefined ? examination.doppler.utASinRI : '—')}
+              {fieldBlock('CMA', examination.doppler?.cma !== undefined ? examination.doppler.cma : '—')}
+              {fieldBlock('PSV', examination.doppler?.psv !== undefined ? examination.doppler.psv : '—')}
+              {fieldBlock('CPR', examination.doppler?.cpr !== undefined ? examination.doppler.cpr : '—')}
+              {fieldBlock('Duc.Ven', examination.doppler?.ducVen || '—')}
             </div>
           ) : (
             <div style={{ color: '#525252', fontStyle: 'italic' }}>No Doppler measurements recorded.</div>
           )}
         </Tile>
 
-        {/* Pregnancy Data */}
-        {hasPregnancyData && (
-          <Tile>
-            <h3 style={{ marginBottom: '1.5rem' }}>Pregnancy Data</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-              {lmp && fieldBlock('Last Menstrual Period (LMP)', formatPlainDate(lmp))}
-              {examination.data?.pregnancy_data?.obstetric_history && fieldBlock('Obstetric History', examination.data.pregnancy_data.obstetric_history)}
-              {examination.data?.pregnancy_data?.family_history && fieldBlock('Family History', examination.data.pregnancy_data.family_history)}
-            </div>
-          </Tile>
-        )}
 
         {/* Ultrasound Findings */}
         {hasUltrasoundFindings && (
           <Tile>
             <h3 style={{ marginBottom: '1.5rem' }}>Ultrasound Findings</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-              {examination.data?.ultrasound_findings?.presentation && fieldBlock('Presentation', <span style={{ textTransform: 'capitalize' }}>{examination.data.ultrasound_findings.presentation}</span>)}
-              {examination.data?.ultrasound_findings?.gender && fieldBlock('Gender', <span style={{ textTransform: 'capitalize' }}>{examination.data.ultrasound_findings.gender}</span>)}
-              {examination.data?.ultrasound_findings?.heart_rate !== undefined && fieldBlock('Fetal Heart Rate', `${examination.data.ultrasound_findings.heart_rate} bpm`)}
-              {examination.data?.ultrasound_findings?.fetal_movement && fieldBlock('Fetal Movement', <span style={{ textTransform: 'capitalize' }}>{examination.data.ultrasound_findings.fetal_movement}</span>)}
-              {examination.data?.ultrasound_findings?.placenta && fieldBlock('Placenta', examination.data.ultrasound_findings.placenta)}
-              {examination.data?.ultrasound_findings?.umbilical_cord && fieldBlock('Umbilical Cord', examination.data.ultrasound_findings.umbilical_cord)}
+              {fieldBlock('Presentation', examination.data?.ultrasound_findings?.presentation ? <span style={{ textTransform: 'capitalize' }}>{examination.data.ultrasound_findings.presentation}</span> : '—')}
+              {fieldBlock('Gender', examination.data?.ultrasound_findings?.gender ? <span style={{ textTransform: 'capitalize' }}>{examination.data.ultrasound_findings.gender}</span> : '—')}
+              {fieldBlock('Fetal Heart Rate', examination.data?.ultrasound_findings?.heart_rate !== undefined ? `${examination.data.ultrasound_findings.heart_rate} bpm` : '—')}
+              {fieldBlock('Fetal Movement', examination.data?.ultrasound_findings?.fetal_movement ? <span style={{ textTransform: 'capitalize' }}>{examination.data.ultrasound_findings.fetal_movement}</span> : '—')}
+              {fieldBlock('Placenta', examination.data?.ultrasound_findings?.placenta || '—')}
+              {fieldBlock('Umbilical Cord', examination.data?.ultrasound_findings?.umbilical_cord || '—')}
             </div>
           </Tile>
         )}
@@ -497,28 +488,17 @@ export default function ExaminationDetailPage() {
           <Tile>
             <h3 style={{ marginBottom: '1.5rem' }}>Anatomy</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.5rem' }}>
-              {examination.data?.anatomy?.head && fieldBlock('Head', examination.data.anatomy.head)}
-              {examination.data?.anatomy?.brain && fieldBlock('Brain', examination.data.anatomy.brain)}
-              {examination.data?.anatomy?.heart && fieldBlock('Heart', examination.data.anatomy.heart)}
-              {examination.data?.anatomy?.abdomen && fieldBlock('Abdomen', examination.data.anatomy.abdomen)}
-              {examination.data?.anatomy?.kidneys && fieldBlock('Kidneys', examination.data.anatomy.kidneys)}
-              {examination.data?.anatomy?.limbs && fieldBlock('Limbs', examination.data.anatomy.limbs)}
-              {examination.data?.anatomy?.skeleton && fieldBlock('Skeleton', examination.data.anatomy.skeleton)}
-              {/* TASK-036: Extended anatomy */}
-              {examination.data?.anatomy?.face && fieldBlock('Face', examination.data.anatomy.face)}
-              {examination.data?.anatomy?.neckSkin && fieldBlock('Neck / Skin', examination.data.anatomy.neckSkin)}
-              {examination.data?.anatomy?.spine && fieldBlock('Spine', examination.data.anatomy.spine)}
-              {examination.data?.anatomy?.thorax && fieldBlock('Thorax', examination.data.anatomy.thorax)}
-            </div>
-          </Tile>
-        )}
-
-        {/* Comments */}
-        {examination.data?.comments && (
-          <Tile>
-            <h3 style={{ marginBottom: '1.5rem' }}>Comments</h3>
-            <div style={{ fontSize: '1rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
-              {examination.data.comments}
+              {fieldBlock('Head', examination.data?.anatomy?.head || '—')}
+              {fieldBlock('Brain', examination.data?.anatomy?.brain || '—')}
+              {fieldBlock('Heart', examination.data?.anatomy?.heart || '—')}
+              {fieldBlock('Abdomen', examination.data?.anatomy?.abdomen || '—')}
+              {fieldBlock('Kidneys', examination.data?.anatomy?.kidneys || '—')}
+              {fieldBlock('Limbs', examination.data?.anatomy?.limbs || '—')}
+              {fieldBlock('Skeleton', examination.data?.anatomy?.skeleton || '—')}
+              {fieldBlock('Face', examination.data?.anatomy?.face || '—')}
+              {fieldBlock('Neck / Skin', examination.data?.anatomy?.neckSkin || '—')}
+              {fieldBlock('Spine', examination.data?.anatomy?.spine || '—')}
+              {fieldBlock('Thorax', examination.data?.anatomy?.thorax || '—')}
             </div>
           </Tile>
         )}
@@ -535,15 +515,22 @@ export default function ExaminationDetailPage() {
                 <div style={{ color: '#525252', fontStyle: 'italic' }}>No findings recorded.</div>
               )}
             </div>
-            <div>
-              <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.5rem', fontWeight: 600 }}>Notes</div>
-              {examination.notes ? (
-                <div style={{ fontSize: '1rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{examination.notes}</div>
-              ) : (
-                <div style={{ color: '#525252', fontStyle: 'italic' }}>No notes recorded.</div>
-              )}
-            </div>
           </Stack>
+        </Tile>
+
+        {/* Comments */}
+        <Tile>
+          <h3 style={{ marginBottom: '1.5rem' }}>Comments</h3>
+          <div style={{ fontSize: '1rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+            {examination.data?.comments || '—'}
+          </div>
+        </Tile>
+
+        <Tile>
+          <h3 style={{ marginBottom: '1.5rem' }}>Notes</h3>
+          <div style={{ fontSize: '1rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+            {examination.notes || '—'}
+          </div>
         </Tile>
 
         {/* Metadata — TASK-016: show updatedAt */}
@@ -552,7 +539,7 @@ export default function ExaminationDetailPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             {fieldBlock('Created By', examination.createdByName || examination.createdBy)}
             {fieldBlock('Created At', formatDateTime(examination.createdAt))}
-            {examination.updatedAt && fieldBlock('Last Updated', formatDateTime(examination.updatedAt))}
+            {fieldBlock('Last Updated', examination.updatedAt ? formatDateTime(examination.updatedAt) : '—')}
           </div>
         </Tile>
 
@@ -583,7 +570,7 @@ export default function ExaminationDetailPage() {
       <Modal
         open={isDeleteModalOpen}
         danger
-        modalHeading="Delete Ultrasound Prenatal Test"
+        modalHeading="Delete Ultrasound Prenatal Exam"
         primaryButtonText={isDeleting ? 'Deleting…' : 'Delete'}
         secondaryButtonText="Cancel"
         primaryButtonDisabled={isDeleting}

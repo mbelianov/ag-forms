@@ -6,7 +6,7 @@ import { ensureTableExists, queryEntities, getEntity } from '../utils/tableClien
 import { BaseEntity, Patient } from '../types';
 
 const PATIENTS_TABLE = 'Patients';
-const MAX_RESULTS = 50;
+const MAX_RESULTS = 1000;
 
 interface PatientSearchEntity extends BaseEntity {
     patientId: string;

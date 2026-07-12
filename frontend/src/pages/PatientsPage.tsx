@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   DataTable,
   Table,
@@ -14,6 +14,7 @@ import {
   Pagination,
   InlineNotification,
   InlineLoading,
+  ActionableNotification,
 } from '@carbon/react';
 import { Add } from '@carbon/icons-react';
 import { patientService } from '../services/patientService';
@@ -27,61 +28,110 @@ const headers = [
   { key: 'name', header: 'Name' },
   { key: 'age', header: 'Age' },
   { key: 'phone', header: 'Phone' },
-  { key: 'mrn', header: 'MRN' },
   { key: 'createdAt', header: 'Created Date' },
 ];
 
 export default function PatientsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const canCreate = user?.role !== 'viewer';
+
+  // Task 5: URL-derived state
   const [patients, setPatients] = useState<Patient[]>([]);
   const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchInfo, setSearchInfo] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  // searchQuery mirrors what was last *submitted* (used for URL and banner)
+  const [searchQuery, setSearchQuery] = useState<string>(
+    () => searchParams.get('q') || ''
+  );
+  // inputValue tracks the current typed value in the Search field (T4-03)
+  const [inputValue, setInputValue] = useState<string>(
+    () => searchParams.get('q') || ''
+  );
+  // isSearchActive is true only when a search has been submitted (T4-02)
+  const [isSearchActive, setIsSearchActive] = useState<boolean>(false);
   const [isSearching, setIsSearching] = useState(false);
   const [continuationToken, setContinuationToken] = useState<string | undefined>();
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState<number>(
+    () => Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
+  );
   const [pageSize, setPageSize] = useState(10);
 
-  // Use ref for debounce timer to avoid stale closure issues
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // AbortControllers (Task 11 — timer ref removed per T4-03)
+  const loadAbortRef = useRef<AbortController | null>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
 
-  const loadPatients = useCallback(async (token?: string) => {
+  const loadPatients = useCallback(async (token?: string, append = false) => {
+    // Task 11: abort previous in-flight request
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
+
     setIsLoading(true);
     setError(null);
     try {
-      const response = await patientService.getPatients(token);
-      setPatients(response.patients);
-      setFilteredPatients(response.patients);
+      const response = await patientService.getPatients(token, controller.signal);
+      // T4-04: append when loading more, replace on initial/clear load
+      if (append) {
+        setPatients(prev => [...prev, ...response.patients]);
+        setFilteredPatients(prev => [...prev, ...response.patients]);
+      } else {
+        setPatients(response.patients);
+        setFilteredPatients(response.patients);
+      }
       setContinuationToken(response.continuationToken);
     } catch (err: any) {
+      if (err.code === 'ERR_CANCELED' || err.name === 'AbortError' || err.name === 'CanceledError') return;
       setError(err.message || 'Failed to load patients');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
+  // Task 5 / 9: mount effect — load patients, then restore search if q is set
   useEffect(() => {
+    const q = searchParams.get('q') || '';
     loadPatients();
-  }, [loadPatients]);
+    // If q is 2+ chars, trigger a search to restore results
+    if (q.trim().length >= 2) {
+      // handleSearch will be called after initial loadPatients resolves;
+      // since searchPatients uses its own API call it is safe to fire in parallel.
+      handleSearch(q);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handleSearch = useCallback((query: string) => {
+  // Cleanup abort controllers on unmount
+  useEffect(() => {
+    return () => {
+      loadAbortRef.current?.abort();
+      searchAbortRef.current?.abort();
+    };
+  }, []);
+
+  // T4-03: handleSearch is called only on Enter submission or explicit clear
+  const handleSearch = useCallback(async (query: string) => {
     setSearchQuery(query);
     setPage(1);
 
-    // Clear existing timer
-    if (searchTimerRef.current) {
-      clearTimeout(searchTimerRef.current);
-    }
+    // Task 5: write URL (replace — no extra history entry per keystroke)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (query) next.set('q', query); else next.delete('q');
+      next.set('page', '1');
+      return next;
+    }, { replace: true });
 
-    // Empty query — restore full list, clear all notices
+    // Empty query — restore full list, clear all notices, reload browse list
     if (!query.trim()) {
       setFilteredPatients(patients);
       setIsSearching(false);
       setSearchInfo(null);
+      setIsSearchActive(false); // T4-02
+      loadPatients();
       return;
     }
 
@@ -94,30 +144,28 @@ export default function PatientsPage() {
 
     // Two or more characters — clear any lingering info hint and search
     setSearchInfo(null);
+    // Task 9: synchronous token reset before API call
+    setContinuationToken(undefined);
 
-    // Debounce search by 300ms
-    searchTimerRef.current = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const results = await patientService.searchPatients(query);
-        setFilteredPatients(results);
-      } catch (err: any) {
-        setError(err.message || 'Search failed');
-        setFilteredPatients([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-  }, [patients]);
+    // T4-03: abort previous search, dispatch immediately (no debounce)
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
 
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (searchTimerRef.current) {
-        clearTimeout(searchTimerRef.current);
-      }
-    };
-  }, []);
+    setIsSearching(true);
+    try {
+      const results = await patientService.searchPatients(query, controller.signal);
+      setFilteredPatients(results);
+      setIsSearchActive(true); // T4-02: mark search as active after successful dispatch
+    } catch (err: any) {
+      if (err.code === 'ERR_CANCELED' || err.name === 'AbortError' || err.name === 'CanceledError') return;
+      setError(err.message || 'Search failed');
+      setFilteredPatients([]);
+    } finally {
+      setIsSearching(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patients, loadPatients]);
 
   const handleRowClick = (patientId: string) => {
     navigate(`/patients/${patientId}`);
@@ -142,7 +190,6 @@ export default function PatientsPage() {
     name: patient.name,
     age: displayAge(patient),
     phone: patient.phone,
-    mrn: patient.mrn || '—',  // TASK-018: show MRN
     createdAt: formatDateShort(patient.createdAt),
   }));
 
@@ -171,6 +218,25 @@ export default function PatientsPage() {
         />
       )}
 
+      {/* Task 9: search mode banner — T4-02: use isSearchActive */}
+      {/* FR-03: fixed-height slot always rendered so the table never shifts */}
+      <div style={{ height: '40px', marginBottom: '1rem' }}>
+        {isSearchActive && (
+          <ActionableNotification
+            kind="info"
+            lowContrast
+            inline
+            title=""
+            subtitle={`Showing search results for "${searchQuery}".`}
+            actionButtonLabel="Clear search"
+            onActionButtonClick={() => {
+              setInputValue('');
+              handleSearch('');
+            }}
+          />
+        )}
+      </div>
+
       {error && (
         <InlineNotification
           kind="error"
@@ -190,9 +256,20 @@ export default function PatientsPage() {
             id="patient-search"
             labelText=""
             placeholder="Search by name…"
-            value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
-            onClear={() => handleSearch('')}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onClear={() => {
+              setInputValue('');
+              handleSearch('');
+            }}
+            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+              if (e.key === 'Enter') {
+                handleSearch(inputValue);
+              } else if (e.key === 'Escape') {
+                setInputValue('');
+                handleSearch('');
+              }
+            }}
             aria-label="Search patients"
           />
         </div>
@@ -222,10 +299,15 @@ export default function PatientsPage() {
           getTableContainerProps,
         }) => (
           <TableContainer
-            title="Patient List"
-            description={`${totalItems} patient${totalItems !== 1 ? 's' : ''} found`}
             {...getTableContainerProps()}
+            style={{ textAlign: 'left' }}
           >
+            <div style={{ padding: '1rem 1rem 0.5rem' }}>
+              <span style={{ fontWeight: 700, fontSize: '1rem' }}>Patient List</span>
+              <span style={{ fontWeight: 400, fontSize: '0.75rem', marginLeft: '0.5rem', color: '#525252' }}>
+                {totalItems} patient{totalItems !== 1 ? 's' : ''} {isSearchActive ? 'found' : 'loaded'}
+              </span>
+            </div>
             <Table {...getTableProps()} aria-label="Patients table">
               <TableHead>
                 <TableRow>
@@ -237,14 +319,40 @@ export default function PatientsPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {rows.length === 0 ? (
+                {!isLoading && rows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={headers.length}>
-                      <div style={{ textAlign: 'center', padding: '2rem', color: '#525252' }}>
-                        {searchQuery
-                          ? `No patients found matching "${searchQuery}"`
-                          : 'No patients yet. Click "Create Patient" to add your first patient.'}
-                      </div>
+                      {/* Task 12: contextual empty state */}
+                      {isSearchActive ? (
+                        <ActionableNotification
+                          kind="info"
+                          lowContrast
+                          inline
+                          title={`No patients found matching "${searchQuery}".`}
+                          subtitle=""
+                          actionButtonLabel="Clear search"
+                          onActionButtonClick={() => {
+                            setInputValue('');
+                            handleSearch('');
+                          }}
+                          style={{ marginTop: '1rem', marginBottom: '1rem' }}
+                        />
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '2rem', color: '#525252' }}>
+                          <p>No patients have been added yet.</p>
+                          {canCreate && (
+                            <Button
+                              kind="ghost"
+                              size="sm"
+                              renderIcon={Add}
+                              onClick={handleCreatePatient}
+                              style={{ marginTop: '0.5rem' }}
+                            >
+                              Add Patient
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -280,16 +388,23 @@ export default function PatientsPage() {
           onChange={({ page: newPage, pageSize: newPageSize }) => {
             setPage(newPage);
             setPageSize(newPageSize);
+            // Task 5: write page to URL (push)
+            setSearchParams((prev) => {
+              const next = new URLSearchParams(prev);
+              next.set('page', String(newPage));
+              return next;
+            });
           }}
           style={{ marginTop: '1rem' }}
         />
       )}
 
-      {continuationToken && (
+      {/* Task 9: hide Load More in search mode — T4-02/T4-04: use isSearchActive */}
+      {continuationToken && !isSearchActive && (
         <div style={{ marginTop: '1rem', textAlign: 'center' }}>
           <Button
             kind="tertiary"
-            onClick={() => loadPatients(continuationToken)}
+            onClick={() => loadPatients(continuationToken, true)}
             disabled={isLoading}
           >
             Load More Patients

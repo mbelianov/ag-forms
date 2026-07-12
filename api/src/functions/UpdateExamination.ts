@@ -5,9 +5,10 @@ import { successResponse, unauthorizedResponse, forbiddenResponse, errorResponse
 import { getEntity, updateEntity, ensureTableExists, getTableClient } from '../utils/tableClient';
 import { validateExamination } from '../utils/validation';
 import { logExaminationUpdated } from '../utils/auditService';
-import { Examination } from '../types';
+import { Examination, Patient } from '../types';
 
 const EXAMINATIONS_TABLE = 'Examinations';
+const PATIENTS_TABLE = 'Patients';
 
 export async function updateExamination(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     try {
@@ -67,6 +68,25 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             return errorResponse('Cannot update deleted examination', 400);
         }
 
+        // Compute patientAgeAtExam server-side if not supplied by client (FLAG-08)
+        let resolvedPatientAge: number | undefined = patientAgeAtExam !== undefined
+            ? patientAgeAtExam
+            : existingExam.patientAgeAtExam;
+
+        if (patientAgeAtExam === undefined && !existingExam.patientAgeAtExam) {
+            const resolvedExamDate = examDate || existingExam.examDate;
+            try {
+                const patient = await getEntity<Patient>(PATIENTS_TABLE, 'PATIENT', existingExam.patientId);
+                if (patient?.birthDate && resolvedExamDate) {
+                    resolvedPatientAge = Math.floor(
+                        (new Date(resolvedExamDate).getTime() - new Date(patient.birthDate).getTime()) / (365.25 * 24 * 3600 * 1000)
+                    );
+                }
+            } catch {
+                // patient fetch failure is non-fatal for update
+            }
+        }
+
         // Validate with patientId from existing exam
         const validationData = {
             patientId: existingExam.patientId,
@@ -80,7 +100,7 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             notes: notes !== undefined ? notes : existingExam.notes,
             data: data !== undefined ? data : undefined,
             examinationType: examinationType !== undefined ? examinationType : existingExam.examinationType,
-            patientAgeAtExam: patientAgeAtExam !== undefined ? patientAgeAtExam : existingExam.patientAgeAtExam
+            patientAgeAtExam: resolvedPatientAge
         };
 
         const validation = validateExamination(validationData);
@@ -142,8 +162,8 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             updatedLookupEntity.examinationType = examinationType;
             changedFields.push('examinationType');
         }
-        if (patientAgeAtExam !== undefined && patientAgeAtExam !== existingExam.patientAgeAtExam) {
-            updatedLookupEntity.patientAgeAtExam = patientAgeAtExam;
+        if (resolvedPatientAge !== undefined && resolvedPatientAge !== existingExam.patientAgeAtExam) {
+            updatedLookupEntity.patientAgeAtExam = resolvedPatientAge;
             changedFields.push('patientAgeAtExam');
         }
 

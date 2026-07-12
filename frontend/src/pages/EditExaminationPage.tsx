@@ -106,7 +106,7 @@ export default function EditExaminationPage() {
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
       <Breadcrumb noTrailingSlash style={{ marginBottom: '1rem' }}>
         <BreadcrumbItem href="/dashboard">Home</BreadcrumbItem>
         <BreadcrumbItem href="/examinations">Examinations</BreadcrumbItem>

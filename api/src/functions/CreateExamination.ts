@@ -60,6 +60,13 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             return errorResponse('Patient has been deleted', 400);
         }
 
+        // Compute patientAgeAtExam server-side if not supplied by client (FLAG-08)
+        const resolvedPatientAge: number | undefined = patientAgeAtExam !== undefined
+            ? patientAgeAtExam
+            : (patient.birthDate && examDate
+                ? Math.floor((new Date(examDate).getTime() - new Date(patient.birthDate).getTime()) / (365.25 * 24 * 3600 * 1000))
+                : undefined);
+
         const examinationId = uuidv4();
         const now = new Date().toISOString();
 
@@ -75,13 +82,14 @@ export async function createExamination(request: HttpRequest, context: Invocatio
         const dataStr = data ? JSON.stringify(data) : undefined;
 
         // Create primary examination entity (for patient's exam list)
-        const primaryExamEntity: Examination & { updatedBy: string } = {
+        const primaryExamEntity: Examination & { updatedBy: string; patientNameLower: string } = {
             partitionKey: `PATIENT_${patientId}`,
             rowKey: `${reverseTicks}_${examinationId}`,
             examinationId,
             mrn,
             patientId,
             patientName: patient.name, // Denormalized for list views
+            patientNameLower: patient.name.toLowerCase(), // Shadow field for case-insensitive search
             examDate,
             gestationalAge: gestationalAge || undefined,
             gestationalAgeFromBiometry: gestationalAgeFromBiometry || undefined,
@@ -92,7 +100,7 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             findings: findings || undefined,
             notes: notes || undefined,
             data: dataStr as any,
-            patientAgeAtExam: patientAgeAtExam !== undefined ? patientAgeAtExam : undefined,
+            patientAgeAtExam: resolvedPatientAge,
             createdAt: now,
             updatedAt: now,
             createdBy: user.userId,
@@ -102,13 +110,14 @@ export async function createExamination(request: HttpRequest, context: Invocatio
         };
 
         // Create lookup entity (for direct access by examination ID)
-        const lookupExamEntity: Examination & { updatedBy: string } = {
+        const lookupExamEntity: Examination & { updatedBy: string; patientNameLower: string } = {
             partitionKey: 'EXAM',
             rowKey: examinationId,
             examinationId,
             mrn,
             patientId,
             patientName: patient.name,
+            patientNameLower: patient.name.toLowerCase(), // Shadow field for case-insensitive search
             examDate,
             gestationalAge: gestationalAge || undefined,
             gestationalAgeFromBiometry: gestationalAgeFromBiometry || undefined,
@@ -119,7 +128,7 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             findings: findings || undefined,
             notes: notes || undefined,
             data: dataStr as any,
-            patientAgeAtExam: patientAgeAtExam !== undefined ? patientAgeAtExam : undefined,
+            patientAgeAtExam: resolvedPatientAge,
             createdAt: now,
             updatedAt: now,
             createdBy: user.userId,

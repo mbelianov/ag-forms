@@ -59,8 +59,7 @@ export default function Layout({ children }: LayoutProps) {
           <HeaderNavigation aria-label="Main Navigation">
             <HeaderMenuItem href="/dashboard">Dashboard</HeaderMenuItem>
             <HeaderMenuItem href="/patients">Patients</HeaderMenuItem>
-            {/* TASK-032: renamed to Ultrasound Prenatal Tests */}
-            <HeaderMenuItem href="/examinations">Ultrasound Prenatal Tests</HeaderMenuItem>
+            <HeaderMenuItem href="/examinations">Exams</HeaderMenuItem>
             {/* TASK-011: Admin-only Users link */}
             {user.role === 'admin' && (
               <HeaderMenuItem href="/users">Users</HeaderMenuItem>

@@ -21,6 +21,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [examinations, setExaminations] = useState<Examination[]>([]);
+  const [totalPatients, setTotalPatients] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,12 +42,18 @@ export default function DashboardPage() {
       } finally {
         setIsLoading(false);
       }
+      // Fetch total patient count independently — failure here is non-fatal
+      try {
+        const count = await patientService.getPatientCount();
+        setTotalPatients(count);
+      } catch (err: any) {
+        console.error('[Dashboard] Failed to load patient count:', err);
+      }
     };
     loadData();
   }, []);
 
   // Derived statistics
-  const totalPatients = patients.length;
   const totalExaminations = examinations.length;
 
   const oneWeekAgo = new Date();

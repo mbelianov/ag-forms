@@ -5,14 +5,13 @@ import {
   TextInput,
   TextArea,
   Button,
+  ButtonSet,
   InlineNotification,
   Select,
   SelectItem,
   DatePicker,
   DatePickerInput,
   FormGroup,
-  Accordion,
-  AccordionItem,
 } from '@carbon/react';
 import type {
   Examination,
@@ -21,8 +20,21 @@ import type {
   Patient,
   ExaminationData,
 } from '../types';
-import { calcGAFromLMP, calcGAFromBiometry, calcEFW, calcEDD, calcBiometryPercentiles, calcEFWPercentile } from '../utils/calculations';
+import { calcGAFromLMP, calcGAFromBiometry, calcEFW, calcEDD, calcBiometryPercentiles, calcEFWPercentile, calculateAgeAtDate } from '../utils/calculations';
+import { EXAM_TYPES, getExamTypeLabel } from '../constants/examinationTypes';
 import type { BiometryPercentiles } from '../utils/calculations';
+
+// ── Section visibility map keyed by examinationType ───────────────────────────
+// Add new types here to control which sections render without touching JSX.
+const SECTION_VISIBILITY: Record<string, Record<string, boolean>> = {
+  ultrasound_prenatal: {
+    pregnancyData: true,
+    ultrasoundFindings: true,
+    anatomy: true,
+    biometry: true,
+    doppler: true,
+  },
+};
 
 interface ExaminationFormProps {
   examination?: Examination;
@@ -466,12 +478,13 @@ export default function ExaminationForm({
         gestationalAge: formData.gestationalAge.trim() || undefined,
         gestationalAgeFromBiometry: formData.gestationalAgeFromBiometry.trim() || undefined,
         status: formData.status,
-        examinationType: formData.examinationType || 'ultrasound_prenatal', // TASK-033
+        examinationType: formData.examinationType || 'ultrasound_prenatal',
         biometry,
         doppler,
         notes: formData.notes.trim() || undefined,
         findings: formData.findings.trim() || undefined,
         data,
+        ...(patientAge !== undefined ? { patientAgeAtExam: patientAge } : {}), // REQ-06, FLAG-07
       } as CreateExaminationRequest | UpdateExaminationRequest;
 
       await onSubmit(submitData);
@@ -496,7 +509,8 @@ export default function ExaminationForm({
   // ── Layout helpers ────────────────────────────────────────────────────────
   const row2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' };
   const row3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' };
-  const rowAuto: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' };
+  const row4: React.CSSProperties = { display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '0.75rem' };
+  const row6: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.75rem' };
 
   // Inline style for a "Calc" button vertically aligned with an adjacent input.
   // Carbon inputs have a label (~1.125rem + 0.5rem gap) above the input itself.
@@ -506,9 +520,16 @@ export default function ExaminationForm({
     justifyContent: 'flex-end',
   };
 
+  // ── Section visibility (REQ-05) ──────────────────────────────────────────
+  const visibility = SECTION_VISIBILITY[formData.examinationType] ?? SECTION_VISIBILITY['ultrasound_prenatal'];
+
+  // ── Patient age at exam (REQ-06, FLAG-07) ────────────────────────────────
+  const selectedPatient = patients.find((p) => p.patientId === formData.patientId);
+  const patientAge = calculateAgeAtDate(selectedPatient?.birthDate ?? '', formData.examDate);
+
   return (
     <Form onSubmit={handleSubmit} autoComplete="off">
-      <Stack gap={6}>
+      <Stack gap={4}>
         {submitError && (
           <InlineNotification
             kind="error"
@@ -551,21 +572,30 @@ export default function ExaminationForm({
           />
         )}
 
-        {/* ── Exam Type (read-only selector) | Status — TASK-033 ── */}
-        <div style={row2}>
-          <Select
-            id="examinationType"
-            labelText="Examination Type"
-            value={formData.examinationType}
-            onChange={(e) => handleChange('examinationType', e.target.value)}
-            disabled={isSubmitting}
-          >
-            <SelectItem value="ultrasound_prenatal" text="Ultrasound Prenatal Test" />
-          </Select>
-        </div>
+        {/* ── Examination Type (locked on edit) | Exam Date | Status | Patient Age (row4, REQ-08) ── */}
+        <div style={row4}>
+          {isEdit ? (
+            <TextInput
+              id="examinationType"
+              labelText="Examination Type"
+              value={getExamTypeLabel(formData.examinationType)}
+              readOnly
+              disabled
+            />
+          ) : (
+            <Select
+              id="examinationType"
+              labelText="Examination Type"
+              value={formData.examinationType}
+              onChange={(e) => handleChange('examinationType', e.target.value)}
+              disabled={isSubmitting}
+            >
+              {EXAM_TYPES.map((t) => (
+                <SelectItem key={t.key} value={t.key} text={t.label} />
+              ))}
+            </Select>
+          )}
 
-        {/* ── Exam Date | Status ── */}
-        <div style={row2}>
           <DatePicker
             datePickerType="single"
             dateFormat="d/m/Y"
@@ -598,17 +628,28 @@ export default function ExaminationForm({
             <SelectItem value="completed" text="Completed" />
             <SelectItem value="reviewed" text="Reviewed" />
           </Select>
+
+          {/* Patient Age at Exam occupies the 4th slot in the row4 ── */}
+          <TextInput
+            id="patientAgeAtExam"
+            labelText="Patient Age at Exam"
+            value={patientAge !== undefined ? `${patientAge} yrs` : '—'}
+            readOnly
+            disabled
+          />
         </div>
 
         {/* ── Clinical data sections ── */}
-        <Accordion>
+        <div>
 
           {/* ── Pregnancy Data ── */}
-          <AccordionItem title="Pregnancy Data" open>
-            <Stack gap={4}>
+          {visibility.pregnancyData && (
+          <div>
+            <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Pregnancy Data</h4>
+            <Stack gap={3}>
 
               {/* LMP | Calc | GA from LMP — single row */}
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'nowrap' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'nowrap' }}>
                 <div style={{ flex: '0 0 auto', minWidth: '200px' }}>
                   <DatePicker
                     datePickerType="single"
@@ -656,21 +697,15 @@ export default function ExaminationForm({
                 </div>
               </div>
 
-              {/* EDD — read-only derived field, shown only when LMP is set */}
-              {edd && (
-                <div style={row2}>
-                  <TextInput
-                    id="edd"
-                    labelText="Expected Delivery Date (EDD)"
-                    value={edd}
-                    readOnly
-                    disabled
-                  />
-                </div>
-              )}
-
-              {/* Obstetric History | Family History */}
-              <div style={row2}>
+              {/* EDD | Obstetric History | Family History — always in row3 (REQ-08 rule 8) */}
+              <div style={row3}>
+                <TextInput
+                  id="edd"
+                  labelText="Expected Delivery Date (EDD)"
+                  value={edd ?? '—'}
+                  readOnly
+                  disabled
+                />
                 <TextInput
                   id="obstetric_history"
                   labelText="Obstetric History"
@@ -679,7 +714,6 @@ export default function ExaminationForm({
                   onChange={(e) => handleChange('obstetric_history', e.target.value)}
                   disabled={isSubmitting}
                 />
-
                 <TextInput
                   id="family_history"
                   labelText="Family History"
@@ -690,202 +724,94 @@ export default function ExaminationForm({
                 />
               </div>
             </Stack>
-          </AccordionItem>
+          </div>
+          )}
 
           {/* ── Ultrasound Findings ── */}
-          <AccordionItem title="Ultrasound Findings" open>
-            <Stack gap={4}>
-              {/* Presentation | Gender */}
-              <div style={row2}>
-                <Select
-                  id="presentation"
-                  labelText="Presentation"
-                  value={formData.presentation}
-                  onChange={(e) => handleChange('presentation', e.target.value)}
-                  disabled={isSubmitting}
-                >
+          {visibility.ultrasoundFindings && (
+          <div>
+            <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Ultrasound Findings</h4>
+              {/* Single row6 — Presentation, Gender, HeartRate, FetalMovement, Placenta, UmbilicalCord (REQ-08 rule 7) */}
+              <div style={row6}>
+                <Select id="presentation" labelText="Presentation" value={formData.presentation} onChange={(e) => handleChange('presentation', e.target.value)} disabled={isSubmitting}>
                   <SelectItem value="" text="Select presentation" />
                   <SelectItem value="cephalic" text="Cephalic" />
                   <SelectItem value="breech" text="Breech" />
                   <SelectItem value="transverse" text="Transverse" />
                   <SelectItem value="oblique" text="Oblique" />
                 </Select>
-
-                <Select
-                  id="gender"
-                  labelText="Gender"
-                  value={formData.gender}
-                  onChange={(e) => handleChange('gender', e.target.value)}
-                  disabled={isSubmitting}
-                >
+                <Select id="gender" labelText="Gender" value={formData.gender} onChange={(e) => handleChange('gender', e.target.value)} disabled={isSubmitting}>
                   <SelectItem value="" text="Select gender" />
                   <SelectItem value="male" text="Male" />
                   <SelectItem value="female" text="Female" />
                   <SelectItem value="unknown" text="Unknown" />
                 </Select>
-              </div>
-
-              {/* Heart Rate | Fetal Movement */}
-              <div style={row2}>
-                <TextInput
-                  id="heart_rate"
-                  labelText="Fetal Heart Rate (bpm)"
-                  placeholder="e.g., 145"
-                  value={formData.heart_rate}
-                  invalid={!!errors.heart_rate}
-                  invalidText={errors.heart_rate}
-                  disabled={isSubmitting}
-                  onChange={(e) => handleChange('heart_rate', e.target.value)}
-                />
-
-                <Select
-                  id="fetal_movement"
-                  labelText="Fetal Movement"
-                  value={formData.fetal_movement}
-                  onChange={(e) => handleChange('fetal_movement', e.target.value)}
-                  disabled={isSubmitting}
-                >
+                <TextInput id="heart_rate" labelText="Fetal Heart Rate (bpm)" placeholder="e.g., 145" value={formData.heart_rate} invalid={!!errors.heart_rate} invalidText={errors.heart_rate} disabled={isSubmitting} onChange={(e) => handleChange('heart_rate', e.target.value)} />
+                <Select id="fetal_movement" labelText="Fetal Movement" value={formData.fetal_movement} onChange={(e) => handleChange('fetal_movement', e.target.value)} disabled={isSubmitting}>
                   <SelectItem value="" text="Select fetal movement" />
                   <SelectItem value="active" text="Active" />
                   <SelectItem value="present" text="Present" />
                   <SelectItem value="reduced" text="Reduced" />
                   <SelectItem value="absent" text="Absent" />
                 </Select>
+                <TextInput id="placenta" labelText="Placenta" placeholder="e.g., anterior, grade 1" value={formData.placenta} onChange={(e) => handleChange('placenta', e.target.value)} disabled={isSubmitting} />
+                <TextInput id="umbilical_cord" labelText="Umbilical Cord" placeholder="e.g., 3 vessels" value={formData.umbilical_cord} onChange={(e) => handleChange('umbilical_cord', e.target.value)} disabled={isSubmitting} />
               </div>
-
-              {/* Placenta | Umbilical Cord */}
-              <div style={row2}>
-                <TextInput
-                  id="placenta"
-                  labelText="Placenta"
-                  placeholder="e.g., anterior, grade 1"
-                  value={formData.placenta}
-                  onChange={(e) => handleChange('placenta', e.target.value)}
-                  disabled={isSubmitting}
-                />
-
-                <TextInput
-                  id="umbilical_cord"
-                  labelText="Umbilical Cord"
-                  placeholder="e.g., 3 vessels"
-                  value={formData.umbilical_cord}
-                  onChange={(e) => handleChange('umbilical_cord', e.target.value)}
-                  disabled={isSubmitting}
-                />
-              </div>
-            </Stack>
-          </AccordionItem>
+          </div>
+          )}
 
           {/* ── Anatomy ── */}
-          <AccordionItem title="Anatomy" open>
-            <Stack gap={4}>
-              {/* Head | Brain | Heart */}
-              <div style={row3}>
-                <TextInput id="anat_head"    labelText="Head"    placeholder="e.g., normal" value={formData.anat_head}    onChange={(e) => handleChange('anat_head',    e.target.value)} disabled={isSubmitting} />
-                <TextInput id="anat_brain"   labelText="Brain"   placeholder="e.g., normal" value={formData.anat_brain}   onChange={(e) => handleChange('anat_brain',   e.target.value)} disabled={isSubmitting} />
-                <TextInput id="anat_heart"   labelText="Heart"   placeholder="e.g., normal" value={formData.anat_heart}   onChange={(e) => handleChange('anat_heart',   e.target.value)} disabled={isSubmitting} />
-              </div>
-              {/* Abdomen | Kidneys | Limbs */}
-              <div style={row3}>
-                <TextInput id="anat_abdomen" labelText="Abdomen" placeholder="e.g., normal" value={formData.anat_abdomen} onChange={(e) => handleChange('anat_abdomen', e.target.value)} disabled={isSubmitting} />
-                <TextInput id="anat_kidneys" labelText="Kidneys" placeholder="e.g., normal" value={formData.anat_kidneys} onChange={(e) => handleChange('anat_kidneys', e.target.value)} disabled={isSubmitting} />
-                <TextInput id="anat_limbs"   labelText="Limbs"   placeholder="e.g., normal" value={formData.anat_limbs}   onChange={(e) => handleChange('anat_limbs',   e.target.value)} disabled={isSubmitting} />
-              </div>
-              {/* Skeleton | Face | Neck Skin */}
-              <div style={row3}>
-                <TextInput id="anat_skeleton"  labelText="Skeleton"  placeholder="e.g., normal" value={formData.anat_skeleton}  onChange={(e) => handleChange('anat_skeleton',  e.target.value)} disabled={isSubmitting} />
-                <TextInput id="anat_face"      labelText="Face"      placeholder="e.g., normal" value={formData.anat_face}      onChange={(e) => handleChange('anat_face',      e.target.value)} disabled={isSubmitting} />
-                <TextInput id="anat_neckSkin"  labelText="Neck Skin" placeholder="e.g., normal" value={formData.anat_neckSkin}  onChange={(e) => handleChange('anat_neckSkin',  e.target.value)} disabled={isSubmitting} />
-              </div>
-              {/* Spine | Thorax */}
-              <div style={row2}>
-                <TextInput id="anat_spine"  labelText="Spine"  placeholder="e.g., normal" value={formData.anat_spine}  onChange={(e) => handleChange('anat_spine',  e.target.value)} disabled={isSubmitting} />
-                <TextInput id="anat_thorax" labelText="Thorax" placeholder="e.g., normal" value={formData.anat_thorax} onChange={(e) => handleChange('anat_thorax', e.target.value)} disabled={isSubmitting} />
-              </div>
-            </Stack>
-          </AccordionItem>
+          {visibility.anatomy && (
+          <div>
+            <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Anatomy</h4>
+            {/* Single row6 — 11 fields across 2 auto rows via CSS grid (REQ-08 rule 6) */}
+            <div style={row6}>
+              <TextInput id="anat_head"     labelText="Head"     placeholder="e.g., normal" value={formData.anat_head}     onChange={(e) => handleChange('anat_head',     e.target.value)} disabled={isSubmitting} />
+              <TextInput id="anat_brain"    labelText="Brain"    placeholder="e.g., normal" value={formData.anat_brain}    onChange={(e) => handleChange('anat_brain',    e.target.value)} disabled={isSubmitting} />
+              <TextInput id="anat_heart"    labelText="Heart"    placeholder="e.g., normal" value={formData.anat_heart}    onChange={(e) => handleChange('anat_heart',    e.target.value)} disabled={isSubmitting} />
+              <TextInput id="anat_abdomen"  labelText="Abdomen"  placeholder="e.g., normal" value={formData.anat_abdomen}  onChange={(e) => handleChange('anat_abdomen',  e.target.value)} disabled={isSubmitting} />
+              <TextInput id="anat_kidneys"  labelText="Kidneys"  placeholder="e.g., normal" value={formData.anat_kidneys}  onChange={(e) => handleChange('anat_kidneys',  e.target.value)} disabled={isSubmitting} />
+              <TextInput id="anat_limbs"    labelText="Limbs"    placeholder="e.g., normal" value={formData.anat_limbs}    onChange={(e) => handleChange('anat_limbs',    e.target.value)} disabled={isSubmitting} />
+              <TextInput id="anat_skeleton" labelText="Skeleton" placeholder="e.g., normal" value={formData.anat_skeleton} onChange={(e) => handleChange('anat_skeleton', e.target.value)} disabled={isSubmitting} />
+              <TextInput id="anat_face"     labelText="Face"     placeholder="e.g., normal" value={formData.anat_face}     onChange={(e) => handleChange('anat_face',     e.target.value)} disabled={isSubmitting} />
+              <TextInput id="anat_neckSkin" labelText="Neck Skin" placeholder="e.g., normal" value={formData.anat_neckSkin} onChange={(e) => handleChange('anat_neckSkin', e.target.value)} disabled={isSubmitting} />
+              <TextInput id="anat_spine"    labelText="Spine"    placeholder="e.g., normal" value={formData.anat_spine}    onChange={(e) => handleChange('anat_spine',    e.target.value)} disabled={isSubmitting} />
+              <TextInput id="anat_thorax"   labelText="Thorax"   placeholder="e.g., normal" value={formData.anat_thorax}   onChange={(e) => handleChange('anat_thorax',   e.target.value)} disabled={isSubmitting} />
+            </div>
+          </div>
+          )}
 
-        </Accordion>
+        </div>
 
         {/* ── Biometry ── */}
+        {visibility.biometry && (
         <FormGroup legendText="Biometry (integers only, in mm/grams)">
-          <Stack gap={4}>
+          <Stack gap={3}>
 
-            {/* BPD | HC | AC | FL — measurement inputs */}
-            <div style={rowAuto}>
-              <TextInput
-                id="bpd"
-                labelText="BPD (mm)"
-                placeholder="e.g., 85"
-                value={formData.bpd}
-                onChange={(e) => handleChange('bpd', e.target.value)}
-                invalid={!!errors.bpd}
-                invalidText={errors.bpd}
-                disabled={isSubmitting}
-              />
-
-              <TextInput
-                id="hc"
-                labelText="HC (mm)"
-                placeholder="e.g., 310"
-                value={formData.hc}
-                onChange={(e) => handleChange('hc', e.target.value)}
-                invalid={!!errors.hc}
-                invalidText={errors.hc}
-                disabled={isSubmitting}
-              />
-
-              <TextInput
-                id="ac"
-                labelText="AC (mm)"
-                placeholder="e.g., 280"
-                value={formData.ac}
-                onChange={(e) => handleChange('ac', e.target.value)}
-                invalid={!!errors.ac}
-                invalidText={errors.ac}
-                disabled={isSubmitting}
-              />
-
-              <TextInput
-                id="fl"
-                labelText="FL (mm)"
-                placeholder="e.g., 55"
-                value={formData.fl}
-                onChange={(e) => handleChange('fl', e.target.value)}
-                invalid={!!errors.fl}
-                invalidText={errors.fl}
-                disabled={isSubmitting}
-              />
+            {/* Row A: BPD | HC | AC | FL | OFD | Vp (row6, REQ-08 rule 4) */}
+            <div style={row6}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <TextInput id="bpd" labelText="BPD (mm)" placeholder="e.g., 85" value={formData.bpd} onChange={(e) => handleChange('bpd', e.target.value)} invalid={!!errors.bpd} invalidText={errors.bpd} disabled={isSubmitting} />
+                <TextInput id="bpdPercentile" labelText="BPD Percentile" value={percentiles?.bpd !== undefined ? `${percentiles.bpd}th` : ''} readOnly />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <TextInput id="hc" labelText="HC (mm)" placeholder="e.g., 310" value={formData.hc} onChange={(e) => handleChange('hc', e.target.value)} invalid={!!errors.hc} invalidText={errors.hc} disabled={isSubmitting} />
+                <TextInput id="hcPercentile" labelText="HC Percentile" value={percentiles?.hc !== undefined ? `${percentiles.hc}th` : ''} readOnly />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <TextInput id="ac" labelText="AC (mm)" placeholder="e.g., 280" value={formData.ac} onChange={(e) => handleChange('ac', e.target.value)} invalid={!!errors.ac} invalidText={errors.ac} disabled={isSubmitting} />
+                <TextInput id="acPercentile" labelText="AC Percentile" value={percentiles?.ac !== undefined ? `${percentiles.ac}th` : ''} readOnly />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <TextInput id="fl" labelText="FL (mm)" placeholder="e.g., 55" value={formData.fl} onChange={(e) => handleChange('fl', e.target.value)} invalid={!!errors.fl} invalidText={errors.fl} disabled={isSubmitting} />
+                <TextInput id="flPercentile" labelText="FL Percentile" value={percentiles?.fl !== undefined ? `${percentiles.fl}th` : ''} readOnly />
+              </div>
+              <TextInput id="ofd" labelText="OFD (mm)" placeholder="e.g., 0" value={formData.ofd} onChange={(e) => handleChange('ofd', e.target.value)} invalid={!!errors.ofd} invalidText={errors.ofd} disabled={isSubmitting} autoComplete="off" />
+              <TextInput id="vp" labelText="Vp (mm)" placeholder="e.g., 0" value={formData.vp} onChange={(e) => handleChange('vp', e.target.value)} invalid={!!errors.vp} invalidText={errors.vp} disabled={isSubmitting} autoComplete="off" />
             </div>
 
-            {/* Percentile display — shown after AutoCalc GA is pressed */}
-            {percentiles && (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: '0.5rem',
-                padding: '0.5rem 0.75rem',
-                background: 'var(--cds-layer-01, #f4f4f4)',
-                borderRadius: '4px',
-                fontSize: '0.875rem',
-              }}>
-                {(
-                  [
-                    ['BPD', formData.bpd, percentiles.bpd],
-                    ['HC',  formData.hc,  percentiles.hc],
-                    ['AC',  formData.ac,  percentiles.ac],
-                    ['FL',  formData.fl,  percentiles.fl],
-                  ] as [string, string, number][]
-                ).map(([label, value, pct]) => (
-                  <span key={label}>
-                    <strong>{label}:</strong> {value}mm ({pct}th)
-                  </span>
-                ))}
-              </div>
-            )}
-
             {/* GA from Biometry row: Calc button | GA from Biometry field | GA from LMP (readonly) */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: '1rem', alignItems: 'end' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: '0.75rem', alignItems: 'end' }}>
               <div style={calcButtonWrap}>
                 <Button
                   kind="tertiary"
@@ -922,7 +848,7 @@ export default function ExaminationForm({
             </div>
 
             {/* EFW row: Calc button | EFW field | EFW percentile (read-only) */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: '1rem', alignItems: 'end' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: '0.75rem', alignItems: 'end' }}>
               <div style={calcButtonWrap}>
                 <Button
                   kind="tertiary"
@@ -962,11 +888,11 @@ export default function ExaminationForm({
               />
             </div>
 
-            {/* TASK-034: Extended biometry — second row */}
-            <div style={rowAuto}>
-              {(['ofd', 'vp', 'tcd', 'cm', 'nuchalFold', 'nb', 'apad', 'tad'] as const).map((field) => {
+            {/* Row B/C: TCD | CM | OFD | Vp | Nuchal Fold | NB | APAD | TAD | LA | LC */}
+            <div style={row6}>
+              {(['tcd', 'cm', 'ofd', 'vp', 'nuchalFold', 'nb', 'apad', 'tad'] as const).map((field) => {
                 const labels: Record<string, string> = {
-                  ofd: 'OFD (mm)', vp: 'Vp (mm)', tcd: 'TCD (mm)', cm: 'CM (mm)',
+                  tcd: 'TCD (mm)', cm: 'CM (mm)', ofd: 'OFD (mm)', vp: 'Vp (mm)',
                   nuchalFold: 'Nuchal Fold (mm)', nb: 'NB (mm)', apad: 'APAD (mm)', tad: 'TAD (mm)',
                 };
                 return (
@@ -984,60 +910,31 @@ export default function ExaminationForm({
                   />
                 );
               })}
-            </div>
-            {/* TASK-035: LA and LC */}
-            <div style={row2}>
               <TextInput id="la" labelText="LA — Left Atrium (mm)" placeholder="e.g., 0" value={formData.la} onChange={(e) => handleChange('la', e.target.value)} invalid={!!errors.la} invalidText={errors.la} disabled={isSubmitting} autoComplete="off" />
               <TextInput id="lc" labelText="LC — Left Cardiac (mm)" placeholder="e.g., 0" value={formData.lc} onChange={(e) => handleChange('lc', e.target.value)} invalid={!!errors.lc} invalidText={errors.lc} disabled={isSubmitting} autoComplete="off" />
             </div>
           </Stack>
         </FormGroup>
+        )}
 
         {/* ── Doppler — PI | RI | Vessel on one row ── */}
+        {visibility.doppler && (
         <FormGroup legendText="Doppler (floats allowed)">
-          <Stack gap={4}>
-            <div style={row3}>
-              <TextInput
-                id="pi"
-                labelText="PI (Pulsatility Index)"
-                placeholder="e.g., 1.25"
-                value={formData.pi}
-                onChange={(e) => handleChange('pi', e.target.value)}
-                invalid={!!errors.pi}
-                invalidText={errors.pi}
-                disabled={isSubmitting}
-                autoComplete="off"
-              />
-
-              <TextInput
-                id="ri"
-                labelText="RI (Resistance Index)"
-                placeholder="e.g., 0.65"
-                value={formData.ri}
-                onChange={(e) => handleChange('ri', e.target.value)}
-                invalid={!!errors.ri}
-                invalidText={errors.ri}
-                disabled={isSubmitting}
-                autoComplete="off"
-              />
-
-              <TextInput
-                id="vessel"
-                labelText="Vessel"
-                placeholder="e.g., Umbilical artery"
-                value={formData.vessel}
-                onChange={(e) => handleChange('vessel', e.target.value)}
-                disabled={isSubmitting}
-                autoComplete="off"
-              />
+          <Stack gap={3}>
+            {/* Row A: PI | RI | Vessel | DucVen (row4, REQ-08 rule 5) */}
+            <div style={row4}>
+              <TextInput id="pi" labelText="PI (Pulsatility Index)" placeholder="e.g., 1.25" value={formData.pi} onChange={(e) => handleChange('pi', e.target.value)} invalid={!!errors.pi} invalidText={errors.pi} disabled={isSubmitting} autoComplete="off" />
+              <TextInput id="ri" labelText="RI (Resistance Index)" placeholder="e.g., 0.65" value={formData.ri} onChange={(e) => handleChange('ri', e.target.value)} invalid={!!errors.ri} invalidText={errors.ri} disabled={isSubmitting} autoComplete="off" />
+              <TextInput id="vessel" labelText="Vessel" placeholder="e.g., Umbilical artery" value={formData.vessel} onChange={(e) => handleChange('vessel', e.target.value)} disabled={isSubmitting} autoComplete="off" />
+              <TextInput id="ducVen" labelText="Duc.Ven" placeholder="e.g., normal" value={formData.ducVen} onChange={(e) => handleChange('ducVen', e.target.value)} disabled={isSubmitting} autoComplete="off" />
             </div>
-            {/* TASK-036: Extended vascular fields */}
-            <div style={rowAuto}>
-              {(['utADexPI', 'utADexRI', 'utASinPI', 'utASinRI', 'cma', 'psv', 'cpr'] as const).map((field) => {
+            {/* Row B: Extended vascular fields (row6, REQ-08 rule 5) */}
+            <div style={row6}>
+              {(['utADexPI', 'utADexRI', 'utASinPI', 'utASinRI', 'cma', 'psv'] as const).map((field) => {
                 const labels: Record<string, string> = {
                   utADexPI: 'A.ut. Dex PI', utADexRI: 'A.ut. Dex RI',
                   utASinPI: 'A.ut. Sin PI', utASinRI: 'A.ut. Sin RI',
-                  cma: 'CMA', psv: 'PSV', cpr: 'CPR',
+                  cma: 'CMA', psv: 'PSV',
                 };
                 return (
                   <TextInput
@@ -1054,10 +951,15 @@ export default function ExaminationForm({
                   />
                 );
               })}
-              <TextInput id="ducVen" labelText="Duc.Ven" placeholder="e.g., normal" value={formData.ducVen} onChange={(e) => handleChange('ducVen', e.target.value)} disabled={isSubmitting} autoComplete="off" />
+            </div>
+            {/* Row C: CPR in first column, 5 spacers (REQ-08 rule 5) */}
+            <div style={row6}>
+              <TextInput id="cpr" labelText="CPR" placeholder="e.g., 0.0" value={formData.cpr} onChange={(e) => handleChange('cpr', e.target.value)} invalid={!!errors.cpr} invalidText={errors.cpr} disabled={isSubmitting} autoComplete="off" />
+              <div /><div /><div /><div /><div />
             </div>
           </Stack>
         </FormGroup>
+        )}
 
         {/* ── Narrative fields ── */}
         <TextArea
@@ -1093,14 +995,14 @@ export default function ExaminationForm({
           />
         </div>
 
-        <Stack orientation="horizontal" gap={4}>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : isEdit ? 'Update Ultrasound Prenatal Test' : 'Create Ultrasound Prenatal Test'}
-          </Button>
+        <ButtonSet style={{ justifyContent: 'flex-end' }}>
           <Button kind="secondary" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
-        </Stack>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Saving...' : isEdit ? `Update ${getExamTypeLabel(formData.examinationType)}` : `Create ${getExamTypeLabel(formData.examinationType)}`}
+          </Button>
+        </ButtonSet>
       </Stack>
     </Form>
   );

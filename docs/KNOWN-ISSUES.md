@@ -41,3 +41,27 @@ Bugs confirmed but deferred for later resolution.
 - **Status:** Deferred
 
 ---
+
+## KI-003 · DR1-03 patient detail exam filter lacks load-more support in current UI
+
+- **Related requirement:** `DR1-03`
+- **File:** `frontend/src/pages/PatientDetailPage.tsx`
+- **Symptom:** The patient detail page now supports filtering exams by type, but the requirement to keep filtered pagination working with a "Load More" flow could not be fully implemented.
+- **Root cause:** [`PatientDetailPage`](../frontend/src/pages/PatientDetailPage.tsx) did not have an existing load-more control, continuation-token flow, or pagination UI for the examinations table. The plan for DR1-03 assumed there was an existing "Load More" handler to extend, but only a single fetch-and-render flow existed. As a result, the type filter and server refetch were implemented, but there is no current UI affordance to request subsequent filtered pages.
+- **Impact:** Filtering by exam type works for the initially returned page of results, but users cannot load additional filtered pages from the patient detail exam table.
+- **Fix:** Add a dedicated filtered pagination/load-more UX to [`PatientDetailPage`](../frontend/src/pages/PatientDetailPage.tsx) that stores and reuses the continuation token for the active `selectedExamType`.
+- **Priority:** P2 · Non-blocking
+- **Status:** Superseded by KI-004
+
+---
+
+## KI-004 · `PatientDetailPage` exam sub-table shows only the first server page when filtered by type
+
+- **Related requirement:** DR3-01 (supersedes KI-003)
+- **File:** `frontend/src/pages/PatientDetailPage.tsx`
+- **Symptom:** When a type filter is selected in the exam sub-table on the Patient Detail page, at most 50 examinations are shown (the default backend page size). There is no "Load More" control, and the `continuationToken` returned by `GET /v1/examinations` is discarded.
+- **Decision:** A patient accumulating more than 50 examinations of a single type is considered an **edge case** in the current clinical usage profile. Implementing server-side load-more pagination inside a detail-page sub-table adds meaningful complexity (continuation-token state, append-vs-replace logic, a conditionally visible button) for a scenario that is unlikely to occur in practice.
+- **Accepted behaviour:** The exam sub-table on `PatientDetailPage` fetches a single page of results per filter selection. Client-side filtering over that page is sufficient for the expected data volumes.
+- **If the edge case materialises:** Revisit this issue. The implementation path is documented in the original DR3-01 defect report (`docs/DEFECTS-ROUND3.md`) and in the removed REQ-3-01 section of the Round 3 requirements spec (removed in the UX improvement pass — see git history). The backend `GET /v1/examinations` endpoint already supports `continuationToken` and `examination_type` query parameters; no backend changes would be needed.
+- **Priority:** P3 · Low — accepted edge case
+- **Status:** Deferred / Won't fix unless usage patterns change

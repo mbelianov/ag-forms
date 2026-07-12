@@ -2,11 +2,6 @@ import {
   calcEDD,
   calcBiometryPercentiles,
   calcEFWPercentile,
-  calcOFDPercentile,
-  calcTCDPercentile,
-  calcNuchalFoldPercentile,
-  calcAPADPercentile,
-  calcTADPercentile,
 } from '../utils/calculations';
 import type { Examination } from '../types';
 
@@ -138,14 +133,6 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
       ? calcEFWPercentile(exam.biometry.efw, gaForPct)
       : undefined;
 
-  // TASK-034: Extended biometry percentiles
-  const ga = gaForPct ?? '';
-  const ofdPct  = calcOFDPercentile(exam.biometry?.ofd, ga);
-  const tcdPct  = calcTCDPercentile(exam.biometry?.tcd, ga);
-  const nfPct   = calcNuchalFoldPercentile(exam.biometry?.nuchalFold, ga);
-  const apadPct = calcAPADPercentile(exam.biometry?.apad, ga);
-  const tadPct  = calcTADPercentile(exam.biometry?.tad, ga);
-
   return {
     patientName: exam.patientName,
     mrn: exam.mrn,
@@ -167,14 +154,14 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
         ? (efwPct !== undefined ? `${exam.biometry.efw} g (${ordinal(efwPct)} %ile)` : `${exam.biometry.efw} g`)
         : undefined,
       // TASK-034
-      ofd:       exam.biometry?.ofd       != null ? withPct(exam.biometry.ofd,       ofdPct)  : undefined,
-      vp:        exam.biometry?.vp        != null ? `${exam.biometry.vp} mm`                  : undefined,
-      tcd:       exam.biometry?.tcd       != null ? withPct(exam.biometry.tcd,       tcdPct)  : undefined,
-      cm:        exam.biometry?.cm        != null ? `${exam.biometry.cm} mm`                  : undefined,
-      nuchalFold: exam.biometry?.nuchalFold != null ? withPct(exam.biometry.nuchalFold, nfPct)  : undefined,
-      nb:        exam.biometry?.nb        != null ? `${exam.biometry.nb} mm`                  : undefined,
-      apad:      exam.biometry?.apad      != null ? withPct(exam.biometry.apad,     apadPct)  : undefined,
-      tad:       exam.biometry?.tad       != null ? withPct(exam.biometry.tad,      tadPct)   : undefined,
+      ofd:       exam.biometry?.ofd       != null ? `${exam.biometry.ofd} mm`       : undefined,
+      vp:        exam.biometry?.vp        != null ? `${exam.biometry.vp} mm`        : undefined,
+      tcd:       exam.biometry?.tcd       != null ? `${exam.biometry.tcd} mm`       : undefined,
+      cm:        exam.biometry?.cm        != null ? `${exam.biometry.cm} mm`        : undefined,
+      nuchalFold: exam.biometry?.nuchalFold != null ? `${exam.biometry.nuchalFold} mm` : undefined,
+      nb:        exam.biometry?.nb        != null ? `${exam.biometry.nb} mm`        : undefined,
+      apad:      exam.biometry?.apad      != null ? `${exam.biometry.apad} mm`      : undefined,
+      tad:       exam.biometry?.tad       != null ? `${exam.biometry.tad} mm`       : undefined,
       // TASK-035
       la: exam.biometry?.la != null ? `${exam.biometry.la} mm` : undefined,
       lc: exam.biometry?.lc != null ? `${exam.biometry.lc} mm` : undefined,

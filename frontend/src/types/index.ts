@@ -47,6 +47,10 @@ export interface PatientsListResponse {
   continuationToken?: string;
 }
 
+export interface PatientCountResponse {
+  count: number;
+}
+
 // Examination types
 export interface Biometry {
   // Core (original)
@@ -171,6 +175,7 @@ export interface UpdateExaminationRequest {
   notes?: string;
   findings?: string;
   data?: ExaminationData;
+  patientAgeAtExam?: number; // FLAG-07, REQ-06
 }
 
 export interface ExaminationsListResponse {

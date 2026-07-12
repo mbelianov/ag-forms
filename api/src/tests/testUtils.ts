@@ -109,7 +109,7 @@ export async function createTestPatient(createdByRole: string = 'doctor'): Promi
 
     const normalizedName = name.trim().toLowerCase().replace(/\s+/g, ' ');
     const searchEntity = {
-        partitionKey: `PATIENT_SEARCH_${normalizedName.charAt(0)}`,
+        partitionKey: `PATIENT_SEARCH_${normalizedName.charAt(0).codePointAt(0)!.toString(16).padStart(4, '0')}`,
         rowKey: `${normalizedName}_${patientId}`,
         patientId,
         name,
@@ -229,8 +229,9 @@ export async function cleanupTestData(): Promise<void> {
             const patient = await patientsTable.getEntity<any>('PATIENT', patientId);
             if (patient) {
                 const normalizedName = patient.name.trim().toLowerCase().replace(/\s+/g, ' ');
+                const bucket = normalizedName.charAt(0).codePointAt(0)!.toString(16).padStart(4, '0');
                 await patientsTable.deleteEntity('PATIENT', patientId, { etag: '*' });
-                await patientsTable.deleteEntity(`PATIENT_SEARCH_${normalizedName.charAt(0)}`, `${normalizedName}_${patientId}`, { etag: '*' });
+                await patientsTable.deleteEntity(`PATIENT_SEARCH_${bucket}`, `${normalizedName}_${patientId}`, { etag: '*' });
             }
         } catch {}
     }

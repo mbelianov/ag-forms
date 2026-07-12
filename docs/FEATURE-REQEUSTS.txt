@@ -1,0 +1,21 @@
+General requirements:
+- refactor the application to support multiple Examination types. Existing Ultrasound Prenatal Test
+  is one of those types. Other types will be defined and implemented in next releases.
+- user selects Examination type from drop down list before entering examination data.
+- functionality of the Examination input form (number and type of input fields, input 
+  validation rules, calculations, etc) depends on the chosen Examination type.
+- when displaying Examination lists, allow filter by examination type in addition to 
+  existing filters.
+- when loading examination lists ot patient lists, implement efficent 
+  loading (partial db reads, pagination and other similar techniques)
+
+
+Related to the existing Ultrasound Prenatal Test
+- Rename it to Ultrasound Prenatal Exam (consistently everywhere)
+- Implement patient age (exam date minus patient birthdate) in the main sectoin 
+  of the exam.
+- no folding sections in the input form
+- tighter structure of the input form (less scrolling)
+- all visual elements properly allinged left and right
+
+

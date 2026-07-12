@@ -26,7 +26,7 @@ export async function getPatients(request: HttpRequest, context: InvocationConte
         );
 
         const tableClient = getTableClient(PATIENTS_TABLE);
-        const filter = `PartitionKey eq 'PATIENT'`;
+        const filter = `PartitionKey eq 'PATIENT' and isDeleted eq false`;
         const patients: Patient[] = [];
 
         const pages = tableClient.listEntities<Patient>({
@@ -40,9 +40,7 @@ export async function getPatients(request: HttpRequest, context: InvocationConte
 
         for await (const page of pages) {
             for (const patient of page) {
-                if (!patient.isDeleted) {
-                    patients.push(patient as Patient);
-                }
+                patients.push(patient as Patient);
             }
             nextContinuationToken = (page as any).continuationToken;
             break; // Only get the first page

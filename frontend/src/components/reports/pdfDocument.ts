@@ -99,8 +99,8 @@ function sectionHeading(doc: jsPDF, label: string, y: number): number {
 }
 
 /**
- * Render a grid of non-empty label/value pairs in N columns.
- * Only visible pairs occupy rows — empty pairs are skipped entirely.
+ * Render a grid of label/value pairs in N columns.
+ * Empty values render as an em dash so field presence stays unconditional.
  * Returns new Y after the block.
  */
 function kvGrid(
@@ -109,8 +109,7 @@ function kvGrid(
   y: number,
   cols = 2,
 ): number {
-  const visible = pairs.filter(([, v]) => v) as Array<[string, string]>;
-  if (visible.length === 0) return y;
+  const visible = pairs.map(([label, value]) => [label, value || '—'] as [string, string]);
 
   const colW = COL_W / cols;
   const labelW = colW * 0.43;
@@ -233,45 +232,35 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   doc.setFontSize(8);
   setTextColor(doc, C_MID);
 
-  if (vm.examinationType) {
-    doc.text(`Type: ${vm.examinationType.replace(/_/g, ' ')}`, MARGIN_L, y);
-    y += 4;
-  }
+  doc.text(`Type: ${(vm.examinationType || '—').replace(/_/g, ' ')}`, MARGIN_L, y);
+  y += 4;
 
-  if (vm.patientAgeAtExam !== undefined) {
-    doc.text(`Patient age at exam: ${vm.patientAgeAtExam} years`, MARGIN_L, y);
-    y += 4;
-  }
+  doc.text(`Patient age at exam: ${vm.patientAgeAtExam !== undefined ? `${vm.patientAgeAtExam} years` : '—'}`, MARGIN_L, y);
+  y += 4;
 
-  if (vm.gestationalAge) {
-    const gaLabel = 'GA (LMP): ';
-    doc.text(gaLabel, MARGIN_L, y);
-    doc.setFont(FONT_ID, 'bold');
-    setTextColor(doc, C_DARK);
-    doc.text(vm.gestationalAge, MARGIN_L + doc.getTextWidth(gaLabel), y);
-    doc.setFont(FONT_ID, 'normal');
-    setTextColor(doc, C_MID);
-  }
+  const gaLabel = 'GA (LMP): ';
+  doc.text(gaLabel, MARGIN_L, y);
+  doc.setFont(FONT_ID, 'bold');
+  setTextColor(doc, C_DARK);
+  doc.text(vm.gestationalAge || '—', MARGIN_L + doc.getTextWidth(gaLabel), y);
+  doc.setFont(FONT_ID, 'normal');
+  setTextColor(doc, C_MID);
 
-  if (vm.gestationalAgeFromBiometry) {
-    const bioLabel = '  GA (Bio): ';
-    doc.text(bioLabel, MARGIN_L + 42, y);
-    doc.setFont(FONT_ID, 'bold');
-    setTextColor(doc, C_DARK);
-    doc.text(vm.gestationalAgeFromBiometry, MARGIN_L + 42 + doc.getTextWidth(bioLabel), y);
-    doc.setFont(FONT_ID, 'normal');
-    setTextColor(doc, C_MID);
-  }
+  const bioLabel = '  GA (Bio): ';
+  doc.text(bioLabel, MARGIN_L + 42, y);
+  doc.setFont(FONT_ID, 'bold');
+  setTextColor(doc, C_DARK);
+  doc.text(vm.gestationalAgeFromBiometry || '—', MARGIN_L + 42 + doc.getTextWidth(bioLabel), y);
+  doc.setFont(FONT_ID, 'normal');
+  setTextColor(doc, C_MID);
 
-  if (vm.expectedDeliveryDate) {
-    doc.setFont(FONT_ID, 'bold');
-    setTextColor(doc, C_ACCENT);
-    doc.setFontSize(8.5);
-    doc.text(`EDD: ${vm.expectedDeliveryDate}`, MARGIN_R, y, { align: 'right' });
-    doc.setFont(FONT_ID, 'normal');
-    setTextColor(doc, C_MID);
-    doc.setFontSize(8);
-  }
+  doc.setFont(FONT_ID, 'bold');
+  setTextColor(doc, C_ACCENT);
+  doc.setFontSize(8.5);
+  doc.text(`EDD: ${vm.expectedDeliveryDate || '—'}`, MARGIN_R, y, { align: 'right' });
+  doc.setFont(FONT_ID, 'normal');
+  setTextColor(doc, C_MID);
+  doc.setFontSize(8);
 
   y += 6;
   rule(doc, y);
@@ -327,19 +316,6 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   }
 
   // ── 5. Pregnancy Data ────────────────────────────────────────────────────────
-  const pregnancyPairs: Array<[string, string | undefined]> = [
-    ['LMP', vm.pregnancy.lmp],
-    ['Obstetric History', vm.pregnancy.obstetricHistory],
-    ['Family History', vm.pregnancy.familyHistory],
-  ];
-  if (pregnancyPairs.some(([, v]) => v)) {
-    rule(doc, y);
-    y += 4;
-    y = sectionHeading(doc, 'Pregnancy Data', y);
-    y = kvGrid(doc, pregnancyPairs, y, 3);
-    y += 1;
-  }
-
   // ── 6. Ultrasound Findings ───────────────────────────────────────────────────
   const ultrasoundPairs: Array<[string, string | undefined]> = [
     ['Presentation', vm.ultrasound.presentation],
@@ -386,11 +362,9 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   y = sectionHeading(doc, 'Clinical Information', y);
   y = textBlock(doc, 'Findings', vm.findings ?? 'No findings recorded.', y, 5);
   y += 2;
-  y = textBlock(doc, 'Notes', vm.notes ?? 'No notes recorded.', y, 5);
-  if (vm.comments) {
-    y += 2;
-    y = textBlock(doc, 'Comments', vm.comments, y, 4);
-  }
+  y = textBlock(doc, 'Comments', vm.comments ?? '—', y, 4);
+  y += 2;
+  y = textBlock(doc, 'Notes', vm.notes ?? '—', y, 5);
   y += 2;
 
   // ── 9. Doctor Signature ──────────────────────────────────────────────────────

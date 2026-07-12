@@ -1,0 +1,12 @@
+- on the dashboard page, the tile "total patients" does not show total patients count in the database
+  currently it shows 50, while the db contains 1000.
+- the Patients list shows "50 patiens found" at the top of the table when search field is empty. 
+  When search fiels is empty, it must show number of loaded patients "50 patients loaded". Only when user initiates
+  search through typing in the search field, the total number of records found in the databse should be shown
+  and ALL of them shall be loaded in the table
+- the search field in the Patients page does not allow user to type more than two chars in the seach 
+  field. for this particular case more convinient behavior is to allow user to type a search string and 
+  press Enter before initiating API call to the backend. In this case the API
+- the Load More Patients button on the same page must load ADDITIONAL patients to the table, not REPLACE. 
+  loading additional patients in the table must update the number of loaded patients message
+

@@ -10,7 +10,7 @@ import { getPatient } from '../../functions/GetPatient';
 import { searchPatients } from '../../functions/SearchPatients';
 import { updatePatient } from '../../functions/UpdatePatient';
 import { deletePatient } from '../../functions/DeletePatient';
-import { createTestUser, createTestPatient, createTestExamination, cleanupTestData, mockHttpRequest, mockInvocationContext } from '../testUtils';
+import { createTestUser, createTestPatient, createTestExamination, cleanupTestData, seedCounter, mockHttpRequest, mockInvocationContext } from '../testUtils';
 import { getTableClient } from '../../utils/tableClient';
 
 const parseBody = (response: any) => JSON.parse(response.body);
@@ -18,6 +18,7 @@ const parseBody = (response: any) => JSON.parse(response.body);
 describe('Patients Integration', () => {
     beforeEach(async () => {
         await cleanupTestData();
+        await seedCounter(0);
     });
 
     afterEach(async () => {

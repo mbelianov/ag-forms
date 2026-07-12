@@ -20,7 +20,7 @@ interface EmailReportButtonProps {
 export default function EmailReportButton({ examination }: EmailReportButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState('');
-  const [subject, setSubject] = useState(`Ultrasound Prenatal Test Report — ${examination.patientName}`);
+  const [subject, setSubject] = useState(`Ultrasound Prenatal Exam Report — ${examination.patientName}`);
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);

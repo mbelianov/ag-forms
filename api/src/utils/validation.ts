@@ -5,6 +5,7 @@
 
 import * as Joi from 'joi';
 import { ValidationResult } from '../types';
+import { EXAM_TYPE_KEYS } from '../constants/examinationTypes';
 
 /**
  * User validation schema
@@ -276,7 +277,7 @@ const examinationSchema = Joi.object({
             'any.only': 'Status must be one of: draft, completed, reviewed',
             'any.required': 'Status is required'
         }),
-    examinationType: Joi.string().max(100).optional().allow(''), // TASK-033
+    examinationType: Joi.string().valid(...EXAM_TYPE_KEYS).optional().allow(''), // FLAG-03, REQ-01
     biometry: biometrySchema,
     doppler: dopplerSchema,
     notes: Joi.string()

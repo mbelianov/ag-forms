@@ -11,7 +11,10 @@ export interface GetExaminationsOptions {
   status?: string;
   from_date?: string;
   to_date?: string;
+  examinationType?: string;
+  patientName?: string;
   continuationToken?: string;
+  signal?: AbortSignal;
 }
 
 /**
@@ -39,9 +42,14 @@ class ExaminationService {
         if (opts.status)    params.status = opts.status;
         if (opts.from_date) params.from_date = opts.from_date;
         if (opts.to_date)   params.to_date = opts.to_date;
+        if (opts.examinationType) params.examination_type = opts.examinationType;
+        if (opts.patientName) params.patient_name = opts.patientName;
         if (opts.continuationToken) params.continuationToken = opts.continuationToken;
       }
-      const response = await api.get<ExaminationsListResponse>(this.EXAMINATIONS_BASE_URL, { params });
+      const response = await api.get<ExaminationsListResponse>(this.EXAMINATIONS_BASE_URL, {
+        params,
+        signal: typeof optsOrPatientId === 'object' ? optsOrPatientId.signal : undefined,
+      });
       // Backend returns { examinations: [...], continuationToken?: string }
       // After envelope unwrap, response.data is that inner object
       const data = response.data as any;
@@ -54,6 +62,7 @@ class ExaminationService {
       }
       return { examinations: [] };
     } catch (error: any) {
+      if (error.code === 'ERR_CANCELED' || error.name === 'AbortError' || (error as any).name === 'CanceledError') throw error;
       const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch examinations';
       throw new Error(message);
     }

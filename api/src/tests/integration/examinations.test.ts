@@ -12,7 +12,7 @@ import { updateExamination } from '../../functions/UpdateExamination';
 import { deleteExamination } from '../../functions/DeleteExamination';
 import { calculateExamination } from '../../functions/CalculateExamination';
 import { emailExaminationReport } from '../../functions/EmailExaminationReport';
-import { createTestUser, createTestPatient, createTestExamination, cleanupTestData, mockHttpRequest, mockInvocationContext } from '../testUtils';
+import { createTestUser, createTestPatient, createTestExamination, cleanupTestData, seedCounter, mockHttpRequest, mockInvocationContext } from '../testUtils';
 import { getTableClient } from '../../utils/tableClient';
 
 const parseBody = (response: any) => JSON.parse(response.body);
@@ -20,6 +20,7 @@ const parseBody = (response: any) => JSON.parse(response.body);
 describe('Examinations Integration', () => {
     beforeEach(async () => {
         await cleanupTestData();
+        await seedCounter(0);
     });
 
     afterEach(async () => {
@@ -73,7 +74,7 @@ describe('Examinations Integration', () => {
         const patientRequest = mockHttpRequest('GET', undefined, {
             authorization: `Bearer ${doctor.token}`
         });
-        (patientRequest as any).query = new URLSearchParams(`patientId=${patient.patientId}`);
+        (patientRequest as any).query = new URLSearchParams(`patient_id=${patient.patientId}`);
         const context = mockInvocationContext();
 
         const allResponse = await getExaminations(allRequest, context);

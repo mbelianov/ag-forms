@@ -1,5 +1,5 @@
 import api from './api';
-import type { Patient, CreatePatientRequest, UpdatePatientRequest, PatientsListResponse } from '../types';
+import type { Patient, CreatePatientRequest, UpdatePatientRequest, PatientsListResponse, PatientCountResponse } from '../types';
 
 /**
  * Patient service for handling patient-related API operations
@@ -12,13 +12,14 @@ class PatientService {
    * @param continuationToken - Optional continuation token for pagination
    * @returns List of patients and optional continuation token
    */
-  async getPatients(continuationToken?: string): Promise<PatientsListResponse> {
+  async getPatients(continuationToken?: string, signal?: AbortSignal): Promise<PatientsListResponse> {
     try {
       const params = continuationToken ? { continuationToken } : {};
       // Interceptor unwraps envelope; response.data is now { patients, continuationToken? }
-      const response = await api.get<PatientsListResponse>(this.PATIENTS_BASE_URL, { params });
+      const response = await api.get<PatientsListResponse>(this.PATIENTS_BASE_URL, { params, signal });
       return response.data;
     } catch (error: any) {
+      if (error.code === 'ERR_CANCELED' || error.name === 'AbortError' || (error as any).name === 'CanceledError') throw error;
       const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch patients';
       throw new Error(message);
     }
@@ -98,19 +99,35 @@ class PatientService {
   }
 
   /**
+   * Get total count of non-deleted patients
+   * @returns Total patient count
+   */
+  async getPatientCount(): Promise<number> {
+    try {
+      const response = await api.get<PatientCountResponse>('/v1/patients-count');
+      return response.data.count;
+    } catch (error: any) {
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch patient count';
+      throw new Error(message);
+    }
+  }
+
+  /**
    * Search patients by name or MRN
    * @param query - Search query string
    * @returns List of matching patients
    */
-  async searchPatients(query: string): Promise<Patient[]> {
+  async searchPatients(query: string, signal?: AbortSignal): Promise<Patient[]> {
     try {
       // Route: v1/patients-search (avoids collision with v1/patients/{id})
       // Parameter: name (matches backend SearchPatients.ts)
       const response = await api.get<{ patients: Patient[] }>('/v1/patients-search', {
         params: { name: query },
+        signal,
       });
       return response.data.patients;
     } catch (error: any) {
+      if (error.code === 'ERR_CANCELED' || error.name === 'AbortError' || (error as any).name === 'CanceledError') throw error;
       const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to search patients';
       throw new Error(message);
     }
