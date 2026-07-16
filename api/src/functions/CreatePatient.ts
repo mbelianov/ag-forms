@@ -6,6 +6,7 @@ import { successResponse, unauthorizedResponse, forbiddenResponse, errorResponse
 import { createEntity, ensureTableExists } from '../utils/tableClient';
 import { validatePatient } from '../utils/validation';
 import { logPatientCreated } from '../utils/auditService';
+import { adjustCounter } from '../utils/counterService';
 import { Patient, BaseEntity } from '../types';
 
 const PATIENTS_TABLE = 'Patients';
@@ -90,6 +91,10 @@ export async function createPatient(request: HttpRequest, context: InvocationCon
         await createEntity(PATIENTS_TABLE, searchEntity);
 
         await logPatientCreated(user.userId, patientId, patientEntity);
+
+        adjustCounter('Counters', 'COUNTER', 'PATIENT_TOTAL', 1).catch(err =>
+            context.error('Failed to increment PATIENT_TOTAL counter:', err)
+        );
 
         context.log('Patient created:', { patientId, createdBy: user.userId });
 

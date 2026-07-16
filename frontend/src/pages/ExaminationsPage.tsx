@@ -9,12 +9,10 @@ import {
   TableBody,
   TableCell,
   TableContainer,
-  TableToolbar,
-  TableToolbarContent,
-  TableToolbarSearch,
   Button,
   Select,
   SelectItem,
+  ComboBox,
   Pagination,
   InlineNotification,
   InlineLoading,
@@ -61,12 +59,13 @@ export default function ExaminationsPage() {
   const { user } = useAuth();
   const canCreate = user?.role !== 'viewer';
 
-  // ── URL-derived state (Task 4) ──────────────────────────────────────────────
+  // ── Core state ─────────────────────────────────────────────────────────────
   const [examinations, setExaminations] = useState<Examination[]>([]);
-  const [filteredExaminations, setFilteredExaminations] = useState<Examination[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExhausting, setIsExhausting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Filter state (URL-derived)
   const [selectedPatientId, setSelectedPatientId] = useState<string>(
     () => searchParams.get('patient') || ''
   );
@@ -82,9 +81,8 @@ export default function ExaminationsPage() {
   const [toDate, setToDate] = useState<string>(
     () => searchParams.get('to') || ''
   );
-  const [searchQuery, setSearchQuery] = useState<string>(
-    () => searchParams.get('q') || ''
-  );
+
+  // Pagination
   const [page, setPage] = useState<number>(
     () => Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
   );
@@ -92,35 +90,47 @@ export default function ExaminationsPage() {
   const [continuationToken, setContinuationToken] = useState<string | undefined>();
   const [hasMore, setHasMore] = useState(false);
 
-  // Task 8: search-specific state
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchInfo, setSearchInfo] = useState<string | null>(null);
+  // Patient combobox state (IMPL-010)
+  const [patientSearchResults, setPatientSearchResults] = useState<Patient[]>([]);
+  const [selectedPatientName, setSelectedPatientName] = useState<string>('');
+  const [isPatientSearching, setIsPatientSearching] = useState(false);
 
-  // Refs for debounce timers and AbortControllers (Tasks 7, 11)
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Refs
   const dateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadAbortRef = useRef<AbortController | null>(null);
-  const searchAbortRef = useRef<AbortController | null>(null);
+  const patientSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const patientSearchAbortRef = useRef<AbortController | null>(null);
 
-  const loadPatients = useCallback(async () => {
-    try {
-      const response = await patientService.getPatients();
-      setPatients(response.patients);
-    } catch (err: any) {
-      console.error('Failed to load patients:', err);
-    }
-  }, []);
-
-  const loadExaminations = useCallback(async (opts?: {
+  // ── fetchOnePage — pure data fetcher, no state mutation ──────────────────
+  const fetchOnePage = useCallback(async (opts?: {
     patientId?: string;
     status?: string;
     from_date?: string;
     to_date?: string;
     examinationType?: string;
     token?: string;
-    append?: boolean;
+    signal?: AbortSignal;
   }) => {
-    // Task 11: abort previous in-flight request
+    const result = await examinationService.getExaminations({
+      patientId: opts?.patientId,
+      status: opts?.status || undefined,
+      from_date: opts?.from_date || undefined,
+      to_date: opts?.to_date || undefined,
+      examinationType: opts?.examinationType || undefined,
+      continuationToken: opts?.token,
+      signal: opts?.signal,
+    });
+    return { examinations: result.examinations, continuationToken: result.continuationToken };
+  }, []);
+
+  // ── startBrowse — browse mode: first page only ────────────────────────────
+  const startBrowse = useCallback(async (opts?: {
+    patientId?: string;
+    status?: string;
+    from_date?: string;
+    to_date?: string;
+    examinationType?: string;
+  }) => {
     loadAbortRef.current?.abort();
     const controller = new AbortController();
     loadAbortRef.current = controller;
@@ -128,134 +138,99 @@ export default function ExaminationsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await examinationService.getExaminations({
-        patientId: opts?.patientId,
-        status: opts?.status || undefined,
-        from_date: opts?.from_date || undefined,
-        to_date: opts?.to_date || undefined,
-        examinationType: opts?.examinationType || undefined,
-        continuationToken: opts?.token,
-        signal: controller.signal,
-      });
-      const newExams = result.examinations;
-      if (opts?.append) {
-        setExaminations((prev) => {
-          const all = [...prev, ...newExams];
-          setFilteredExaminations(all);
-          return all;
-        });
-      } else {
-        setExaminations(newExams);
-        setFilteredExaminations(newExams);
-        // NOTE: do NOT clear searchQuery here (Task 8 regression fix)
-      }
+      const result = await fetchOnePage({ ...opts, signal: controller.signal });
+      setExaminations(result.examinations);
       setContinuationToken(result.continuationToken);
       setHasMore(!!result.continuationToken);
     } catch (err: any) {
-      // Task 11: silently ignore aborted requests
       if (err.code === 'ERR_CANCELED' || err.name === 'AbortError' || err.name === 'CanceledError') return;
       setError(err.message || 'Failed to load examinations');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [fetchOnePage]);
 
-  // Mount: load data using URL-derived state (Task 4)
+  // ── startFilterExhaustion — filter mode: auto-exhaust all pages ───────────
+  const startFilterExhaustion = useCallback(async (opts: {
+    patientId?: string;
+    status?: string;
+    from_date?: string;
+    to_date?: string;
+    examinationType?: string;
+  }) => {
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
+
+    setIsExhausting(true);
+    setIsLoading(true);
+    setError(null);
+    setExaminations([]);
+    setHasMore(false);
+
+    let token: string | undefined;
+    let running: Examination[] = [];
+    try {
+      while (true) {
+        const result = await fetchOnePage({ ...opts, token, signal: controller.signal });
+        running = [...running, ...result.examinations];
+        setExaminations([...running]);
+        token = result.continuationToken;
+        if (!token) break;
+      }
+      setContinuationToken(undefined);
+      setHasMore(false);
+    } catch (err: any) {
+      if (err.code === 'ERR_CANCELED' || err.name === 'AbortError' || err.name === 'CanceledError') return;
+      setError(err.message || 'Failed to load examinations');
+    } finally {
+      setIsExhausting(false);
+      setIsLoading(false);
+    }
+  }, [fetchOnePage]);
+
+  // ── Mount: load initial data using URL-derived state ─────────────────────
   useEffect(() => {
-    loadPatients();
-    loadExaminations({
-      patientId: searchParams.get('patient') || undefined,
-      status: searchParams.get('status') || undefined,
-      from_date: searchParams.get('from') || undefined,
-      to_date: searchParams.get('to') || undefined,
-      examinationType: searchParams.get('type') || undefined,
-    });
+    const urlPatient = searchParams.get('patient') || undefined;
+    const urlStatus = searchParams.get('status') || undefined;
+    const urlFrom = searchParams.get('from') || undefined;
+    const urlTo = searchParams.get('to') || undefined;
+    const urlType = searchParams.get('type') || undefined;
+    const hasFilter = !!(urlPatient || urlStatus || urlFrom || urlTo || urlType);
+
+    if (hasFilter) {
+      startFilterExhaustion({ patientId: urlPatient, status: urlStatus, from_date: urlFrom, to_date: urlTo, examinationType: urlType });
+    } else {
+      startBrowse();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cleanup timers and abort controllers on unmount
+  // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
       if (dateTimerRef.current) clearTimeout(dateTimerRef.current);
+      if (patientSearchTimerRef.current) clearTimeout(patientSearchTimerRef.current);
       loadAbortRef.current?.abort();
-      searchAbortRef.current?.abort();
+      patientSearchAbortRef.current?.abort();
     };
   }, []);
 
-  // ── Filter handlers (Tasks 4, 6) ───────────────────────────────────────────
+  // ── Patient combobox handlers (IMPL-010) ──────────────────────────────────
+  const handlePatientComboInputChange = (value: string) => {
 
-  const handlePatientFilter = (patientId: string) => {
-    // Task 6: synchronous token reset
-    setContinuationToken(undefined);
-    setSelectedPatientId(patientId);
-    setPage(1);
-    // Task 4: write URL
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (patientId) next.set('patient', patientId); else next.delete('patient');
-      next.set('page', '1');
-      return next;
-    });
-    loadExaminations({ patientId: patientId || undefined, status: selectedStatus || undefined, from_date: fromDate || undefined, to_date: toDate || undefined, examinationType: selectedExamType || undefined });
-  };
-
-  const handleStatusFilter = (status: string) => {
-    // Task 6: synchronous token reset
-    setContinuationToken(undefined);
-    setSelectedStatus(status);
-    setPage(1);
-    // Task 4: write URL
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (status) next.set('status', status); else next.delete('status');
-      next.set('page', '1');
-      return next;
-    });
-    loadExaminations({ patientId: selectedPatientId || undefined, status: status || undefined, from_date: fromDate || undefined, to_date: toDate || undefined, examinationType: selectedExamType || undefined });
-  };
-
-  const handleExamTypeFilter = (type: string) => {
-    setSelectedExamType(type);
-    setPage(1);
-    setContinuationToken(undefined);
-    // Task 4: write URL
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (type) next.set('type', type); else next.delete('type');
-      next.set('page', '1');
-      return next;
-    });
-    loadExaminations({ patientId: selectedPatientId || undefined, status: selectedStatus || undefined, from_date: fromDate || undefined, to_date: toDate || undefined, examinationType: type || undefined });
-  };
-
-  const handleDateFilter = (from: string, to: string) => {
-    // Task 6: synchronous token reset
-    setContinuationToken(undefined);
-    setPage(1);
-    loadExaminations({ patientId: selectedPatientId || undefined, status: selectedStatus || undefined, from_date: from || undefined, to_date: to || undefined, examinationType: selectedExamType || undefined });
-  };
-
-  // Task 8: server-side search with debounce + composable filters
-  const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query);
-    setPage(1);
-
-    // Task 4: write URL (replace — no extra history entries per keystroke)
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (query) next.set('q', query); else next.delete('q');
-      next.set('page', '1');
-      return next;
-    }, { replace: true });
-
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-
-    // Empty query — restore full browse list
-    if (!query.trim()) {
-      setSearchInfo(null);
-      loadExaminations({
-        patientId: selectedPatientId || undefined,
+    if (!value) {
+      // Clear — reset patient filter and return to browse mode if no other filter active
+      setSelectedPatientId('');
+      setSelectedPatientName('');
+      setPatientSearchResults([]);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('patient');
+        next.set('page', '1');
+        return next;
+      });
+      startBrowse({
         status: selectedStatus || undefined,
         from_date: fromDate || undefined,
         to_date: toDate || undefined,
@@ -264,58 +239,129 @@ export default function ExaminationsPage() {
       return;
     }
 
-    // < 2 chars — show hint
-    if (query.trim().length < 2) {
-      setSearchInfo('Type at least 2 characters to search.');
+    if (value.trim().length < 2) {
+      // Too short — clear results but preserve existing filter
+      setPatientSearchResults([]);
       return;
     }
 
-    // 2+ chars — debounced API call
-    setSearchInfo(null);
-    setContinuationToken(undefined);
+    // 2+ chars — debounce
+    if (patientSearchTimerRef.current) clearTimeout(patientSearchTimerRef.current);
+    patientSearchAbortRef.current?.abort();
+    const controller = new AbortController();
+    patientSearchAbortRef.current = controller;
 
-    searchTimerRef.current = setTimeout(async () => {
-      // Task 11: abort previous search
-      searchAbortRef.current?.abort();
-      const controller = new AbortController();
-      searchAbortRef.current = controller;
-
-      setIsSearching(true);
+    setIsPatientSearching(true);
+    patientSearchTimerRef.current = setTimeout(async () => {
       try {
-        const result = await examinationService.getExaminations({
-          patientId: selectedPatientId || undefined,
-          status: selectedStatus || undefined,
-          from_date: fromDate || undefined,
-          to_date: toDate || undefined,
-          examinationType: selectedExamType || undefined,
-          patientName: query,
-          signal: controller.signal,
-        });
-        setExaminations(result.examinations);
-        setFilteredExaminations(result.examinations);
-        setContinuationToken(result.continuationToken);
-        setHasMore(!!result.continuationToken);
+        const results = await patientService.searchPatients(value, controller.signal);
+        setPatientSearchResults(results);
       } catch (err: any) {
         if (err.code === 'ERR_CANCELED' || err.name === 'AbortError' || err.name === 'CanceledError') return;
-        setError(err.message || 'Search failed');
+        setPatientSearchResults([]);
       } finally {
-        setIsSearching(false);
+        setIsPatientSearching(false);
       }
-    }, 200);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPatientId, selectedStatus, fromDate, toDate, selectedExamType, loadExaminations]);
+    }, 350);
+  };
 
-  const handleLoadMore = () => {
-    if (!continuationToken) return;
-    loadExaminations({
-      patientId: selectedPatientId || undefined,
+  const handlePatientComboSelect = (selectedItem: Patient | null) => {
+    if (!selectedItem) {
+      // Clear selection
+      setSelectedPatientId('');
+      setSelectedPatientName('');
+      setPatientSearchResults([]);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('patient');
+        next.set('page', '1');
+        return next;
+      });
+      startBrowse({
+        status: selectedStatus || undefined,
+        from_date: fromDate || undefined,
+        to_date: toDate || undefined,
+        examinationType: selectedExamType || undefined,
+      });
+      return;
+    }
+
+    setSelectedPatientId(selectedItem.patientId);
+    setSelectedPatientName(selectedItem.name);
+    setPage(1);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('patient', selectedItem.patientId);
+      next.set('page', '1');
+      return next;
+    });
+    startFilterExhaustion({
+      patientId: selectedItem.patientId,
       status: selectedStatus || undefined,
       from_date: fromDate || undefined,
       to_date: toDate || undefined,
       examinationType: selectedExamType || undefined,
-      token: continuationToken,
-      append: true,
     });
+  };
+
+  // ── Other filter handlers ─────────────────────────────────────────────────
+  const handleStatusFilter = (status: string) => {
+    setContinuationToken(undefined);
+    setSelectedStatus(status);
+    setPage(1);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (status) next.set('status', status); else next.delete('status');
+      next.set('page', '1');
+      return next;
+    });
+    startFilterExhaustion({ patientId: selectedPatientId || undefined, status: status || undefined, from_date: fromDate || undefined, to_date: toDate || undefined, examinationType: selectedExamType || undefined });
+  };
+
+  const handleExamTypeFilter = (type: string) => {
+    setSelectedExamType(type);
+    setPage(1);
+    setContinuationToken(undefined);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (type) next.set('type', type); else next.delete('type');
+      next.set('page', '1');
+      return next;
+    });
+    startFilterExhaustion({ patientId: selectedPatientId || undefined, status: selectedStatus || undefined, from_date: fromDate || undefined, to_date: toDate || undefined, examinationType: type || undefined });
+  };
+
+  const handleDateFilter = (from: string, to: string) => {
+    setContinuationToken(undefined);
+    setPage(1);
+    startFilterExhaustion({ patientId: selectedPatientId || undefined, status: selectedStatus || undefined, from_date: from || undefined, to_date: to || undefined, examinationType: selectedExamType || undefined });
+  };
+
+  const handleLoadMore = async () => {
+    if (!continuationToken) return;
+    setIsLoading(true);
+    try {
+      loadAbortRef.current?.abort();
+      const controller = new AbortController();
+      loadAbortRef.current = controller;
+      const result = await fetchOnePage({
+        patientId: selectedPatientId || undefined,
+        status: selectedStatus || undefined,
+        from_date: fromDate || undefined,
+        to_date: toDate || undefined,
+        examinationType: selectedExamType || undefined,
+        token: continuationToken,
+        signal: controller.signal,
+      });
+      setExaminations((prev) => [...prev, ...result.examinations]);
+      setContinuationToken(result.continuationToken);
+      setHasMore(!!result.continuationToken);
+    } catch (err: any) {
+      if (err.code === 'ERR_CANCELED' || err.name === 'AbortError' || err.name === 'CanceledError') return;
+      setError(err.message || 'Failed to load more');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleRowClick = (examinationId: string) => {
@@ -331,16 +377,15 @@ export default function ExaminationsPage() {
     navigate('/examinations/new');
   };
 
-  // Task 12: derived helpers for empty state
-  const isFilterActive = !!(selectedPatientId || selectedStatus || selectedExamType || fromDate || toDate || searchQuery.trim().length >= 2);
+  // ── Derived helpers ───────────────────────────────────────────────────────
+  const isFilterActive = !!(selectedPatientId || selectedStatus || selectedExamType || fromDate || toDate);
 
   const activeFilterSummary = [
-    selectedPatientId && patients.find(p => p.patientId === selectedPatientId)?.name && `Patient: ${patients.find(p => p.patientId === selectedPatientId)!.name}`,
+    selectedPatientId && selectedPatientName && `Patient: ${selectedPatientName}`,
     selectedStatus && `Status: ${selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)}`,
     selectedExamType && `Type: ${getExamTypeLabel(selectedExamType)}`,
     fromDate && `From: ${toDisplayDate(fromDate)}`,
     toDate && `To: ${toDisplayDate(toDate)}`,
-    searchQuery.trim().length >= 2 && `Search: "${searchQuery}"`,
   ].filter(Boolean).join(', ');
 
   const clearAllFilters = () => {
@@ -349,16 +394,23 @@ export default function ExaminationsPage() {
     setSelectedExamType('');
     setFromDate('');
     setToDate('');
-    setSearchQuery('');
-    setSearchInfo(null);
+    setSelectedPatientName('');
+    setPatientSearchResults([]);
     setContinuationToken(undefined);
     setPage(1);
     setSearchParams({});
-    loadExaminations();
+    startBrowse();
   };
 
-  // Prepare rows for DataTable — keep patientId for click handler
-  const allRows = filteredExaminations.map((exam) => ({
+  // ── Count label ───────────────────────────────────────────────────────────
+  const N = examinations.length;
+  const examWord = N === 1 ? 'exam' : 'exams';
+  const countLabel = isFilterActive
+    ? (isExhausting ? `${N} ${examWord} found…` : `${N} ${examWord} found`)
+    : `${N} ${examWord} loaded`;
+
+  // ── Table rows ────────────────────────────────────────────────────────────
+  const allRows = examinations.map((exam) => ({
     id: exam.examinationId,
     patientName: exam.patientName,
     patientId: exam.patientId,
@@ -368,10 +420,9 @@ export default function ExaminationsPage() {
     gestationalAge: exam.gestationalAge || '—',
     status: exam.status,
     createdBy: exam.createdByName || exam.createdBy,
-    actions: exam.examinationId, // used to render button
+    actions: exam.examinationId,
   }));
 
-  // Pagination
   const totalItems = allRows.length;
   const startIndex = (page - 1) * pageSize;
   const paginatedRows = allRows.slice(startIndex, startIndex + pageSize);
@@ -395,26 +446,23 @@ export default function ExaminationsPage() {
         />
       )}
 
-      {/* Task 7: Filter bar with disabled={isLoading} on selects */}
+      {/* Filter bar */}
       <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        {/* Patient combobox (IMPL-010) */}
         <div style={{ flex: '0 0 280px' }}>
-          <Select
+          <ComboBox<Patient>
             id="patientFilter"
-            labelText="Filter by Patient"
-            value={selectedPatientId}
-            onChange={(e) => handlePatientFilter(e.target.value)}
-            aria-label="Filter examinations by patient"
+            titleText="Filter by Patient"
+            placeholder="Type to search patients..."
+            items={patientSearchResults}
+            itemToString={(item) => item?.name ?? ''}
+            selectedItem={patientSearchResults.find(p => p.patientId === selectedPatientId) ?? null}
+            onInputChange={handlePatientComboInputChange}
+            onChange={({ selectedItem }) => handlePatientComboSelect(selectedItem ?? null)}
+            shouldFilterItem={() => true}
             disabled={isLoading}
-          >
-            <SelectItem value="" text="All Patients" />
-            {patients.map((patient) => (
-              <SelectItem
-                key={patient.patientId}
-                value={patient.patientId}
-                text={patient.name}
-              />
-            ))}
-          </Select>
+          />
+          {isPatientSearching && <InlineLoading description="Searching..." style={{ width: 'auto' }} />}
         </div>
         <div style={{ flex: '0 0 200px' }}>
           <Select
@@ -446,7 +494,6 @@ export default function ExaminationsPage() {
             ))}
           </Select>
         </div>
-        {/* Task 7: DatePicker with dateTimerRef debounce */}
         <div style={{ flex: '0 0 auto' }}>
           <DatePicker
             datePickerType="range"
@@ -458,17 +505,14 @@ export default function ExaminationsPage() {
             onChange={(dates: Date[]) => {
               const from = dates[0] ? toISODate(dates[0]) : '';
               const to = dates[1] ? toISODate(dates[1]) : '';
-              // UI reflects picks immediately
               setFromDate(from);
               setToDate(to);
-              // Task 4: write URL immediately
               setSearchParams((prev) => {
                 const next = new URLSearchParams(prev);
                 if (from) next.set('from', from); else next.delete('from');
                 if (to) next.set('to', to); else next.delete('to');
                 return next;
               });
-              // Task 7: debounce the API call to avoid firing mid-range-pick
               if (dateTimerRef.current) clearTimeout(dateTimerRef.current);
               dateTimerRef.current = setTimeout(() => {
                 if (from && to) {
@@ -491,32 +535,22 @@ export default function ExaminationsPage() {
             />
           </DatePicker>
         </div>
+        {/* Create Exam button — outside DataTable */}
+        {canCreate && (
+          <Button
+            renderIcon={Add}
+            onClick={handleCreateExamination}
+            aria-label="Create new exam"
+            style={{ marginTop: 'auto' }}
+          >
+            Create Exam
+          </Button>
+        )}
       </div>
 
-      {/* Task 8: 2-char hint */}
-      {searchInfo && (
-        <InlineNotification
-          kind="info"
-          title=""
-          subtitle={searchInfo}
-          lowContrast
-          hideCloseButton
-          style={{ marginBottom: '1rem' }}
-        />
-      )}
-
-      {/* Task 10: search mode banner */}
-      {searchQuery.trim().length >= 2 && (
-        <ActionableNotification
-          kind="info"
-          lowContrast
-          inline
-          title=""
-          subtitle={`Showing search results for "${searchQuery}".`}
-          actionButtonLabel="Clear search"
-          onActionButtonClick={() => handleSearch('')}
-          style={{ marginBottom: '1rem' }}
-        />
+      {/* Filter mode exhaustion loading indicator */}
+      {isExhausting && (
+        <InlineLoading description="Loading all results..." style={{ marginBottom: '1rem' }} />
       )}
 
       <DataTable rows={paginatedRows} headers={headers}>
@@ -528,44 +562,14 @@ export default function ExaminationsPage() {
           getTableProps,
           getTableContainerProps,
         }) => (
-          <TableContainer
-            title="All Exams"
-            description={
-              searchQuery.trim().length >= 2
-                ? `${totalItems} result${totalItems !== 1 ? 's' : ''} found matching "${searchQuery}"`
-                : `${totalItems} exam${totalItems !== 1 ? 's' : ''} found`
-            }
-            {...getTableContainerProps()}
-          >
-            <TableToolbar>
-              <TableToolbarContent>
-                {/* Task 8: persistent search with Escape handler (Task 10) */}
-                <TableToolbarSearch
-                  placeholder="Search by patient name..."
-                  onChange={(e: any) => handleSearch(e.target?.value ?? e)}
-                  value={searchQuery}
-                  persistent
-                  aria-label="Search examinations by patient name"
-                  onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                    if (e.key === 'Escape') handleSearch('');
-                  }}
-                />
-                {/* Task 8: inline searching indicator */}
-                {isSearching && (
-                  <InlineLoading description="Searching..." style={{ width: 'auto' }} />
-                )}
-                {/* TASK-010: hide Create for viewer */}
-                {canCreate && (
-                  <Button
-                    renderIcon={Add}
-                    onClick={handleCreateExamination}
-                    aria-label="Create new exam"
-                  >
-                    Create Exam
-                  </Button>
-                )}
-              </TableToolbarContent>
-            </TableToolbar>
+          <TableContainer {...getTableContainerProps()}>
+            {/* Inline count label (IMPL-011) */}
+            <div style={{ padding: '1rem 1rem 0.5rem' }}>
+              <span style={{ fontWeight: 700, fontSize: '1rem' }}>Exam List</span>
+              <span style={{ fontWeight: 400, fontSize: '0.75rem', marginLeft: '0.5rem', color: '#525252' }}>
+                {countLabel}
+              </span>
+            </div>
             <Table {...getTableProps()} aria-label="All Exams table">
               <TableHead>
                 <TableRow>
@@ -580,7 +584,6 @@ export default function ExaminationsPage() {
                 {!isLoading && rows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={headers.length}>
-                      {/* Task 12: contextual empty state */}
                       {isFilterActive ? (
                         <ActionableNotification
                           kind="info"
@@ -652,7 +655,7 @@ export default function ExaminationsPage() {
                                     e.stopPropagation();
                                     handleRowClick(row.id);
                                   }}
-                                  aria-label="View details for test"
+                                  aria-label="View details for exam"
                                 >
                                   View Details
                                 </Button>
@@ -682,7 +685,6 @@ export default function ExaminationsPage() {
         onChange={({ page: newPage, pageSize: newPageSize }) => {
           setPage(newPage);
           setPageSize(newPageSize);
-          // Task 4: write page to URL (push)
           setSearchParams((prev) => {
             const next = new URLSearchParams(prev);
             next.set('page', String(newPage));
@@ -692,15 +694,15 @@ export default function ExaminationsPage() {
         style={{ marginTop: '1rem' }}
       />
 
-      {/* Task 10: hide Load More in search mode */}
-      {hasMore && searchQuery.trim().length < 2 && (
+      {/* Load More Exams — browse mode only, hidden in filter mode */}
+      {hasMore && !isFilterActive && (
         <div style={{ marginTop: '1rem', textAlign: 'center' }}>
           <Button
             kind="tertiary"
             onClick={handleLoadMore}
             disabled={isLoading}
           >
-            Load More Tests
+            Load More Exams
           </Button>
         </div>
       )}

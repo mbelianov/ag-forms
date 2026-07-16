@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [examinations, setExaminations] = useState<Examination[]>([]);
   const [totalPatients, setTotalPatients] = useState<number>(0);
+  const [totalExaminations, setTotalExaminations] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,12 +50,18 @@ export default function DashboardPage() {
       } catch (err: any) {
         console.error('[Dashboard] Failed to load patient count:', err);
       }
+      // Fetch total examination count independently — failure here is non-fatal
+      try {
+        const exCount = await examinationService.getExaminationCount();
+        setTotalExaminations(exCount);
+      } catch (err: any) {
+        console.error('[Dashboard] Failed to load examination count:', err);
+      }
     };
     loadData();
   }, []);
 
   // Derived statistics
-  const totalExaminations = examinations.length;
 
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -116,7 +123,7 @@ export default function DashboardPage() {
             <Tile style={{ minHeight: '140px', marginBottom: '1rem' }}>
               <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.5rem' }}>Total Examinations</div>
               <div style={{ fontSize: '2.5rem', fontWeight: 700, lineHeight: 1, color: '#161616' }}>
-                {totalExaminations}
+                {totalExaminations !== null ? totalExaminations : '—'}
               </div>
             </Tile>
           </Column>
@@ -140,20 +147,24 @@ export default function DashboardPage() {
       )}
 
       {/* Quick Actions */}
-      <Tile style={{ marginBottom: '2rem', padding: '1.5rem' }}>
-        <h3 style={{ marginBottom: '1rem' }}>Quick Actions</h3>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <Button renderIcon={Add} onClick={() => navigate('/patients/new')} aria-label="Create new patient">
-            Create New Patient
-          </Button>
-          <Button kind="secondary" renderIcon={ArrowRight} onClick={() => navigate('/patients')} aria-label="View all patients">
-            All Patients
-          </Button>
-          <Button kind="secondary" renderIcon={ArrowRight} onClick={() => navigate('/examinations')} aria-label="View all examinations">
-            All Examinations
-          </Button>
-        </div>
-      </Tile>
+      <Grid narrow style={{ marginBottom: '2rem' }}>
+        <Column lg={16} md={8} sm={4}>
+          <Tile style={{ padding: '1.5rem' }}>
+            <h3 style={{ marginBottom: '1rem' }}>Quick Actions</h3>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              <Button renderIcon={Add} onClick={() => navigate('/patients/new')} aria-label="Create new patient">
+                Create New Patient
+              </Button>
+              <Button kind="secondary" renderIcon={ArrowRight} onClick={() => navigate('/patients')} aria-label="View all patients">
+                All Patients
+              </Button>
+              <Button kind="secondary" renderIcon={ArrowRight} onClick={() => navigate('/examinations')} aria-label="View all examinations">
+                All Examinations
+              </Button>
+            </div>
+          </Tile>
+        </Column>
+      </Grid>
 
       {/* Recent Activity */}
       {!isLoading && (

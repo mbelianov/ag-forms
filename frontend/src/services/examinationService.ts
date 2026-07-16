@@ -140,6 +140,20 @@ class ExaminationService {
       throw new Error(message);
     }
   }
+
+  /**
+   * Get the total examination count from the counter
+   * @returns Total examination count
+   */
+  async getExaminationCount(): Promise<number> {
+    try {
+      const response = await api.get<{ count: number }>('/v1/examinations-count');
+      return response.data.count;
+    } catch (error: any) {
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch examination count';
+      throw new Error(message);
+    }
+  }
 }
 
 // Export singleton instance

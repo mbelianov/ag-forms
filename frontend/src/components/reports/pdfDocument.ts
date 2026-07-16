@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import type { ExamPdfViewModel } from '../../services/print.service';
+import { getSectionVisibility } from '../../constants/examinationTypes';
 
 // ─── Layout constants (mm on A4: 210 × 297) ──────────────────────────────────
 
@@ -142,13 +143,14 @@ function kvGrid(
     col++;
     if (col >= cols) {
       col = 0;
-      rowY = rowBottom + 7;
+      rowY = rowBottom + 5.5;
       rowBottom = rowY;
     }
   });
 
-  // If the last row wasn't flushed (partial row), advance from rowBottom
-  return rowBottom + 7;
+  // col === 0: last row was complete and already flushed; rowY holds the next-row start.
+  // col > 0:  last row was partial and never flushed; add pitch from rowBottom.
+  return col === 0 ? rowY : rowBottom + 5.5;
 }
 
 /**
@@ -193,6 +195,7 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   // Register Unicode fonts before drawing any text
   await registerFonts(doc);
 
+  const visibility = getSectionVisibility(vm.examinationType);
   let y = 0;
 
   // ── 1. Header bar ────────────────────────────────────────────────────────────
@@ -238,33 +241,51 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   doc.text(`Patient age at exam: ${vm.patientAgeAtExam !== undefined ? `${vm.patientAgeAtExam} years` : '—'}`, MARGIN_L, y);
   y += 4;
 
-  const gaLabel = 'GA (LMP): ';
-  doc.text(gaLabel, MARGIN_L, y);
-  doc.setFont(FONT_ID, 'bold');
-  setTextColor(doc, C_DARK);
-  doc.text(vm.gestationalAge || '—', MARGIN_L + doc.getTextWidth(gaLabel), y);
-  doc.setFont(FONT_ID, 'normal');
-  setTextColor(doc, C_MID);
+  if (visibility.pregnancyData) {
+    const gaLabel = 'GA (LMP): ';
+    doc.text(gaLabel, MARGIN_L, y);
+    doc.setFont(FONT_ID, 'bold');
+    setTextColor(doc, C_DARK);
+    doc.text(vm.gestationalAge || '—', MARGIN_L + doc.getTextWidth(gaLabel), y);
+    doc.setFont(FONT_ID, 'normal');
+    setTextColor(doc, C_MID);
 
-  const bioLabel = '  GA (Bio): ';
-  doc.text(bioLabel, MARGIN_L + 42, y);
-  doc.setFont(FONT_ID, 'bold');
-  setTextColor(doc, C_DARK);
-  doc.text(vm.gestationalAgeFromBiometry || '—', MARGIN_L + 42 + doc.getTextWidth(bioLabel), y);
-  doc.setFont(FONT_ID, 'normal');
-  setTextColor(doc, C_MID);
+    const bioLabel = '  GA (Bio): ';
+    doc.text(bioLabel, MARGIN_L + 42, y);
+    doc.setFont(FONT_ID, 'bold');
+    setTextColor(doc, C_DARK);
+    doc.text(vm.gestationalAgeFromBiometry || '—', MARGIN_L + 42 + doc.getTextWidth(bioLabel), y);
+    doc.setFont(FONT_ID, 'normal');
+    setTextColor(doc, C_MID);
 
-  doc.setFont(FONT_ID, 'bold');
-  setTextColor(doc, C_ACCENT);
-  doc.setFontSize(8.5);
-  doc.text(`EDD: ${vm.expectedDeliveryDate || '—'}`, MARGIN_R, y, { align: 'right' });
-  doc.setFont(FONT_ID, 'normal');
-  setTextColor(doc, C_MID);
-  doc.setFontSize(8);
+    doc.setFont(FONT_ID, 'bold');
+    setTextColor(doc, C_ACCENT);
+    doc.setFontSize(8.5);
+    doc.text(`EDD: ${vm.expectedDeliveryDate || '—'}`, MARGIN_R, y, { align: 'right' });
+    doc.setFont(FONT_ID, 'normal');
+    setTextColor(doc, C_MID);
+    doc.setFontSize(8);
 
-  y += 6;
+    y += 6;
+  }
+
   rule(doc, y);
   y += 5;
+
+  // ── Pregnancy Data ───────────────────────────────────────────────────────────
+  if (visibility.pregnancyData) {
+    y = sectionHeading(doc, 'Pregnancy Data', y);
+    const pregnancyPairs: Array<[string, string | undefined]> = [
+      ['LMP',              vm.pregnancy.lmp],
+      ['EDD',              vm.expectedDeliveryDate],
+      ['GA from LMP',      vm.gestationalAge],
+      ['GA from Biometry', vm.gestationalAgeFromBiometry],
+      ['Obstetric History',vm.pregnancy.obstetricHistory],
+      ['Family History',   vm.pregnancy.familyHistory],
+    ];
+    y = kvGrid(doc, pregnancyPairs, y, 2);
+    y += 1;
+  }
 
   // ── 3. Biometry ──────────────────────────────────────────────────────────────
   const biometryPairs: Array<[string, string | undefined]> = [
@@ -286,9 +307,11 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
     ['LA', vm.biometry.la],
     ['LC', vm.biometry.lc],
   ];
-  if (biometryPairs.some(([, v]) => v)) {
+  if (visibility.biometry) {
+    rule(doc, y);
+    y += 4;
     y = sectionHeading(doc, 'Biometry Measurements', y);
-    y = kvGrid(doc, biometryPairs, y, 2);
+    y = kvGrid(doc, biometryPairs, y, 3);
     y += 1;
   }
 
@@ -307,7 +330,7 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
     ['CPR', vm.doppler.cpr],
     ['Duc.Ven', vm.doppler.ducVen],
   ];
-  if (dopplerPairs.some(([, v]) => v)) {
+  if (visibility.doppler) {
     rule(doc, y);
     y += 4;
     y = sectionHeading(doc, 'Doppler Measurements', y);
@@ -325,7 +348,7 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
     ['Placenta', vm.ultrasound.placenta],
     ['Umbilical Cord', vm.ultrasound.umbilicalCord],
   ];
-  if (ultrasoundPairs.some(([, v]) => v)) {
+  if (visibility.ultrasoundFindings) {
     rule(doc, y);
     y += 4;
     y = sectionHeading(doc, 'Ultrasound Findings', y);
@@ -348,7 +371,7 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
     ['Spine', vm.anatomy.spine],
     ['Thorax', vm.anatomy.thorax],
   ];
-  if (anatomyPairs.some(([, v]) => v)) {
+  if (visibility.anatomy) {
     rule(doc, y);
     y += 4;
     y = sectionHeading(doc, 'Anatomy', y);
@@ -368,25 +391,43 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   y += 2;
 
   // ── 9. Doctor Signature ──────────────────────────────────────────────────────
-  // Fixed position from bottom — always visible regardless of content above
-  const SIG_Y = PAGE_H - 28;
-  rule(doc, SIG_Y);
+  // Dynamic position: pins to bottom on normal reports; overflows to page 2 when
+  // clinical text is unusually long.
+  let sigY = Math.max(y + 12, PAGE_H - 28);
+  let totalPages = 1;
+  if (sigY + 20 > PAGE_H) {
+    // Content overflows page 1 — draw page-1 footer before the page break.
+    const p1FooterY = PAGE_H - 8;
+    rule(doc, p1FooterY - 3);
+    doc.setFont(FONT_ID, 'normal');
+    doc.setFontSize(6.5);
+    setTextColor(doc, C_MID);
+    doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, MARGIN_L, p1FooterY);
+    doc.text('CONFIDENTIAL — For clinical use only', PAGE_W / 2, p1FooterY, { align: 'center' });
+    doc.text('Page 1 of 2', MARGIN_R, p1FooterY, { align: 'right' });
+
+    doc.addPage();
+    sigY = 30;
+    totalPages = 2;
+  }
+
+  rule(doc, sigY);
 
   doc.setFont(FONT_ID, 'bold');
   doc.setFontSize(8);
   setTextColor(doc, C_MID);
-  doc.text('Examining Doctor:', MARGIN_L, SIG_Y + 8);
+  doc.text('Examining Doctor:', MARGIN_L, sigY + 8);
   setDrawColor(doc, C_DARK);
   doc.setLineWidth(0.3);
-  doc.line(MARGIN_L + 40, SIG_Y + 8, MARGIN_L + 40 + 68, SIG_Y + 8);
+  doc.line(MARGIN_L + 40, sigY + 8, MARGIN_L + 40 + 68, sigY + 8);
 
-  doc.text('Date:', MARGIN_R - 52, SIG_Y + 8);
-  doc.line(MARGIN_R - 41, SIG_Y + 8, MARGIN_R, SIG_Y + 8);
+  doc.text('Date:', MARGIN_R - 52, sigY + 8);
+  doc.line(MARGIN_R - 41, sigY + 8, MARGIN_R, sigY + 8);
 
   doc.setFont(FONT_ID, 'normal');
   doc.setFontSize(7);
   setTextColor(doc, C_MID);
-  doc.text('Signature', MARGIN_L + 40, SIG_Y + 11.5);
+  doc.text('Signature', MARGIN_L + 40, sigY + 11.5);
 
   // ── 10. Footer ───────────────────────────────────────────────────────────────
   const FOOTER_Y = PAGE_H - 8;
@@ -397,7 +438,7 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   setTextColor(doc, C_MID);
   doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, MARGIN_L, FOOTER_Y);
   doc.text('CONFIDENTIAL — For clinical use only', PAGE_W / 2, FOOTER_Y, { align: 'center' });
-  doc.text('Page 1 of 1', MARGIN_R, FOOTER_Y, { align: 'right' });
+  doc.text(totalPages === 1 ? 'Page 1 of 1' : 'Page 2 of 2', MARGIN_R, FOOTER_Y, { align: 'right' });
 
   return doc;
 }

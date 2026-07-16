@@ -1,0 +1,18 @@
+- defect: on the main dashboard page, the Total Examinations tile does not show the total 
+  examinations in the database but only those loaded for rendering. must show total in dashboard
+- defect: on the same page, the Quick Actoins section does not align left and right. must align with
+  the other sections
+- change: on All Exams page, the exam list table currently shows "50 exams found" information message, just 
+  below the title of the table.
+  -- append this information text as suffix to the table title, and left allign. See Patients list table as example
+     and apply same, style font and size.
+  -- whenever there is an active filter, the information message shall show "<N> exams found", where <N> is total exams 
+     found in the database. this is same behavior as Patients list table
+  -- whenever thre is no active filter, the information message shall show "<N> exams loaded". 
+     this is same behavior as Patients list table
+  -- whenever there is an active filter, all exams from the db must be loaded
+  -- the integrated in the table search field (the one just above the header of the table) is not needed. 
+     remove
+  -- All filter fields must triger database call and the table shall efficienly paginate through the full db set
+  -- "Filter by Patient" drop down to allow search by name
+

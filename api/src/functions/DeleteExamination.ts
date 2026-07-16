@@ -4,6 +4,7 @@ import { handleError } from '../utils/errorHandler';
 import { successResponse, unauthorizedResponse, forbiddenResponse, errorResponse } from '../utils/responseHelpers';
 import { getEntity, ensureTableExists, updateEntity } from '../utils/tableClient';
 import { logExaminationDeleted } from '../utils/auditService';
+import { adjustCounter } from '../utils/counterService';
 import { Examination, MRNLookup } from '../types';
 
 const EXAMINATIONS_TABLE = 'Examinations';
@@ -98,6 +99,11 @@ export async function deleteExamination(request: HttpRequest, context: Invocatio
                 await updateEntity(EXAMINATIONS_TABLE, deletedMrnLookup);
             }
         }
+
+        // Decrement EXAM_TOTAL counter (non-fatal)
+        adjustCounter('Counters', 'COUNTER', 'EXAM_TOTAL', -1).catch(err =>
+            context.error('Failed to decrement EXAM_TOTAL counter:', err)
+        );
 
         await logExaminationDeleted(user.userId, examinationId);
 

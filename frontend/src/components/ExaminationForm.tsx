@@ -21,20 +21,8 @@ import type {
   ExaminationData,
 } from '../types';
 import { calcGAFromLMP, calcGAFromBiometry, calcEFW, calcEDD, calcBiometryPercentiles, calcEFWPercentile, calculateAgeAtDate } from '../utils/calculations';
-import { EXAM_TYPES, getExamTypeLabel } from '../constants/examinationTypes';
+import { EXAM_TYPES, getExamTypeLabel, getSectionVisibility } from '../constants/examinationTypes';
 import type { BiometryPercentiles } from '../utils/calculations';
-
-// ── Section visibility map keyed by examinationType ───────────────────────────
-// Add new types here to control which sections render without touching JSX.
-const SECTION_VISIBILITY: Record<string, Record<string, boolean>> = {
-  ultrasound_prenatal: {
-    pregnancyData: true,
-    ultrasoundFindings: true,
-    anatomy: true,
-    biometry: true,
-    doppler: true,
-  },
-};
 
 interface ExaminationFormProps {
   examination?: Examination;
@@ -521,7 +509,7 @@ export default function ExaminationForm({
   };
 
   // ── Section visibility (REQ-05) ──────────────────────────────────────────
-  const visibility = SECTION_VISIBILITY[formData.examinationType] ?? SECTION_VISIBILITY['ultrasound_prenatal'];
+  const visibility = getSectionVisibility(formData.examinationType);
 
   // ── Patient age at exam (REQ-06, FLAG-07) ────────────────────────────────
   const selectedPatient = patients.find((p) => p.patientId === formData.patientId);
@@ -785,10 +773,12 @@ export default function ExaminationForm({
 
         {/* ── Biometry ── */}
         {visibility.biometry && (
-        <FormGroup legendText="Biometry (integers only, in mm/grams)">
+        <>
+        <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Biometry (integers only, in mm/grams)</h4>
+        <FormGroup legendText="">
           <Stack gap={3}>
 
-            {/* Row A: BPD | HC | AC | FL | OFD | Vp (row6, REQ-08 rule 4) */}
+            {/* Row A: BPD | HC | AC | FL (row6, REQ-08 rule 4) */}
             <div style={row6}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <TextInput id="bpd" labelText="BPD (mm)" placeholder="e.g., 85" value={formData.bpd} onChange={(e) => handleChange('bpd', e.target.value)} invalid={!!errors.bpd} invalidText={errors.bpd} disabled={isSubmitting} />
@@ -806,12 +796,10 @@ export default function ExaminationForm({
                 <TextInput id="fl" labelText="FL (mm)" placeholder="e.g., 55" value={formData.fl} onChange={(e) => handleChange('fl', e.target.value)} invalid={!!errors.fl} invalidText={errors.fl} disabled={isSubmitting} />
                 <TextInput id="flPercentile" labelText="FL Percentile" value={percentiles?.fl !== undefined ? `${percentiles.fl}th` : ''} readOnly />
               </div>
-              <TextInput id="ofd" labelText="OFD (mm)" placeholder="e.g., 0" value={formData.ofd} onChange={(e) => handleChange('ofd', e.target.value)} invalid={!!errors.ofd} invalidText={errors.ofd} disabled={isSubmitting} autoComplete="off" />
-              <TextInput id="vp" labelText="Vp (mm)" placeholder="e.g., 0" value={formData.vp} onChange={(e) => handleChange('vp', e.target.value)} invalid={!!errors.vp} invalidText={errors.vp} disabled={isSubmitting} autoComplete="off" />
             </div>
 
             {/* GA from Biometry row: Calc button | GA from Biometry field | GA from LMP (readonly) */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: '0.75rem', alignItems: 'end' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '9rem 1fr 1fr', gap: '0.75rem', alignItems: 'end' }}>
               <div style={calcButtonWrap}>
                 <Button
                   kind="tertiary"
@@ -848,7 +836,7 @@ export default function ExaminationForm({
             </div>
 
             {/* EFW row: Calc button | EFW field | EFW percentile (read-only) */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: '0.75rem', alignItems: 'end' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '9rem 1fr 1fr', gap: '0.75rem', alignItems: 'end' }}>
               <div style={calcButtonWrap}>
                 <Button
                   kind="tertiary"
@@ -915,50 +903,36 @@ export default function ExaminationForm({
             </div>
           </Stack>
         </FormGroup>
+        </>
         )}
 
         {/* ── Doppler — PI | RI | Vessel on one row ── */}
         {visibility.doppler && (
-        <FormGroup legendText="Doppler (floats allowed)">
+        <>
+        <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Doppler (floats allowed)</h4>
+        <FormGroup legendText="">
           <Stack gap={3}>
-            {/* Row A: PI | RI | Vessel | DucVen (row4, REQ-08 rule 5) */}
-            <div style={row4}>
+            {/* Row A: PI | RI | Vessel | DucVen | A.ut.Dex PI | A.ut.Dex RI (row6) */}
+            <div style={row6}>
               <TextInput id="pi" labelText="PI (Pulsatility Index)" placeholder="e.g., 1.25" value={formData.pi} onChange={(e) => handleChange('pi', e.target.value)} invalid={!!errors.pi} invalidText={errors.pi} disabled={isSubmitting} autoComplete="off" />
               <TextInput id="ri" labelText="RI (Resistance Index)" placeholder="e.g., 0.65" value={formData.ri} onChange={(e) => handleChange('ri', e.target.value)} invalid={!!errors.ri} invalidText={errors.ri} disabled={isSubmitting} autoComplete="off" />
               <TextInput id="vessel" labelText="Vessel" placeholder="e.g., Umbilical artery" value={formData.vessel} onChange={(e) => handleChange('vessel', e.target.value)} disabled={isSubmitting} autoComplete="off" />
               <TextInput id="ducVen" labelText="Duc.Ven" placeholder="e.g., normal" value={formData.ducVen} onChange={(e) => handleChange('ducVen', e.target.value)} disabled={isSubmitting} autoComplete="off" />
+              <TextInput id="utADexPI" labelText="A.ut. Dex PI" placeholder="e.g., 0.0" value={formData.utADexPI} onChange={(e) => handleChange('utADexPI', e.target.value)} invalid={!!errors.utADexPI} invalidText={errors.utADexPI} disabled={isSubmitting} autoComplete="off" />
+              <TextInput id="utADexRI" labelText="A.ut. Dex RI" placeholder="e.g., 0.0" value={formData.utADexRI} onChange={(e) => handleChange('utADexRI', e.target.value)} invalid={!!errors.utADexRI} invalidText={errors.utADexRI} disabled={isSubmitting} autoComplete="off" />
             </div>
-            {/* Row B: Extended vascular fields (row6, REQ-08 rule 5) */}
+            {/* Row B: A.ut.Sin PI | A.ut.Sin RI | CMA | PSV | CPR (row6, 5 fields + 1 empty) */}
             <div style={row6}>
-              {(['utADexPI', 'utADexRI', 'utASinPI', 'utASinRI', 'cma', 'psv'] as const).map((field) => {
-                const labels: Record<string, string> = {
-                  utADexPI: 'A.ut. Dex PI', utADexRI: 'A.ut. Dex RI',
-                  utASinPI: 'A.ut. Sin PI', utASinRI: 'A.ut. Sin RI',
-                  cma: 'CMA', psv: 'PSV',
-                };
-                return (
-                  <TextInput
-                    key={field}
-                    id={field}
-                    labelText={labels[field]}
-                    placeholder="e.g., 0.0"
-                    value={formData[field] ?? ''}
-                    onChange={(e) => handleChange(field, e.target.value)}
-                    invalid={!!errors[field]}
-                    invalidText={errors[field]}
-                    disabled={isSubmitting}
-                    autoComplete="off"
-                  />
-                );
-              })}
-            </div>
-            {/* Row C: CPR in first column, 5 spacers (REQ-08 rule 5) */}
-            <div style={row6}>
+              <TextInput id="utASinPI" labelText="A.ut. Sin PI" placeholder="e.g., 0.0" value={formData.utASinPI} onChange={(e) => handleChange('utASinPI', e.target.value)} invalid={!!errors.utASinPI} invalidText={errors.utASinPI} disabled={isSubmitting} autoComplete="off" />
+              <TextInput id="utASinRI" labelText="A.ut. Sin RI" placeholder="e.g., 0.0" value={formData.utASinRI} onChange={(e) => handleChange('utASinRI', e.target.value)} invalid={!!errors.utASinRI} invalidText={errors.utASinRI} disabled={isSubmitting} autoComplete="off" />
+              <TextInput id="cma" labelText="CMA" placeholder="e.g., 0.0" value={formData.cma} onChange={(e) => handleChange('cma', e.target.value)} invalid={!!errors.cma} invalidText={errors.cma} disabled={isSubmitting} autoComplete="off" />
+              <TextInput id="psv" labelText="PSV" placeholder="e.g., 0.0" value={formData.psv} onChange={(e) => handleChange('psv', e.target.value)} invalid={!!errors.psv} invalidText={errors.psv} disabled={isSubmitting} autoComplete="off" />
               <TextInput id="cpr" labelText="CPR" placeholder="e.g., 0.0" value={formData.cpr} onChange={(e) => handleChange('cpr', e.target.value)} invalid={!!errors.cpr} invalidText={errors.cpr} disabled={isSubmitting} autoComplete="off" />
-              <div /><div /><div /><div /><div />
+              <div />
             </div>
           </Stack>
         </FormGroup>
+        </>
         )}
 
         {/* ── Narrative fields ── */}

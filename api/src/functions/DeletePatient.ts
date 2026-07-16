@@ -5,6 +5,7 @@ import { successResponse, unauthorizedResponse, forbiddenResponse, notFoundRespo
 import { ensureTableExists, getEntity, queryEntities, updateEntity } from '../utils/tableClient';
 import { Patient, Examination, MRNLookup } from '../types';
 import { logPatientDeleted } from '../utils/auditService';
+import { adjustCounter } from '../utils/counterService';
 
 const PATIENTS_TABLE = 'Patients';
 const EXAMINATIONS_TABLE = 'Examinations';
@@ -106,6 +107,18 @@ export async function deletePatient(request: HttpRequest, context: InvocationCon
         };
 
         await updateEntity(PATIENTS_TABLE, deletedPatient);
+
+        // Decrement PATIENT_TOTAL counter (non-fatal)
+        adjustCounter('Counters', 'COUNTER', 'PATIENT_TOTAL', -1).catch(err =>
+            context.error('Failed to decrement PATIENT_TOTAL counter:', err)
+        );
+
+        // Decrement EXAM_TOTAL counter by the number of cascade-deleted exams (non-fatal)
+        if (activeExaminations.length > 0) {
+            adjustCounter('Counters', 'COUNTER', 'EXAM_TOTAL', -activeExaminations.length).catch(err =>
+                context.error('Failed to decrement EXAM_TOTAL counter:', err)
+            );
+        }
 
         await logPatientDeleted(user.userId, patientId);
 

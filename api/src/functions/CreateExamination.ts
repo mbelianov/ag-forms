@@ -6,6 +6,7 @@ import { successResponse, unauthorizedResponse, forbiddenResponse, errorResponse
 import { createEntity, ensureTableExists, getEntity } from '../utils/tableClient';
 import { validateExamination } from '../utils/validation';
 import { logExaminationCreated } from '../utils/auditService';
+import { adjustCounter } from '../utils/counterService';
 import { generateMRN } from '../utils/mrnGenerator';
 import { Examination, Patient, MRNLookup } from '../types';
 
@@ -151,6 +152,10 @@ export async function createExamination(request: HttpRequest, context: Invocatio
         await createEntity(EXAMINATIONS_TABLE, primaryExamEntity);
         await createEntity(EXAMINATIONS_TABLE, lookupExamEntity);
         await createEntity(EXAMINATIONS_TABLE, mrnLookupEntity);
+
+        adjustCounter('Counters', 'COUNTER', 'EXAM_TOTAL', 1).catch(err =>
+            context.error('Failed to increment EXAM_TOTAL counter:', err)
+        );
 
         await logExaminationCreated(user.userId, examinationId, patientId);
 
