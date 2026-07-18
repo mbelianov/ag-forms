@@ -365,4 +365,60 @@ export const logDataExport = async (
     );
 };
 
+/**
+ * Log user deletion event
+ * @param performedByUserId - Admin who performed the deletion
+ * @param deletedUserId - ID of the deleted user
+ * @param deletedUsername - Username of the deleted user
+ */
+export const logUserDeleted = async (
+    performedByUserId: string,
+    deletedUserId: string,
+    deletedUsername: string
+): Promise<void> => {
+    await logAuditEvent(
+        'USER_DELETED',
+        performedByUserId,
+        { deletedUserId, deletedUsername }
+    );
+};
+
+/**
+ * Log examination reassignment event (bulk, during user deletion)
+ * @param performedByUserId - Admin who performed the operation
+ * @param fromUserId - User whose examinations were reassigned
+ * @param toUserId - User who received the examinations
+ * @param count - Number of examinations reassigned
+ */
+export const logExaminationsReassigned = async (
+    performedByUserId: string,
+    fromUserId: string,
+    toUserId: string,
+    count: number
+): Promise<void> => {
+    await logAuditEvent(
+        'EXAMINATIONS_REASSIGNED',
+        performedByUserId,
+        { fromUserId, toUserId, count }
+    );
+};
+
+/**
+ * Log admin-forced password reset event
+ * @param performedByUserId - Admin who performed the reset
+ * @param targetUserId - User whose password was reset
+ * @param targetUsername - Username of the affected user
+ */
+export const logPasswordResetByAdmin = async (
+    performedByUserId: string,
+    targetUserId: string,
+    targetUsername: string
+): Promise<void> => {
+    await logAuditEvent(
+        'PASSWORD_RESET_BY_ADMIN',
+        performedByUserId,
+        { targetUserId, targetUsername }
+    );
+};
+
 // Made with Bob

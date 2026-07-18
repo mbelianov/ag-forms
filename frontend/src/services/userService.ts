@@ -57,6 +57,26 @@ class UserService {
       throw new Error(message);
     }
   }
+
+  async deleteUser(id: string, reassignTo?: string): Promise<void> {
+    try {
+      await api.delete(`${this.USERS_BASE_URL}/${id}`, {
+        data: reassignTo ? { reassignTo } : undefined,
+      });
+    } catch (error: any) {
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to delete user';
+      throw new Error(message);
+    }
+  }
+
+  async resetUserPassword(id: string, newPassword: string): Promise<void> {
+    try {
+      await api.post(`${this.USERS_BASE_URL}/${id}/reset-password`, { newPassword });
+    } catch (error: any) {
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to reset password';
+      throw new Error(message);
+    }
+  }
 }
 
 export const userService = new UserService();

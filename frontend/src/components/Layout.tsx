@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Header,
@@ -35,6 +35,17 @@ export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [userMenuOpen]);
 
   const handleLogout = async () => {
     setUserMenuOpen(false);
@@ -98,7 +109,6 @@ export default function Layout({ children }: LayoutProps) {
                       zIndex: 9999,
                       minWidth: '200px',
                     }}
-                    onBlur={() => setUserMenuOpen(false)}
                   >
                     <div
                       style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e0e0e0', fontSize: '0.875rem', color: '#525252' }}
