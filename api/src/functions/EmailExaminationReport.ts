@@ -30,7 +30,8 @@ export async function emailExaminationReport(request: HttpRequest, context: Invo
             return errorResponse('Examination ID is required', 400);
         }
 
-        const body = await request.json() as any;
+        interface EmailReportBody { pdfData?: string; recipientEmail?: string; }
+        const body = await request.json() as EmailReportBody;
         const { pdfData } = body;
 
         if (!pdfData) {

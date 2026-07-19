@@ -5,6 +5,7 @@
  */
 
 import * as bcrypt from 'bcryptjs';
+import { randomInt } from 'crypto';
 import { ValidationResult } from '../types';
 
 // Number of salt rounds for bcrypt (12 is recommended for security/performance balance)
@@ -102,18 +103,24 @@ export const generateSecurePassword = (length: number = 16): string => {
     let password = '';
 
     // Ensure at least one character from each required category
-    password += uppercase[Math.floor(Math.random() * uppercase.length)];
-    password += lowercase[Math.floor(Math.random() * lowercase.length)];
-    password += numbers[Math.floor(Math.random() * numbers.length)];
-    password += special[Math.floor(Math.random() * special.length)];
+    // Using crypto.randomInt for cryptographically secure random selection
+    password += uppercase[randomInt(uppercase.length)];
+    password += lowercase[randomInt(lowercase.length)];
+    password += numbers[randomInt(numbers.length)];
+    password += special[randomInt(special.length)];
 
     // Fill the rest with random characters
     for (let i = password.length; i < length; i++) {
-        password += allChars[Math.floor(Math.random() * allChars.length)];
+        password += allChars[randomInt(allChars.length)];
     }
 
-    // Shuffle the password to avoid predictable patterns
-    return password.split('').sort(() => Math.random() - 0.5).join('');
+    // Fisher-Yates shuffle for uniform distribution
+    const chars = password.split('');
+    for (let i = chars.length - 1; i > 0; i--) {
+        const j = randomInt(i + 1);
+        [chars[i], chars[j]] = [chars[j], chars[i]];
+    }
+    return chars.join('');
 };
 
 // Made with Bob

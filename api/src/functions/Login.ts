@@ -12,18 +12,23 @@ import { User } from '../types';
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 30 * 60 * 1000; // 30 minutes
 
+// Computed once at module load — used only to normalise timing when user not found.
+// Generated with: node -e "require('bcryptjs').hash('dummy', 12).then(console.log)"
+// Cost factor 12 matches SALT_ROUNDS in passwordService.ts.
+const DUMMY_HASH = '$2a$12$LDjIBt/cx1GMAuHJu5B1duQJDMhkDhXf3p9UOpSNWb5TPWKV8mkMi';
+
 /**
  * User login endpoint
  * Authenticates user and issues JWT token
  * Implements brute force protection with account lockout
  */
 export async function login(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-    // Handle CORS preflight
+    // Handle CORS preflight — use the same env-driven origin as getCorsHeaders()
     if (request.method === 'OPTIONS') {
         return {
             status: 204,
             headers: {
-                'Access-Control-Allow-Origin': 'http://127.0.0.1:3000',
+                'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'http://127.0.0.1:3000',
                 'Access-Control-Allow-Credentials': 'true',
                 'Access-Control-Allow-Methods': 'POST, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -34,7 +39,8 @@ export async function login(request: HttpRequest, context: InvocationContext): P
 
     try {
         // Parse request body
-        const body = await request.json() as any;
+        interface LoginBody { username?: string; password?: string; }
+        const body = await request.json() as LoginBody;
         const { username, password } = body;
 
         // Validate input
@@ -55,7 +61,9 @@ export async function login(request: HttpRequest, context: InvocationContext): P
         try {
             userLookup = await usersTable.getEntity('USERNAME', normalizedUsername);
         } catch (error: any) {
-            // User not found - return generic error message for security
+            // User not found — run a dummy bcrypt compare to normalise response timing
+            // and prevent username enumeration via timing differences.
+            await verifyPassword('dummy', DUMMY_HASH);
             context.log('Username not found:', normalizedUsername);
             await logUserLogin('unknown', normalizedUsername, false);
             return errorResponse('Invalid credentials', 401);
@@ -162,18 +170,19 @@ export async function login(request: HttpRequest, context: InvocationContext): P
             role: user.role
         };
 
-        // Create response with Set-Cookie header and include token in body
-        const response = successResponse({ token, user: userResponse });
+        // Create response — token is delivered via HttpOnly cookie only, not in the body
+        const response = successResponse({ user: userResponse });
         
         // Use Secure flag only in production (requires HTTPS)
         const isProduction = process.env.NODE_ENV === 'production';
         const secureCookie = isProduction ? 'Secure; ' : '';
         
+        // Max-Age must match TOKEN_EXPIRATION in tokenService.ts (currently 24h = 86400s)
         return {
             ...response,
             headers: {
                 ...response.headers,
-                'Set-Cookie': `session_token=${token}; HttpOnly; ${secureCookie}SameSite=Strict; Max-Age=28800; Path=/`
+                'Set-Cookie': `session_token=${token}; HttpOnly; ${secureCookie}SameSite=Strict; Max-Age=86400; Path=/`
             }
         };
     } catch (error) {

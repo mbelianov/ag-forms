@@ -379,23 +379,4 @@ export const validateLogin = (data: any): ValidationResult => {
     return { valid: true, errors: [] };
 };
 
-/**
- * Validate partial update data (allows partial objects)
- * @param data - Data to validate
- * @param schema - Joi schema to use
- * @returns ValidationResult
- */
-export const validatePartialUpdate = (data: any, schema: Joi.ObjectSchema): ValidationResult => {
-    const result = schema.validate(data, { abortEarly: false, presence: 'optional' });
-    
-    if (result.error) {
-        return {
-            valid: false,
-            errors: result.error.details.map(detail => detail.message)
-        };
-    }
-
-    return { valid: true, errors: [] };
-};
-
 // Made with Bob

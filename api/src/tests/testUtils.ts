@@ -267,11 +267,36 @@ export async function cleanupTestData(): Promise<void> {
         }
     } catch {}
 
-    // Full sweep of MRN partition in Examinations table to catch any untracked examination MRN lookups
+    // Full sweep of EXAM, MRN, and all PATIENT_* timeline partitions in Examinations table
+    // to catch any untracked rows (e.g. examinations created directly via the createExamination endpoint)
     try {
         const examinationSweepTable = getTableClient(EXAMINATIONS_TABLE);
-        for await (const entity of examinationSweepTable.listEntities({ queryOptions: { filter: `PartitionKey eq 'MRN'` } })) {
-            try { await examinationSweepTable.deleteEntity('MRN', entity.rowKey as string, { etag: '*' }); } catch {}
+
+        // Collect all entities in one pass to find every partition that needs wiping
+        const examEntitiesToDelete: Array<{ partitionKey: string; rowKey: string }> = [];
+        for await (const entity of examinationSweepTable.listEntities()) {
+            const pk = entity.partitionKey as string;
+            if (pk === 'EXAM' || pk === 'MRN' || pk.startsWith('PATIENT_')) {
+                examEntitiesToDelete.push({ partitionKey: pk, rowKey: entity.rowKey as string });
+            }
+        }
+        for (const e of examEntitiesToDelete) {
+            try { await examinationSweepTable.deleteEntity(e.partitionKey, e.rowKey, { etag: '*' }); } catch {}
+        }
+    } catch {}
+
+    // Full sweep of all PATIENT_SEARCH_* partitions to catch any untracked search rows
+    // (the PATIENT full-sweep above only removes the main row; search rows live in separate buckets)
+    try {
+        const patientSearchSweepTable = getTableClient(PATIENTS_TABLE);
+        const searchEntities: Array<{ partitionKey: string; rowKey: string }> = [];
+        for await (const entity of patientSearchSweepTable.listEntities()) {
+            if ((entity.partitionKey as string).startsWith('PATIENT_SEARCH_')) {
+                searchEntities.push({ partitionKey: entity.partitionKey as string, rowKey: entity.rowKey as string });
+            }
+        }
+        for (const e of searchEntities) {
+            try { await patientSearchSweepTable.deleteEntity(e.partitionKey, e.rowKey, { etag: '*' }); } catch {}
         }
     } catch {}
 

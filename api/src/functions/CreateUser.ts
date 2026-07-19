@@ -21,7 +21,8 @@ export async function createUser(request: HttpRequest, context: InvocationContex
             return forbiddenResponse('Admin role required to create users');
         }
 
-        const body = await request.json() as any;
+        interface CreateUserBody { username?: string; password?: string; fullName?: string; email?: string; role?: string; }
+        const body = await request.json() as CreateUserBody;
         const { username, password, fullName, email, role } = body;
 
         const validation = validateUser({ username, password, fullName, email, role });

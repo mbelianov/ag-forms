@@ -6,6 +6,7 @@ import { ensureTableExists, getEntity, updateEntity, deleteEntity, createEntity 
 import { Patient, BaseEntity } from '../types';
 import { validatePatient } from '../utils/validation';
 import { logPatientUpdated } from '../utils/auditService';
+import { normalizePatientName, getSearchPartitionKey } from '../utils/patientUtils';
 
 const PATIENTS_TABLE = 'Patients';
 
@@ -15,22 +16,6 @@ interface PatientSearchEntity extends BaseEntity {
     normalizedName: string;
     createdAt: string;
 }
-
-const normalizePatientName = (name: string): string => {
-    return name.trim().toLowerCase().replace(/\s+/g, ' ');
-};
-
-const getSearchPartitionKey = (normalizedName: string): string => {
-    const firstChar = normalizedName.charAt(0);
-    // Use the Unicode code-point hex value as the bucket suffix so the partition
-    // key remains pure ASCII and is safe for Azure Table Storage OData filters,
-    // regardless of whether the patient name uses Latin, Cyrillic, or any other
-    // Unicode script.  e.g. "a" -> "0061", "и" -> "0438".
-    const bucket = firstChar
-        ? firstChar.codePointAt(0)!.toString(16).padStart(4, '0')
-        : 'unknown';
-    return `PATIENT_SEARCH_${bucket}`;
-};
 
 export async function updatePatient(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     try {
@@ -49,7 +34,8 @@ export async function updatePatient(request: HttpRequest, context: InvocationCon
             return errorResponse('Patient ID is required', 400);
         }
 
-        const body = await request.json() as any;
+        interface PatientBody { name?: string; age?: number; birthDate?: string; phone?: string; email?: string; address?: string; etag?: string; }
+        const body = await request.json() as PatientBody;
         const { name, age, birthDate, phone, email, address, etag } = body;
 
         if (!etag) {
@@ -148,9 +134,13 @@ export async function updatePatient(request: HttpRequest, context: InvocationCon
             changedFields: Object.keys(changes)
         });
 
+        // Strip internal storage fields; return etag as a top-level field so the
+        // frontend can use it for subsequent updates without it being mixed into PII.
+        const { partitionKey, rowKey, isDeleted, createdBy, updatedBy, timestamp, etag: responseEtag, ...safePatient } = updatedPatient as any;
         return successResponse({
             message: 'Patient updated successfully',
-            patient: updatedPatient
+            patient: safePatient,
+            etag: responseEtag
         });
     } catch (error) {
         context.error('Error in updatePatient:', error);

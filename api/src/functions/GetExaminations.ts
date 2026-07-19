@@ -1,9 +1,11 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
+import { odata } from '@azure/data-tables';
 import { requireAuth } from '../utils/authMiddleware';
 import { handleError } from '../utils/errorHandler';
 import { successResponse, unauthorizedResponse, errorResponse } from '../utils/responseHelpers';
 import { getTableClient, ensureTableExists } from '../utils/tableClient';
 import { Examination } from '../types';
+import { EXAM_TYPE_KEYS } from '../constants/examinationTypes';
 
 const EXAMINATIONS_TABLE = 'Examinations';
 
@@ -37,36 +39,44 @@ export async function getExaminations(request: HttpRequest, context: InvocationC
             pageSize = Math.min(parsed, 100);
         }
 
+        // Allowlist validation for enum parameters
+        const VALID_STATUSES = ['draft', 'completed', 'reviewed'];
+        if (status && !VALID_STATUSES.includes(status)) {
+            return errorResponse(`Invalid status value. Must be one of: ${VALID_STATUSES.join(', ')}`, 400);
+        }
+        if (examinationType && !EXAM_TYPE_KEYS.includes(examinationType)) {
+            return errorResponse(`Invalid examinationType value`, 400);
+        }
+
         let filter: string;
 
         if (patientId) {
             // Query specific patient's examinations
-            const partitionKey = `PATIENT_${patientId}`;
-            filter = `PartitionKey eq '${partitionKey}' and isDeleted eq false`;
+            filter = odata`PartitionKey eq ${'PATIENT_' + patientId} and isDeleted eq false`;
         } else {
             // Query all examinations from EXAM partition
-            filter = `PartitionKey eq 'EXAM' and isDeleted eq false`;
+            filter = odata`PartitionKey eq ${'EXAM'} and isDeleted eq false`;
         }
 
         if (examinationType) {
-            filter += ` and examinationType eq '${examinationType}'`;
+            filter += odata` and examinationType eq ${examinationType}`;
         }
 
         if (status) {
-            filter += ` and status eq '${status}'`;
+            filter += odata` and status eq ${status}`;
         }
 
         if (fromDate) {
-            filter += ` and examDate ge '${fromDate}'`;
+            filter += odata` and examDate ge ${fromDate}`;
         }
 
         if (toDate) {
-            filter += ` and examDate le '${toDate}'`;
+            filter += odata` and examDate le ${toDate}`;
         }
 
         // patient_name range filter only applies to EXAM partition (no patient_id given)
         if (!patientId && patientName) {
-            filter += ` and patientNameLower ge '${patientName}' and patientNameLower lt '${patientName}\uFFFF'`;
+            filter += odata` and patientNameLower ge ${patientName} and patientNameLower lt ${patientName + '\uFFFF'}`;
         }
 
         const tableClient = getTableClient(EXAMINATIONS_TABLE);

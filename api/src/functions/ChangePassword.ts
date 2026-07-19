@@ -23,23 +23,27 @@ export async function changePassword(request: HttpRequest, context: InvocationCo
         context.log('Password change request for user:', tokenUser.userId);
 
         // Parse request body
-        const body = await request.json() as any;
-        const { currentPassword, newPassword } = body;
+        interface ChangePasswordBody { currentPassword?: string; newPassword?: string; confirmPassword?: string; }
+        const body = await request.json() as ChangePasswordBody;
+        const { currentPassword, newPassword, confirmPassword } = body;
 
-        // Validate input
+        // Validate input — presence check first
         if (!currentPassword || !newPassword) {
             return errorResponse('Current password and new password are required', 400);
+        }
+
+        // Server-side confirmPassword check (cannot be bypassed by direct API callers)
+        if (!confirmPassword) {
+            return errorResponse('Password confirmation is required', 400);
+        }
+        if (newPassword !== confirmPassword) {
+            return errorResponse('New password and confirmation do not match', 400);
         }
 
         // Validate new password strength
         const passwordValidation = validatePasswordStrength(newPassword);
         if (!passwordValidation.valid) {
             return errorResponse(passwordValidation.errors.join(', '), 400);
-        }
-
-        // Check if new password is same as current
-        if (currentPassword === newPassword) {
-            return errorResponse('New password must be different from current password', 400);
         }
 
         // Ensure Users table exists
@@ -66,6 +70,12 @@ export async function changePassword(request: HttpRequest, context: InvocationCo
         if (!isCurrentPasswordValid) {
             context.log('Invalid current password for user:', tokenUser.userId);
             return errorResponse('Current password is incorrect', 401);
+        }
+
+        // Check if new password is the same as the current password (using bcrypt — not plaintext)
+        const isSamePassword = await verifyPassword(newPassword, user.passwordHash);
+        if (isSamePassword) {
+            return errorResponse('New password must be different from current password', 400);
         }
 
         // Hash new password

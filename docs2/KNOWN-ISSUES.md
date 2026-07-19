@@ -90,3 +90,95 @@ Bugs confirmed but deferred for later resolution.
 - **Recommended path:** Option C — extend the existing `Counters` table (already used by `mrnGenerator.ts`) with `PATIENT_TOTAL` and `EXAM_TOTAL` partition rows. Update create/delete functions to increment/decrement with optimistic-concurrency retries. Count endpoints become single-entity reads. This is consistent with the established pattern, adds no new infrastructure, and scales to any data volume.
 - **Priority:** P3 · Low — no current impact; becomes P1 if data volume exceeds ~20 000 combined records
 - **Status:** Deferred — document and track; implement Option C before dashboard count endpoints are added for examinations
+
+---
+
+## KI-006 · `SearchPatients` endpoint allows silent bulk patient enumeration
+
+- **File:** `api/src/functions/SearchPatients.ts` (lines 9, 53–71, 73–77)
+- **Severity:** 🟡 Medium — insider / stolen-credential threat; no unauthenticated exposure
+- **Priority:** P2 · Non-blocking at current data volumes; elevate to P1 for GDPR compliance review
+- **Status:** Deferred — document and track; implement mitigations before production deployment with real patient data
+
+### Symptom
+
+Any authenticated user (including `viewer` role) can retrieve the full patient list — names, phone numbers, email addresses, birth dates, and addresses — by issuing a small number of sequential search requests. There is no audit trail for search queries.
+
+### Root Cause Analysis
+
+#### Storage layout
+
+Patient creation writes two rows to the `Patients` table (see [`CreatePatient.ts:81-88`](../api/src/functions/CreatePatient.ts:81)):
+
+```
+PartitionKey              | RowKey
+--------------------------|---------------------------------
+PATIENT                   | {patientId}            ← primary record
+PATIENT_SEARCH_{bucket}   | {normalizedName}_{patientId}   ← search index
+```
+
+`bucket` is the 4-hex Unicode code-point of the first character of the normalised name (e.g. `0061` for Latin "a", `0438` for Cyrillic "и"). The search index row key starts with the full normalised name, so a prefix query for `"ив"` hits only rows whose name starts with "ив" within the `PATIENT_SEARCH_0438` partition.
+
+#### How the endpoint works
+
+[`SearchPatients.ts:53-58`](../api/src/functions/SearchPatients.ts:53) calls `queryEntities()` with:
+
+- `partitionKey = PATIENT_SEARCH_{bucket}` (derived from the first character of the search term)
+- `rowKeyPrefix = normalizedSearch` (the full 2+ character search string)
+
+[`tableClient.ts:80`](../api/src/utils/tableClient.ts:80) turns this into an OData range query:
+
+```
+RowKey ge '{prefix}' and RowKey lt '{prefix}\uFFFF'
+```
+
+The function then fetches the full `PATIENT` entity for each matching search row (one `getEntity` call per result), assembles all matching patients, and returns them with no pagination and no audit event. The `MAX_RESULTS = 1000` cap is a deliberate product requirement (D4-02 in [`REQUIREMENTS.md:219`](../docs2/REQUIREMENTS.md:219)): the endpoint must return **all** matches for a given prefix so the frontend can display a complete result set.
+
+#### Enumeration attack
+
+The minimum search length is 2 characters ([`SearchPatients.ts:47-49`](../api/src/functions/SearchPatients.ts:47)). Because the row key prefix is the full normalised name, a 2-character query like `"ив"` returns only patients whose names start with "ив", not the entire "и" bucket. This makes single-character enumeration impossible — but systematic 2-character enumeration remains feasible:
+
+- For a Bulgarian clinical deployment the practical character space is ~30 Cyrillic + ~26 Latin starting characters, each with ~10–30 common second characters ≈ roughly 200–400 prefix pairs to cover the entire patient population.
+- Each request returns **all** matching patients for a given prefix — required by D4-02. In practice results per prefix pair will be small (name distribution across prefixes is sparse), but an attacker systematically submitting every common 2-character combination will collect the full dataset.
+- The total number of requests needed to enumerate the full patient list is proportional to the number of distinct 2-character name prefixes in the dataset — at worst a few hundred requests, taking seconds with a simple script.
+
+#### Why this is silent
+
+[`SearchPatients.ts:73-77`](../api/src/functions/SearchPatients.ts:73) logs to the Azure Functions invocation trace:
+
+```ts
+context.log('Patient search completed:', {
+    searchTerm: normalizedSearch,
+    resultCount: patients.length,
+    requestedBy: user.userId
+});
+```
+
+This goes to the Functions host trace — it is **not** written to the `AuditLogs` table. The `GET /v1/audit-logs` endpoint (admin-only) therefore shows no record of search queries. An admin reviewing the audit log for suspicious activity would see no signal from a bulk enumeration run.
+
+#### Comparison with `GetPatients`
+
+`GET /v1/patients` (paginated, max 100 per page) is the other patient listing endpoint. It uses cursor-based continuation tokens, so bulk extraction via that route requires many sequential pages each requiring the previous page's token — the access pattern is visible as a long chain of requests. `SearchPatients` has no pagination and no continuation tokens, making repeated queries structurally indistinguishable from normal typeahead usage.
+
+### Impact
+
+- **Data exposed per request:** Full `Patient` entity — `name`, `phone`, `email`, `address`, `birthDate`, `patientId`, `createdAt`, `updatedAt`, `createdBy` — all fields that constitute personal data under GDPR and healthcare data protection regulations.
+- **Who can exploit it:** Any holder of a valid session cookie or Bearer token, including `viewer`-role accounts (read-only, lowest privilege level).
+- **Precondition:** Valid authenticated session. Unauthenticated requests are rejected with 401.
+- **Detection difficulty:** High — search queries are functionally identical to legitimate typeahead usage; only the volume and breadth of prefixes queried distinguishes an enumeration from normal use, and that signal is only visible in Functions host traces, not in the application audit log.
+
+### Candidate Mitigations (ranked by implementation cost)
+
+| Option | Change | Cost | Effect |
+|--------|--------|------|--------|
+| **A — Audit search queries** | Call `logAuditEvent('PATIENT_SEARCH', ...)` inside `SearchPatients.ts` with `userId`, `searchTerm`, and `resultCount`. | Low — one function call | Enumeration attempts become visible to admins in `GET /v1/audit-logs`. Does not prevent extraction but enables detection and forensic response. |
+| **B — Reduce `MAX_RESULTS`** | **Not viable.** Requirement D4-02 mandates that all prefix matches are returned. Any cap below the full match count would break the patients search UI. Changing this requires a product decision to revise D4-02. | — | Blocked by D4-02. |
+| **C — Request-level rate limiting** | Apply per-user rate limiting on the search endpoint (e.g. max 30 requests/minute). | Medium — requires Azure API Management or a counter-based in-process rate limiter | Makes systematic enumeration take hours instead of seconds; practical deterrent against scripted extraction. |
+
+**Recommended path:** Implement **A** (audit logging) immediately — one function call, no product impact, closes the compliance gap of untracked PII access. Option C (rate limiting) is the stronger preventive control but belongs at the infrastructure layer (Azure API Management), consistent with the approach taken for Finding #9 in the security plan.
+
+### Notes
+
+- `MAX_RESULTS = 1000` is set by requirement D4-02 ([`REQUIREMENTS.md:219`](../docs2/REQUIREMENTS.md:219)), which mandates that all matches for a given prefix are returned. Reducing this cap would require a product decision to revise D4-02, not just a security change.
+- Audit logging for search is also needed for compliance independently of the enumeration risk — any access to PII in a clinical system should be traceable.
+- Finding #9 in `security-fixes-impl-plan.md` addresses rate limiting for the `Register` endpoint via an infrastructure note; the same infrastructure recommendation applies here.

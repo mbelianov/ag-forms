@@ -7,6 +7,7 @@
  * PATIENT_TOTAL and EXAM_TOTAL counter rows.
  */
 
+import { InvocationContext } from '@azure/functions';
 import { Counter } from '../types';
 import { getEntity, createEntity, updateEntity } from './tableClient';
 
@@ -34,6 +35,7 @@ export async function adjustCounter(
   partitionKey: string,
   rowKey: string,
   delta: number,
+  context?: Pick<InvocationContext, 'error'>,
 ): Promise<void> {
   try {
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -85,7 +87,8 @@ export async function adjustCounter(
       }
     }
   } catch (err) {
-    console.error('[counterService] adjustCounter failed after retries:', err);
+    // Use context.error when available so the error is bound to the invocation trace
+    (context?.error ?? console.error)('[counterService] adjustCounter failed:', err);
     // Non-fatal — resolve normally so caller HTTP responses are unaffected
   }
 }

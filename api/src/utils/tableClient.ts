@@ -245,32 +245,4 @@ export const softDeleteEntity = async (
     }
 };
 
-/**
- * Query entities with custom OData filter
- * @param tableName - Name of the table
- * @param filter - OData filter string
- * @returns Promise<T[]> - Array of entities
- */
-export const queryWithFilter = async <T extends BaseEntity>(
-    tableName: string,
-    filter: string
-): Promise<T[]> => {
-    const tableClient = getTableClient(tableName);
-    const entities: T[] = [];
-
-    try {
-        const entitiesIter = tableClient.listEntities<T>({
-            queryOptions: { filter }
-        });
-
-        for await (const entity of entitiesIter) {
-            entities.push(entity as T);
-        }
-
-        return entities;
-    } catch (error: any) {
-        throw new Error(`Failed to query entities from ${tableName}: ${error.message}`);
-    }
-};
-
 // Made with Bob

@@ -7,10 +7,16 @@ import * as jwt from 'jsonwebtoken';
 import { HttpRequest } from '@azure/functions';
 import { TokenPayload } from '../types';
 
-// JWT secret from environment or fallback for local development
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+// JWT secret — must be provided via environment variable; no fallback is allowed
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    throw new Error(
+        'JWT_SECRET environment variable is required. ' +
+        'Generate with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"'
+    );
+}
 
-// Token expiration time (24 hours)
+// Must match Set-Cookie Max-Age in Login.ts (currently 24h = 86400s)
 const TOKEN_EXPIRATION = '24h';
 
 /**
@@ -78,15 +84,12 @@ export const extractTokenFromRequest = (req: HttpRequest): string | null => {
         return token;
     }
 
-    // Check cookies — accept both 'session_token' (production) and 'token' (legacy/test)
+    // Check cookies — only 'session_token' is accepted; the legacy 'token' cookie name has been removed
     const cookieHeader = req.headers.get('cookie');
     if (cookieHeader) {
         const cookies = parseCookies(cookieHeader);
         if (cookies.session_token) {
             return cookies.session_token;
-        }
-        if (cookies.token) {
-            return cookies.token;
         }
     }
 

@@ -25,7 +25,21 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             return forbiddenResponse('Doctor or admin role required');
         }
 
-        const body = await request.json() as any;
+        interface ExaminationCreateBody {
+            patientId?: string;
+            examDate?: string;
+            gestationalAge?: string;
+            gestationalAgeFromBiometry?: string;
+            biometry?: any;
+            doppler?: any;
+            findings?: string;
+            notes?: string;
+            status?: string;
+            data?: any;
+            examinationType?: string;
+            patientAgeAtExam?: number;
+        }
+        const body = await request.json() as ExaminationCreateBody;
         const { patientId, examDate, gestationalAge, gestationalAgeFromBiometry, biometry, doppler, findings, notes, status, data, examinationType, patientAgeAtExam } = body;
 
         const validation = validateExamination({
@@ -94,7 +108,7 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             examDate,
             gestationalAge: gestationalAge || undefined,
             gestationalAgeFromBiometry: gestationalAgeFromBiometry || undefined,
-            status,
+            status: status as 'completed' | 'draft' | 'reviewed',
             examinationType: examinationType || undefined,
             biometry: biometryStr as any,
             doppler: dopplerStr as any,
@@ -122,7 +136,7 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             examDate,
             gestationalAge: gestationalAge || undefined,
             gestationalAgeFromBiometry: gestationalAgeFromBiometry || undefined,
-            status,
+            status: status as 'completed' | 'draft' | 'reviewed',
             examinationType: examinationType || undefined,
             biometry: biometryStr as any,
             doppler: dopplerStr as any,

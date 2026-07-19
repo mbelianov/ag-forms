@@ -75,9 +75,10 @@ export async function deleteUser(request: HttpRequest, context: InvocationContex
         let reassignTo: string | undefined;
         let reassignTargetUser: any | undefined;
         try {
-            const body = await request.json() as any;
+            interface DeleteUserBody { reassignTo?: string; }
+            const body = await request.json() as DeleteUserBody;
             if (body && body.reassignTo) {
-                reassignTo = body.reassignTo as string;
+                reassignTo = body.reassignTo;
             }
         } catch {
             // body is optional
@@ -115,7 +116,9 @@ export async function deleteUser(request: HttpRequest, context: InvocationContex
             return errorResponse('User has examinations; provide reassignTo', 400);
         }
 
-        // Reassign all three partition copies for each examination
+        // NOTE: Non-transactional race window — examinations created after the query but before
+        // this loop finishes will not be reassigned. This is a known limitation of Azure Table
+        // Storage's lack of multi-row transactions.
         if (examinations.length > 0 && reassignTo && reassignTargetUser) {
             for (const exam of examinations) {
                 const newCreatedBy = reassignTargetUser.userId;

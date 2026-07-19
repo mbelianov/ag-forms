@@ -21,7 +21,8 @@ export async function updateUser(request: HttpRequest, context: InvocationContex
             return errorResponse('User ID is required', 400);
         }
 
-        const body = await request.json() as any;
+        interface UpdateUserBody { fullName?: string; role?: string; isActive?: boolean; }
+        const body = await request.json() as UpdateUserBody;
         const { fullName, role, isActive } = body;
 
         if (role !== undefined && !['admin', 'doctor', 'viewer'].includes(role)) {

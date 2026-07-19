@@ -7,6 +7,7 @@ import { createEntity, ensureTableExists } from '../utils/tableClient';
 import { validatePatient } from '../utils/validation';
 import { logPatientCreated } from '../utils/auditService';
 import { adjustCounter } from '../utils/counterService';
+import { normalizePatientName, getSearchPartitionKey } from '../utils/patientUtils';
 import { Patient, BaseEntity } from '../types';
 
 const PATIENTS_TABLE = 'Patients';
@@ -17,22 +18,6 @@ interface PatientSearchEntity extends BaseEntity {
     normalizedName: string;
     createdAt: string;
 }
-
-const normalizePatientName = (name: string): string => {
-    return name.trim().toLowerCase().replace(/\s+/g, ' ');
-};
-
-const getSearchPartitionKey = (normalizedName: string): string => {
-    const firstChar = normalizedName.charAt(0);
-    // Use the Unicode code-point hex value as the bucket suffix so the partition
-    // key remains pure ASCII and is safe for Azure Table Storage OData filters,
-    // regardless of whether the patient name uses Latin, Cyrillic, or any other
-    // Unicode script.  e.g. "a" -> "0061", "и" -> "0438".
-    const bucket = firstChar
-        ? firstChar.codePointAt(0)!.toString(16).padStart(4, '0')
-        : 'unknown';
-    return `PATIENT_SEARCH_${bucket}`;
-};
 
 export async function createPatient(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     try {
@@ -46,7 +31,8 @@ export async function createPatient(request: HttpRequest, context: InvocationCon
             return forbiddenResponse('Doctor or admin role required');
         }
 
-        const body = await request.json() as any;
+        interface PatientBody { name?: string; age?: number; birthDate?: string; phone?: string; email?: string; address?: string; }
+        const body = await request.json() as PatientBody;
         const { name, age, birthDate, phone, email, address } = body;
 
         const validation = validatePatient({ name, age, birthDate, phone, email, address });
@@ -98,9 +84,11 @@ export async function createPatient(request: HttpRequest, context: InvocationCon
 
         context.log('Patient created:', { patientId, createdBy: user.userId });
 
+        // Strip internal storage fields before returning — do not expose partitionKey, rowKey, isDeleted, etc.
+        const { partitionKey, rowKey, isDeleted, createdBy, updatedBy, etag, timestamp, ...safePatient } = patientEntity as any;
         return successResponse({
             message: 'Patient created successfully',
-            patient: patientEntity
+            patient: safePatient
         }, 201);
     } catch (error) {
         context.error('Error in createPatient:', error);

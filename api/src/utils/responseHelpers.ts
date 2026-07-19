@@ -4,13 +4,14 @@
  */
 
 import { HttpResponseInit } from "@azure/functions";
+import { randomUUID } from 'crypto';
 import { ApiResponse } from "../types";
 
 /**
  * Get CORS headers for responses
  */
 const getCorsHeaders = () => ({
-    'Access-Control-Allow-Origin': 'http://127.0.0.1:3000',
+    'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'http://127.0.0.1:3000',
     'Access-Control-Allow-Credentials': 'true',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -31,7 +32,7 @@ export const successResponse = <T = any>(
         data,
         meta: {
             timestamp: new Date().toISOString(),
-            request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+            request_id: `req_${Date.now()}_${randomUUID()}`
         }
     };
 
@@ -66,7 +67,7 @@ export const errorResponse = (
         },
         meta: {
             timestamp: new Date().toISOString(),
-            request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+            request_id: `req_${Date.now()}_${randomUUID()}`
         }
     };
 

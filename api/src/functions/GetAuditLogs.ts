@@ -1,7 +1,8 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
+import { odata } from '@azure/data-tables';
 import { requireAuth, requireRole } from '../utils/authMiddleware';
 import { handleError } from '../utils/errorHandler';
-import { successResponse, unauthorizedResponse, forbiddenResponse } from '../utils/responseHelpers';
+import { successResponse, unauthorizedResponse, forbiddenResponse, errorResponse } from '../utils/responseHelpers';
 import { ensureTableExists, getTableClient } from '../utils/tableClient';
 import { AuditLog } from '../types';
 
@@ -48,6 +49,19 @@ export async function getAuditLogs(request: HttpRequest, context: InvocationCont
             Math.max(1, Number.isNaN(requestedPageSize) ? DEFAULT_PAGE_SIZE : requestedPageSize)
         );
 
+        // Allowlist validation for action parameter
+        const VALID_ACTIONS = [
+            'USER_LOGIN_SUCCESS', 'USER_LOGIN_FAILED', 'USER_LOGOUT',
+            'USER_CREATED', 'USER_DELETED', 'PASSWORD_CHANGED', 'PASSWORD_RESET_BY_ADMIN',
+            'PATIENT_CREATED', 'PATIENT_UPDATED', 'PATIENT_DELETED',
+            'EXAMINATION_CREATED', 'EXAMINATION_UPDATED', 'EXAMINATION_DELETED',
+            'EXAMINATION_EMAIL_SENT', 'EXAMINATIONS_REASSIGNED',
+            'DATA_EXPORT', 'UNAUTHORIZED_ACCESS'
+        ];
+        if (filterAction && !VALID_ACTIONS.includes(filterAction)) {
+            return errorResponse(`Invalid action value`, 400);
+        }
+
         const tableClient = getTableClient(AUDIT_TABLE);
         const partitionKeys = getPartitionKeys(month);
         const logs: AuditLog[] = [];
@@ -56,12 +70,12 @@ export async function getAuditLogs(request: HttpRequest, context: InvocationCont
         for (const partitionKey of partitionKeys) {
             if (logs.length >= pageSize) break;
 
-            let filter = `PartitionKey eq '${partitionKey}'`;
+            let filter = odata`PartitionKey eq ${partitionKey}`;
             if (filterUser) {
-                filter += ` and (userId eq '${filterUser}' or username eq '${filterUser}')`;
+                filter += odata` and (userId eq ${filterUser} or username eq ${filterUser})`;
             }
             if (filterAction) {
-                filter += ` and action eq '${filterAction}'`;
+                filter += odata` and action eq ${filterAction}`;
             }
 
             const pages = tableClient.listEntities<AuditLog>({

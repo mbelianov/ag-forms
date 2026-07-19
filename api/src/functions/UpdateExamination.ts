@@ -1,4 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
+import { odata } from '@azure/data-tables';
 import { requireAuth, requireRole } from '../utils/authMiddleware';
 import { handleError } from '../utils/errorHandler';
 import { successResponse, unauthorizedResponse, forbiddenResponse, errorResponse } from '../utils/responseHelpers';
@@ -30,7 +31,22 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             return errorResponse('Examination ID is required', 400);
         }
 
-        const body = await request.json() as any;
+        interface ExaminationBody {
+            mrn?: never;
+            examDate?: string;
+            gestationalAge?: string;
+            gestationalAgeFromBiometry?: string;
+            biometry?: any;
+            doppler?: any;
+            findings?: string;
+            notes?: string;
+            status?: string;
+            data?: any;
+            etag?: string;
+            examinationType?: string;
+            patientAgeAtExam?: number;
+        }
+        const body = await request.json() as ExaminationBody;
         // Strip any client-supplied mrn — MRN is immutable once assigned
         const { mrn: _discardedMrn, examDate, gestationalAge, gestationalAgeFromBiometry, biometry, doppler, findings, notes, status, data, etag, examinationType, patientAgeAtExam } = body;
 
@@ -150,7 +166,7 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             changedFields.push('notes');
         }
         if (status !== undefined && status !== existingExam.status) {
-            updatedLookupEntity.status = status;
+            updatedLookupEntity.status = status as 'completed' | 'draft' | 'reviewed';
             changedFields.push('status');
         }
         if (data !== undefined) {
@@ -179,7 +195,7 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
         let primaryEntity: (Examination & any) | null = null;
         for await (const ent of tableClient.listEntities<Examination>({
             queryOptions: {
-                filter: `PartitionKey eq 'PATIENT_${existingExam.patientId}' and examinationId eq '${examinationId}'`
+                filter: odata`PartitionKey eq ${'PATIENT_' + existingExam.patientId} and examinationId eq ${examinationId}`
             }
         })) {
             primaryEntity = ent;

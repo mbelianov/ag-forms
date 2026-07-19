@@ -4,6 +4,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import { InvocationContext } from '@azure/functions';
 import { AuditLog } from '../types';
 import { createEntity, ensureTableExists } from './tableClient';
 
@@ -30,6 +31,7 @@ export const initializeAuditTable = async (): Promise<void> => {
  * @param username - Username (optional, for readability)
  * @param ipAddress - IP address (optional)
  * @param userAgent - User agent string (optional)
+ * @param context - Azure Functions invocation context for structured logging (optional)
  * @returns Promise<void>
  */
 export const logAuditEvent = async (
@@ -38,7 +40,8 @@ export const logAuditEvent = async (
     details: Record<string, any>,
     username?: string,
     ipAddress?: string,
-    userAgent?: string
+    userAgent?: string,
+    context?: Pick<InvocationContext, 'error'>
 ): Promise<void> => {
     try {
         // Ensure table exists
@@ -74,7 +77,8 @@ export const logAuditEvent = async (
         await createEntity(AUDIT_TABLE, auditLog);
     } catch (error: any) {
         // Log error but don't throw - audit failures shouldn't break application flow
-        console.error('Failed to log audit event:', error.message);
+        // Use context.error when available so the error is bound to the invocation trace
+        (context?.error ?? console.error)('Failed to log audit event:', error.message);
     }
 };
 
@@ -289,28 +293,6 @@ export const logExaminationEmailSent = async (
 };
 
 /**
- * Log unauthorized access attempt
- * @param userId - User ID (if authenticated)
- * @param resource - Resource being accessed
- * @param action - Action attempted
- * @param ipAddress - IP address (optional)
- */
-export const logUnauthorizedAccess = async (
-    userId: string,
-    resource: string,
-    action: string,
-    ipAddress?: string
-): Promise<void> => {
-    await logAuditEvent(
-        'UNAUTHORIZED_ACCESS',
-        userId,
-        { resource, action },
-        undefined,
-        ipAddress
-    );
-};
-
-/**
  * Log user creation event
  * @param userId - User ID who created the new user
  * @param newUserId - ID of the newly created user
@@ -344,24 +326,6 @@ export const logPasswordChanged = async (
         userId,
         {},
         username
-    );
-};
-
-/**
- * Log data export event
- * @param userId - User ID who exported data
- * @param exportType - Type of export (e.g., "PDF", "CSV")
- * @param recordCount - Number of records exported
- */
-export const logDataExport = async (
-    userId: string,
-    exportType: string,
-    recordCount: number
-): Promise<void> => {
-    await logAuditEvent(
-        'DATA_EXPORT',
-        userId,
-        { exportType, recordCount }
     );
 };
 

@@ -65,11 +65,14 @@ class PatientService {
   async updatePatient(id: string, data: UpdatePatientRequest, etag: string): Promise<Patient> {
     try {
       // Backend reads etag from the request body (see UpdatePatient.ts)
-      const response = await api.put<{ patient: Patient }>(
+      // Response shape: { patient: Patient (no internal fields), etag: string }
+      const response = await api.put<{ patient: Patient; etag?: string }>(
         `${this.PATIENTS_BASE_URL}/${id}`,
         { ...data, etag }
       );
-      return response.data.patient;
+      // Merge the top-level etag back into the patient object so callers can
+      // use patient.etag for subsequent optimistic-concurrency updates.
+      return { ...response.data.patient, etag: response.data.etag } as Patient;
     } catch (error: any) {
       const status = error.response?.status;
       // Backend returns 409 for concurrency conflicts (conflictResponse helper)

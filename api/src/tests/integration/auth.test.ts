@@ -54,7 +54,9 @@ describe('Auth Integration', () => {
 
         expect(response.status).toBe(200);
         expect(body.success).toBe(true);
-        expect(body.data.token).toBeDefined();
+        // Token is delivered via HttpOnly Set-Cookie header, not in the response body
+        const setCookie = (response.headers as any)['set-cookie'] ?? (response.headers as any)?.['Set-Cookie'] ?? '';
+        expect(setCookie).toContain('session_token=');
         expect(body.data.user.username).toBe(created.user.username);
     });
 
@@ -107,7 +109,8 @@ describe('Auth Integration', () => {
         const created = await createTestUser('doctor');
         const request = mockHttpRequest('POST', {
             currentPassword: created.password,
-            newPassword: 'NewStrongPassword123!'
+            newPassword: 'NewStrongPassword123!',
+            confirmPassword: 'NewStrongPassword123!'
         }, {
             authorization: `Bearer ${created.token}`
         });
@@ -202,7 +205,8 @@ describe('Auth Integration', () => {
         const created = await createTestUser('doctor');
         const request = mockHttpRequest('POST', {
             currentPassword: 'WrongPassword123!',
-            newPassword: 'NewStrongPassword123!'
+            newPassword: 'NewStrongPassword123!',
+            confirmPassword: 'NewStrongPassword123!'
         }, {
             authorization: `Bearer ${created.token}`
         });

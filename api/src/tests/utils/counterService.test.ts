@@ -89,7 +89,12 @@ describe('counterService.adjustCounter', () => {
     (getEntity as any).mockResolvedValue(makeCounter(1));
     (updateEntity as any).mockRejectedValue(conflictErr);
 
+    const mockContext = { error: jest.fn() };
+
     // Should resolve without throwing even after all retries fail
-    await expect(adjustCounter(TABLE, PK, RK, 1)).resolves.toBeUndefined();
+    await expect(adjustCounter(TABLE, PK, RK, 1, mockContext)).resolves.toBeUndefined();
+
+    // The non-fatal error path must log via context.error, not console.error
+    expect(mockContext.error).toHaveBeenCalledWith('[counterService] adjustCounter failed:', conflictErr);
   });
 });

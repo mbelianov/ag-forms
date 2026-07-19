@@ -17,7 +17,8 @@ import { User } from '../types';
 export async function register(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     try {
         // Parse request body
-        const body = await request.json() as any;
+        interface CreateUserBody { username?: string; password?: string; fullName?: string; email?: string; role?: string; }
+        const body = await request.json() as CreateUserBody;
         const { username, password, fullName, email, role } = body;
 
         // Validate input
@@ -28,6 +29,9 @@ export async function register(request: HttpRequest, context: InvocationContext)
 
         // Normalize username to lowercase for case-insensitive lookup
         const normalizedUsername = username.toLowerCase();
+
+        // Extract auth token early (used for fail-fast on non-first-user requests)
+        const authUser = requireAuth(request);
 
         // **CRITICAL: Ensure Users table exists BEFORE any queries**
         await ensureTableExists('Users');
@@ -51,24 +55,25 @@ export async function register(request: HttpRequest, context: InvocationContext)
             
             isFirstUser = userCount === 0;
         } catch (error: any) {
-            // If table doesn't exist (404) or other error, assume first user
+            // Only treat a confirmed 404/ResourceNotFound as "table missing → first user".
+            // Any other error (throttling, network, SDK exception) must fail closed with 503
+            // to prevent a storage-error bypass that would grant unauthenticated admin registration.
             if (error.statusCode === 404 || error.details?.errorCode === 'ResourceNotFound') {
                 context.log('Users table does not exist yet - this is the first user');
                 isFirstUser = true;
             } else {
-                context.log('Error checking for existing users (assuming first user):', error.message);
-                isFirstUser = true;
+                context.log('Error checking for existing users:', error.message);
+                return errorResponse('Service temporarily unavailable. Please try again.', 503);
             }
         }
 
-        // If not first user, require admin authentication
+        // If not first user, require admin authentication (check uses the early-extracted token)
         if (!isFirstUser) {
-            const user = await requireAuth(request);
-            if (!user) {
+            if (!authUser) {
                 return errorResponse('Authentication required', 401);
             }
 
-            const hasRole = requireRole(user, ['admin']);
+            const hasRole = requireRole(authUser, ['admin']);
             if (!hasRole) {
                 return forbiddenResponse('Admin role required to create users');
             }
@@ -108,7 +113,7 @@ export async function register(request: HttpRequest, context: InvocationContext)
             passwordHash,
             fullName,
             email,
-            role: isFirstUser ? 'admin' : role, // First user is always admin
+            role: (isFirstUser ? 'admin' : role) as 'admin' | 'doctor' | 'viewer', // First user is always admin
             isActive: true,
             isDeleted: false,
             failedLoginAttempts: 0,
@@ -146,8 +151,10 @@ export async function register(request: HttpRequest, context: InvocationContext)
             role: userEntity.role
         };
         
+        // By design, no token or session cookie is issued here.
+        // The caller must authenticate via POST /v1/auth/login to obtain a session.
         return successResponse({
-            message: 'User registered successfully',
+            message: 'User registered successfully. Please log in to continue.',
             user: userResponse
         }, 201);
     } catch (error) {

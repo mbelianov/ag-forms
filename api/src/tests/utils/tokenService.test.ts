@@ -55,13 +55,22 @@ describe('Token Service', () => {
             expect(extractTokenFromRequest(request)).toBe(token);
         });
 
-        test('should extract token from cookie header', () => {
+        test('should extract token from session_token cookie header', () => {
             const token = generateToken('user-1', 'doctor1', 'doctor');
             const request = mockHttpRequest('GET', undefined, {
-                cookie: `theme=dark; token=${encodeURIComponent(token)}`
+                cookie: `theme=dark; session_token=${encodeURIComponent(token)}`
             });
 
             expect(extractTokenFromRequest(request)).toBe(token);
+        });
+
+        test('should not extract token from legacy token cookie (removed)', () => {
+            const token = generateToken('user-1', 'doctor1', 'doctor');
+            const request = mockHttpRequest('GET', undefined, {
+                cookie: `token=${encodeURIComponent(token)}`
+            });
+
+            expect(extractTokenFromRequest(request)).toBeNull();
         });
 
         test('should return null when token is missing', () => {

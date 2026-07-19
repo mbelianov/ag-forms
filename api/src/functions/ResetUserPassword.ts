@@ -35,8 +35,9 @@ export async function resetUserPassword(request: HttpRequest, context: Invocatio
         }
 
         // Parse and validate request body
-        const body = await request.json() as any;
-        const { newPassword } = body || {};
+        interface ResetPasswordBody { newPassword?: string; }
+        const body = (await request.json() as ResetPasswordBody) || {};
+        const { newPassword } = body;
 
         if (!newPassword) {
             return errorResponse('newPassword is required', 400);

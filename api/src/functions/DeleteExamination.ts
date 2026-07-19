@@ -1,5 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { requireAuth } from '../utils/authMiddleware';
+import { requireAuth, isAdmin } from '../utils/authMiddleware';
 import { handleError } from '../utils/errorHandler';
 import { successResponse, unauthorizedResponse, forbiddenResponse, errorResponse } from '../utils/responseHelpers';
 import { getEntity, ensureTableExists, updateEntity } from '../utils/tableClient';
@@ -8,13 +8,6 @@ import { adjustCounter } from '../utils/counterService';
 import { Examination, MRNLookup } from '../types';
 
 const EXAMINATIONS_TABLE = 'Examinations';
-
-/**
- * Check if user is admin
- */
-const isAdmin = (user: any): boolean => {
-    return user.role === 'admin';
-};
 
 export async function deleteExamination(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     try {
