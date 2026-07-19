@@ -98,7 +98,7 @@ export async function resetUserPassword(request: HttpRequest, context: Invocatio
 
 app.http('ResetUserPassword', {
     methods: ['POST'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/users/{id}/reset-password',
     handler: resetUserPassword,
 });

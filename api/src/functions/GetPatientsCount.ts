@@ -26,7 +26,7 @@ export async function getPatientsCount(request: HttpRequest, context: Invocation
 
 app.http('GetPatientsCount', {
     methods: ['GET'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/patients-count',
     handler: getPatientsCount
 });

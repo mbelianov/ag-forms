@@ -26,7 +26,7 @@ export async function getExaminationsCount(request: HttpRequest, context: Invoca
 
 app.http('GetExaminationsCount', {
     methods: ['GET'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/examinations-count',
     handler: getExaminationsCount
 });

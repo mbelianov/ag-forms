@@ -57,7 +57,7 @@ export async function initializeTables(request: HttpRequest, context: Invocation
 
 app.http('InitializeTables', {
     methods: ['POST'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/admin/initialize-tables',
     handler: initializeTables
 });

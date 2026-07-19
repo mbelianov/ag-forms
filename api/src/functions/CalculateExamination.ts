@@ -251,7 +251,7 @@ export async function calculateExamination(request: HttpRequest, context: Invoca
 
 app.http('CalculateExamination', {
     methods: ['POST'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/examinations/{id}/calculate',
     handler: calculateExamination
 });

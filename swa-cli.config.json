@@ -1,0 +1,14 @@
+{
+  "$schema": "https://aka.ms/azure/static-web-apps-cli/schema",
+  "configurations": {
+    "ag-forms": {
+      "appLocation": "frontend",
+      "outputLocation": "dist",
+      "appBuildCommand": "npm run build",
+      "apiLocation": "api",
+      "apiBuildCommand": "npm run build",
+      "run": "npm run dev",
+      "env": "local"
+    }
+  }
+}

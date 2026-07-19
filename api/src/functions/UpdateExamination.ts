@@ -249,7 +249,7 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
 
 app.http('UpdateExamination', {
     methods: ['PUT'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/examinations/{id}',
     handler: updateExamination
 });

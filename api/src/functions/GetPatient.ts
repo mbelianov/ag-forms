@@ -40,7 +40,7 @@ export async function getPatient(request: HttpRequest, context: InvocationContex
 
 app.http('GetPatient', {
     methods: ['GET'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/patients/{id}',
     handler: getPatient
 });

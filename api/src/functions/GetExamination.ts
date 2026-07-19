@@ -64,7 +64,7 @@ export async function getExamination(request: HttpRequest, context: InvocationCo
 
 app.http('GetExamination', {
     methods: ['GET'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/examinations/{id}',
     handler: getExamination
 });

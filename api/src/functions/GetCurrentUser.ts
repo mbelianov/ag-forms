@@ -71,7 +71,7 @@ export async function getCurrentUser(request: HttpRequest, context: InvocationCo
 
 app.http('GetCurrentUser', {
     methods: ['GET'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/auth/me',
     handler: getCurrentUser
 });

@@ -73,7 +73,7 @@ export async function searchPatients(request: HttpRequest, context: InvocationCo
 // Route uses a dedicated path to avoid collision with v1/patients/{id}
 app.http('SearchPatients', {
     methods: ['GET'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/patients-search',
     handler: searchPatients
 });

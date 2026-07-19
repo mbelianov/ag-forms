@@ -139,7 +139,7 @@ export async function deletePatient(request: HttpRequest, context: InvocationCon
 
 app.http('DeletePatient', {
     methods: ['DELETE'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/patients/{id}',
     handler: deletePatient
 });

@@ -92,7 +92,7 @@ export async function createUser(request: HttpRequest, context: InvocationContex
 
 app.http('CreateUser', {
     methods: ['POST'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/users',
     handler: createUser,
 });
