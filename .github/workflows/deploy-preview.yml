@@ -1,0 +1,67 @@
+name: Deploy — PR Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches:
+      - main
+
+jobs:
+  deploy-preview:
+    name: Deploy PR preview
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+
+    # WARNING: PR preview environments share the production Azure Storage account.
+    # The SWA Free Tier has no per-environment application settings override —
+    # AZURE_STORAGE_CONNECTION_STRING set in the Azure Portal applies to all slots.
+    # PR previews are intended for UI and layout review only.
+    # Do NOT perform write operations (create/update/delete patients, examinations,
+    # or users) in a PR preview — they will affect production data.
+    # For write-path testing, run integration tests locally against Azurite:
+    #   cd api && npm test -- --testPathPattern="src/tests/integration"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install & build API
+        run: |
+          npm ci
+          npm run build
+        working-directory: api
+
+      - name: Install & build frontend
+        run: |
+          npm ci
+          npm run build
+        working-directory: frontend
+
+      - name: Deploy preview to SWA staging slot
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: frontend
+          output_location: dist
+          api_location: api
+          skip_app_build: true
+          skip_api_build: true
+          deployment_environment: pr-${{ github.event.pull_request.number }}
+
+  close-preview:
+    name: Tear down PR preview
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed'
+
+    steps:
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: close
+          deployment_environment: pr-${{ github.event.pull_request.number }}

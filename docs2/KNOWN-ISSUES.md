@@ -182,3 +182,35 @@ This goes to the Functions host trace — it is **not** written to the `AuditLog
 - `MAX_RESULTS = 1000` is set by requirement D4-02 ([`REQUIREMENTS.md:219`](../docs2/REQUIREMENTS.md:219)), which mandates that all matches for a given prefix are returned. Reducing this cap would require a product decision to revise D4-02, not just a security change.
 - Audit logging for search is also needed for compliance independently of the enumeration risk — any access to PII in a clinical system should be traceable.
 - Finding #9 in `security-fixes-impl-plan.md` addresses rate limiting for the `Register` endpoint via an infrastructure note; the same infrastructure recommendation applies here.
+
+---
+
+## KI-007 · Joi strict TLD validation rejects valid internal email addresses on user creation
+
+- **Affects:**
+  - `api/src/utils/validation.ts` — `emailField` (line 43), shared by both `registerSchema` and `userSchema`
+  - `api/src/functions/Register.ts` — `POST /v1/auth/register` (first user and subsequent user registration via `manage-data.ps1`)
+  - `api/src/functions/CreateUser.ts` — `POST /v1/users` (Create User form in the UI)
+- **Symptom:** HTTP 400 "Validation error" is returned when the submitted email address uses a TLD that is not in Joi's built-in allowlist. Observed on first-user registration via `manage-data.ps1` and on the Create User page in the UI.
+- **Root cause:** `emailField` is defined as `Joi.string().email().required()` with no TLD options. Joi 17's `.email()` defaults to `{ tlds: { allow: true } }`, which validates the domain TLD against an internal allowlist of real public TLDs. Email addresses commonly used in development and internal deployments — such as `admin@localhost`, `doctor@hospital.internal`, `user@example.test`, or any address whose TLD is not on the public internet — are rejected even though they are syntactically valid.
+- **Scope:** Both entry points for user creation hit the same shared field definition:
+  - `manage-data.ps1` → `POST /v1/auth/register` → `validateRegister` → `registerSchema` → `emailField`
+  - UI Create User page → `POST /v1/users` → `validateUser` → `userSchema` → `emailField`
+  
+  The UI performs its own client-side email validation at [`CreateUserPage.tsx:44`](../frontend/src/pages/CreateUserPage.tsx:44) using a simple regex (`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`) that does not check TLDs. This client-side check passes for addresses like `admin@hospital.internal`, but the server-side Joi check then rejects them, returning a 400 that surfaces as an error notification in the UI.
+- **Fix:** Add `{ tlds: { allow: false } }` to the `emailField` definition in `validation.ts`. This disables TLD checking while preserving all other structural email validation (must contain `@`, must have a domain part, etc.):
+
+  ```ts
+  // api/src/utils/validation.ts — line 43
+  const emailField = Joi.string()
+      .email({ tlds: { allow: false } })
+      .required()
+      .messages({
+          'string.email': 'Email must be a valid email address',
+          'any.required': 'Email is required'
+      });
+  ```
+
+  This is a one-line change to a shared field that fixes both `registerSchema` and `userSchema` simultaneously. No schema structure change, no new fields, no migration needed.
+- **Priority:** P1 · High — blocks first-user bootstrap via `manage-data.ps1` and blocks user creation via the UI for any email address with a non-public TLD
+- **Status:** Deferred — documented; fix is ready to apply

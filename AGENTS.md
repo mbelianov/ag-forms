@@ -2,7 +2,7 @@
 
 This file provides guidance to agents when working with code in this repository.
 
-- Backend/frontend are separate npm projects; the root PowerShell scripts are the intended local-dev entrypoints: [`start-azurite.ps1`](start-azurite.ps1), [`start-functions.ps1`](start-functions.ps1), [`start-frontend.ps1`](start-frontend.ps1).
+- Backend/frontend are part are developed as separate projects but intended to be deployed on Azure SWA free tier.
 - Backend single-test command is `cd api && npm test -- src/tests/utils/validation.test.ts`; Jest roots are [`api/src`](api/src), but coverage explicitly excludes [`api/src/tests/**`](api/src/tests).
 - [`api/package.json`](api/package.json) `start` is not a plain runtime start: it runs `prestart` (`clean && build`) before `func start`.
 - Azure Functions are only discovered when a file calls [`app.http(...)`](api/src/functions/Login.ts:185); the registration name becomes the function name and routes are usually explicit `v1/...`.
@@ -16,7 +16,7 @@ This file provides guidance to agents when working with code in this repository.
 - Soft delete is the project convention; delete flows set `isDeleted` and timestamps instead of removing rows — all queries must filter `isDeleted eq false` explicitly. Cascade patient delete performs a three-pass deletion per examination (EXAM, PATIENT_, MRN partition rows).
 - Validation is domain-specific: patient age `2-99`, gestational age format `28w 3d`, biometry values are strict integers (reject decimals), doppler values may be floats.
 - Backend TS is intentionally loose: [`api/tsconfig.json`](api/tsconfig.json) uses `strict: false`, `rootDir: "."`, and CommonJS output.
-- Frontend dev server must stay on `127.0.0.1:3000`; [`frontend/vite.config.ts`](frontend/vite.config.ts) proxies `/api` to `http://localhost:7071`.
+- Local development uses `swa start` (SWA CLI) on port **4280** — see [`README-SWA.md`](README-SWA.md). The Vite proxy block has been removed; SWA CLI owns `/api/*` forwarding to the Functions runtime on port 7071. Do **not** run `vite dev` directly for local SWA testing.
 - Frontend service types use `import type` and the codebase prefers single quotes + semicolons; the axios interceptor in [`api.ts`](frontend/src/services/api.ts) unwraps the envelope once. After unwrapping, **both** `/v1/auth/login` and `/v1/auth/me` yield `response.data.user` (a `{ user: User }` shape at the inner data level). Update [`authService.ts`](frontend/src/services/authService.ts) with care.
 - MRN generation ([`mrnGenerator.ts`](api/src/utils/mrnGenerator.ts)) transliterates Cyrillic patient names (full Bulgarian map) and uses optimistic-concurrency retries (max 5) against a `Counters` table; the format is `MRN-{nameSegment}-{YYYY}-{NNNNNN}`.
 - Login brute-force protection: account locks after 5 failed attempts for 30 minutes; the lock state is stored on the `USER` entity, not a separate table.
@@ -25,6 +25,6 @@ This file provides guidance to agents when working with code in this repository.
 - New utilities: [`useAutoNotification(value, clearFn, ms?)`](frontend/src/utils/useAutoNotification.ts) auto-clears notifications after 5 s; [`getStatusTag(status)`](frontend/src/utils/statusHelpers.tsx) returns a Carbon `<Tag>` JSX element (not a string) — use it directly in JSX.
 - Medical terminology may appear in Bulgarian; `УЗД` means ultrasound examination.
 - When registering a new examination type in [`examinationTypes.ts`](frontend/src/constants/examinationTypes.ts), a corresponding `SECTION_VISIBILITY` entry is **mandatory**. Without it, the fallback to `ultrasound_prenatal` silently applies across the form, detail page, and PDF.
-- **Production deployment:** The `/v1/auth/register` endpoint is anonymous. In production, place the Function App behind Azure API Management or Azure Front Door and configure per-IP rate limiting on this route (recommended: max 5 requests per minute per IP).
 - **CORS:** The `ALLOWED_ORIGIN` environment variable controls the `Access-Control-Allow-Origin` header for all API responses. Set it to the real frontend URL in production (e.g. `https://your-app.azurestaticapps.net`). Defaults to `http://127.0.0.1:3000` for local dev. There is no `cors` block in `host.json` — the application layer is the single source of truth.
+- **SWA routing:** SWA CLI 2.x forwards `/api/*` requests to the Functions runtime on port 7071 **with the `/api` prefix intact** (it does not strip it). `host.json` must therefore set `routePrefix: "api"` — not `""`. Setting it to `""` causes 404 on every API route.
 - **JWT_SECRET:** Must be set as an environment variable. No fallback is allowed. Generate with `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`.

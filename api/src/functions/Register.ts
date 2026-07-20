@@ -5,7 +5,7 @@ import { handleError } from '../utils/errorHandler';
 import { successResponse, errorResponse, forbiddenResponse } from '../utils/responseHelpers';
 import { getTableClient, ensureTableExists } from '../utils/tableClient';
 import { hashPassword } from '../utils/passwordService';
-import { validateUser } from '../utils/validation';
+import { validateRegister } from '../utils/validation';
 import { logUserCreated } from '../utils/auditService';
 import { User } from '../types';
 
@@ -21,8 +21,12 @@ export async function register(request: HttpRequest, context: InvocationContext)
         const body = await request.json() as CreateUserBody;
         const { username, password, fullName, email, role } = body;
 
-        // Validate input
-        const validation = validateUser({ username, password, fullName, email, role });
+        // Validate input fields that are always required regardless of first-user status.
+        // role is intentionally not required here: the first user always gets 'admin' forced
+        // by the server, so accepting any submitted role (or none at all) prevents a 400 that
+        // would block bootstrapping a completely empty system.  For non-first users, role is
+        // validated programmatically after the isFirstUser check below.
+        const validation = validateRegister({ username, password, fullName, email, role });
         if (!validation.valid) {
             return errorResponse(validation.errors.join(', '), 400);
         }
@@ -67,7 +71,10 @@ export async function register(request: HttpRequest, context: InvocationContext)
             }
         }
 
-        // If not first user, require admin authentication (check uses the early-extracted token)
+        // If not first user, require admin authentication AND a valid role in the body.
+        // Role validation is deferred to here (after isFirstUser is determined) so that
+        // first-user bootstrap requests are never rejected for omitting or mis-typing role
+        // (the server forces 'admin' for the first user regardless of the submitted value).
         if (!isFirstUser) {
             if (!authUser) {
                 return errorResponse('Authentication required', 401);
@@ -76,6 +83,11 @@ export async function register(request: HttpRequest, context: InvocationContext)
             const hasRole = requireRole(authUser, ['admin']);
             if (!hasRole) {
                 return forbiddenResponse('Admin role required to create users');
+            }
+
+            // For non-first users an explicit valid role is mandatory.
+            if (!role || !['admin', 'doctor', 'viewer'].includes(role)) {
+                return errorResponse('Role must be one of: admin, doctor, viewer', 400);
             }
         }
 

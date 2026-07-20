@@ -10,46 +10,83 @@ import { EXAM_TYPE_KEYS } from '../constants/examinationTypes';
 /**
  * User validation schema
  */
+/** Shared field definitions reused across user schemas */
+const usernameField = Joi.string()
+    .min(3)
+    .max(50)
+    .pattern(/^[a-zA-Z0-9_-]+$/)
+    .required()
+    .messages({
+        'string.min': 'Username must be at least 3 characters long',
+        'string.max': 'Username must not exceed 50 characters',
+        'string.pattern.base': 'Username can only contain letters, numbers, underscores, and hyphens',
+        'any.required': 'Username is required'
+    });
+
+const passwordField = Joi.string()
+    .min(12)
+    .required()
+    .messages({
+        'string.min': 'Password must be at least 12 characters long',
+        'any.required': 'Password is required'
+    });
+
+const fullNameField = Joi.string()
+    .min(2)
+    .max(255)
+    .optional()
+    .messages({
+        'string.min': 'Full name must be at least 2 characters long',
+        'string.max': 'Full name must not exceed 255 characters'
+    });
+
+const emailField = Joi.string()
+    .email()
+    .required()
+    .messages({
+        'string.email': 'Email must be a valid email address',
+        'any.required': 'Email is required'
+    });
+
+const roleField = Joi.string()
+    .valid('admin', 'doctor', 'viewer')
+    .required()
+    .messages({
+        'any.only': 'Role must be one of: admin, doctor, viewer',
+        'any.required': 'Role is required'
+    });
+
+/**
+ * Admin-facing user schema — role is required.
+ * Used by CreateUser (admin creates a user with an explicit role).
+ */
 const userSchema = Joi.object({
-    username: Joi.string()
-        .min(3)
-        .max(50)
-        .pattern(/^[a-zA-Z0-9_-]+$/)
-        .required()
-        .messages({
-            'string.min': 'Username must be at least 3 characters long',
-            'string.max': 'Username must not exceed 50 characters',
-            'string.pattern.base': 'Username can only contain letters, numbers, underscores, and hyphens',
-            'any.required': 'Username is required'
-        }),
-    password: Joi.string()
-        .min(12)
-        .required()
-        .messages({
-            'string.min': 'Password must be at least 12 characters long',
-            'any.required': 'Password is required'
-        }),
-    fullName: Joi.string()
-        .min(2)
-        .max(255)
-        .optional()
-        .messages({
-            'string.min': 'Full name must be at least 2 characters long',
-            'string.max': 'Full name must not exceed 255 characters'
-        }),
-    email: Joi.string()
-        .email()
-        .required()
-        .messages({
-            'string.email': 'Email must be a valid email address',
-            'any.required': 'Email is required'
-        }),
+    username: usernameField,
+    password: passwordField,
+    fullName: fullNameField,
+    email:    emailField,
+    role:     roleField
+});
+
+/**
+ * Self-registration schema — role is optional.
+ * The first user always gets role='admin' assigned by the server regardless of
+ * what was submitted; subsequent registrations must supply a valid role but that
+ * is enforced programmatically in Register.ts AFTER the isFirstUser check, not
+ * here, so the schema itself leaves role optional to avoid a 400 before we even
+ * know whether this is the first user.
+ */
+const registerSchema = Joi.object({
+    username: usernameField,
+    password: passwordField,
+    fullName: fullNameField,
+    email:    emailField,
     role: Joi.string()
         .valid('admin', 'doctor', 'viewer')
-        .required()
+        .optional()
+        .allow('')
         .messages({
-            'any.only': 'Role must be one of: admin, doctor, viewer',
-            'any.required': 'Role is required'
+            'any.only': 'Role must be one of: admin, doctor, viewer'
         })
 });
 
@@ -299,13 +336,34 @@ const examinationSchema = Joi.object({
 });
 
 /**
- * Validate user data
+ * Validate user data (admin-facing — role is required).
+ * Used by CreateUser when an admin creates a new user with an explicit role.
  * @param data - User data to validate
  * @returns ValidationResult
  */
 export const validateUser = (data: any): ValidationResult => {
     const result = userSchema.validate(data, { abortEarly: false });
     
+    if (result.error) {
+        return {
+            valid: false,
+            errors: result.error.details.map(detail => detail.message)
+        };
+    }
+
+    return { valid: true, errors: [] };
+};
+
+/**
+ * Validate self-registration data (role is optional — first user gets 'admin' forced by server;
+ * subsequent users must supply a valid role, but that is checked programmatically in Register.ts
+ * after the isFirstUser determination so the schema itself does not require it).
+ * @param data - Registration data to validate
+ * @returns ValidationResult
+ */
+export const validateRegister = (data: any): ValidationResult => {
+    const result = registerSchema.validate(data, { abortEarly: false });
+
     if (result.error) {
         return {
             valid: false,

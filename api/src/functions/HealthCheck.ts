@@ -12,5 +12,6 @@ export async function HealthCheck(request: HttpRequest, context: InvocationConte
 app.http('HealthCheck', {
     methods: ['GET'],
     authLevel: 'anonymous',
+    route: 'v1/health',
     handler: HealthCheck
 });

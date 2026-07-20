@@ -18,7 +18,7 @@ Browser → http://localhost:4280
               ├── GET /          → SWA CLI serves frontend/dist/
               ├── GET /patients  → SWA CLI serves frontend/dist/index.html (SPA fallback)
               └── POST /api/*    → SWA CLI forwards to Functions runtime on port 7071
-                                       (strips /api prefix before forwarding)
+                                       (/api prefix is KEPT — Functions runtime receives /api/v1/...)
 ```
 
 The SWA CLI (`swa start`) replaces both:
@@ -56,17 +56,13 @@ cd ..
 swa start --config swa-cli.config.json
 ```
 
-Or without the config file (explicit flags):
-
-```powershell
-swa start frontend/dist `
-  --api-location api `
-  --api-devserver-url http://localhost:7071
-```
-
 **SWA CLI starts:**
 - The Functions runtime on port **7071** (reads `api/local.settings.json` for env vars)
 - A unified gateway on port **4280** that serves both frontend and proxies `/api/*`
+
+> **Do not use `--api-devserver-url`** — it behaves identically to the built-in launcher
+> in SWA CLI 2.x (both forward with the `/api` prefix intact) and adds unnecessary
+> complexity. Use `--config swa-cli.config.json` only.
 
 ### 4. Initialize the database (first time only)
 
@@ -106,16 +102,17 @@ This file is git-ignored — do not commit it with real secrets.
 
 ## Route Mapping: How the URL paths work
 
-| Browser URL | SWA CLI action | Function route |
-|-------------|---------------|----------------|
+| Browser URL | SWA CLI action | Received by Functions runtime |
+|-------------|---------------|-------------------------------|
 | `http://localhost:4280/` | Serves `frontend/dist/index.html` | — |
 | `http://localhost:4280/patients` | SPA fallback → `index.html` | — |
-| `http://localhost:4280/api/v1/patients` | Strip `/api` → forward to Functions | `v1/patients` |
-| `http://localhost:4280/api/v1/auth/login` | Strip `/api` → forward to Functions | `v1/auth/login` |
+| `http://localhost:4280/api/v1/patients` | Forward to Functions (prefix kept) | `/api/v1/patients` |
+| `http://localhost:4280/api/v1/auth/login` | Forward to Functions (prefix kept) | `/api/v1/auth/login` |
 
-**Note:** `host.json` sets `routePrefix: ""` (empty). This is required because SWA
-already owns the `/api` segment — adding it again in `routePrefix` would cause double
-prefixing and 404 errors on all routes.
+**Note:** `host.json` sets `routePrefix: "api"`. SWA CLI 2.x forwards the full path
+including the `/api` segment to the Functions runtime on port 7071 — it does **not** strip
+it. The `routePrefix: "api"` setting tells the runtime to match that prefix, so
+`/api/v1/patients` correctly resolves to the function registered with `route: 'v1/patients'`.
 
 ---
 
@@ -124,9 +121,9 @@ prefixing and 404 errors on all routes.
 | Old (`start-functions.ps1` + `start-frontend.ps1`) | New (`swa start`) |
 |----------------------------------------------------|-------------------|
 | Frontend on port 3000, API on port 7071 | Everything on port **4280** |
-| Vite dev proxy forwards `/api/*` to 7071 | SWA CLI proxy forwards `/api/*` to 7071 |
+| Vite dev proxy forwards `/api/*` to 7071 (strips prefix) | SWA CLI proxy forwards `/api/*` to 7071 (keeps prefix) |
 | `ALLOWED_ORIGIN=http://127.0.0.1:3000` | `ALLOWED_ORIGIN=http://localhost:4280` |
-| `host.json` routePrefix `"api"` | `host.json` routePrefix `""` |
+| `host.json` routePrefix `"api"` | `host.json` routePrefix `"api"` (unchanged) |
 | `authLevel: 'function'` (26 functions) | `authLevel: 'anonymous'` (all functions) |
 
 ---
@@ -137,7 +134,9 @@ prefixing and 404 errors on all routes.
 Run `npm run build` inside `api/` first — SWA CLI needs compiled JS in `api/dist/`.
 
 ### API returns 404 on all routes
-Check `api/host.json` — `routePrefix` must be `""` not `"api"`.
+Check `api/host.json` — `routePrefix` must be `"api"`. SWA CLI 2.x forwards requests
+to the Functions runtime with the `/api` prefix intact; the runtime needs `routePrefix: "api"`
+to match it. Setting it to `""` causes 404 on every route.
 
 ### 401 on all protected endpoints
 Confirm `authLevel: 'anonymous'` in all function registrations (26 files were patched).
