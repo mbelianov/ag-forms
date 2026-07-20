@@ -187,7 +187,7 @@ export async function createExamination(request: HttpRequest, context: Invocatio
 
 app.http('CreateExamination', {
     methods: ['POST'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/examinations',
     handler: createExamination
 });

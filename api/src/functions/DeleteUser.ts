@@ -187,7 +187,7 @@ export async function deleteUser(request: HttpRequest, context: InvocationContex
 
 app.http('DeleteUser', {
     methods: ['DELETE'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/users/{id}',
     handler: deleteUser,
 });

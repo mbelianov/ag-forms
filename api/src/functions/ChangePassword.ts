@@ -113,7 +113,7 @@ export async function changePassword(request: HttpRequest, context: InvocationCo
 
 app.http('ChangePassword', {
     methods: ['POST'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/auth/change-password',
     handler: changePassword
 });

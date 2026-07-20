@@ -9,7 +9,7 @@
 
 import { InvocationContext } from '@azure/functions';
 import { Counter } from '../types';
-import { getEntity, createEntity, updateEntity } from './tableClient';
+import { getEntity, createEntity, updateEntity, ensureTableExists } from './tableClient';
 
 const MAX_RETRIES = 5;
 
@@ -38,6 +38,7 @@ export async function adjustCounter(
   context?: Pick<InvocationContext, 'error'>,
 ): Promise<void> {
   try {
+    await ensureTableExists(tableName);
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         const entity = await getEntity<Counter>(tableName, partitionKey, rowKey);

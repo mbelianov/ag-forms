@@ -150,7 +150,7 @@ export async function updatePatient(request: HttpRequest, context: InvocationCon
 
 app.http('UpdatePatient', {
     methods: ['PUT'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/patients/{id}',
     handler: updatePatient
 });

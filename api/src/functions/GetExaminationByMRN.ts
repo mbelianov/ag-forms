@@ -72,7 +72,7 @@ export async function getExaminationByMRN(request: HttpRequest, context: Invocat
 
 app.http('GetExaminationByMRN', {
     methods: ['GET'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/examinations/mrn/{mrn}',
     handler: getExaminationByMRN
 });

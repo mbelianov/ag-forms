@@ -105,7 +105,7 @@ export async function getAuditLogs(request: HttpRequest, context: InvocationCont
 
 app.http('GetAuditLogs', {
     methods: ['GET'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/audit-logs',
     handler: getAuditLogs,
 });

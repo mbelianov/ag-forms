@@ -9,6 +9,7 @@ jest.mock('../../utils/tableClient', () => ({
   getEntity: jest.fn(),
   createEntity: jest.fn(),
   updateEntity: jest.fn(),
+  ensureTableExists: jest.fn().mockResolvedValue(undefined),
 }));
 
 import { adjustCounter } from '../../utils/counterService';

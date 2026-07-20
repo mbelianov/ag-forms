@@ -118,7 +118,7 @@ export async function emailExaminationReport(request: HttpRequest, context: Invo
 
 app.http('EmailExaminationReport', {
     methods: ['POST'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/examinations/{id}/email-report',
     handler: emailExaminationReport
 });

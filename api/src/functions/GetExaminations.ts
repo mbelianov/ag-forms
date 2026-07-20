@@ -134,7 +134,7 @@ export async function getExaminations(request: HttpRequest, context: InvocationC
 
 app.http('GetExaminations', {
     methods: ['GET'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/examinations',
     handler: getExaminations
 });

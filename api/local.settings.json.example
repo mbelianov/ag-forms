@@ -3,7 +3,9 @@
   "Values": {
     "FUNCTIONS_WORKER_RUNTIME": "node",
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "AZURE_STORAGE_CONNECTION_STRING": "UseDevelopmentStorage=true",
     "JWT_SECRET": "<generate with: node -e \"console.log(require('crypto').randomBytes(64).toString('hex'))\">",
-    "ALLOWED_ORIGIN": "http://127.0.0.1:3000"
+    "ALLOWED_ORIGIN": "http://localhost:4280",
+    "NODE_ENV": "development"
   }
 }

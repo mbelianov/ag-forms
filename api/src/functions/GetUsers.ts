@@ -41,7 +41,7 @@ export async function getUsers(request: HttpRequest, context: InvocationContext)
 
 app.http('GetUsers', {
     methods: ['GET'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/users',
     handler: getUsers,
 });

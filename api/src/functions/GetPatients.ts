@@ -64,7 +64,7 @@ export async function getPatients(request: HttpRequest, context: InvocationConte
 
 app.http('GetPatients', {
     methods: ['GET'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/patients',
     handler: getPatients
 });

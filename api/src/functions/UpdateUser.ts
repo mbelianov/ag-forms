@@ -68,7 +68,7 @@ export async function updateUser(request: HttpRequest, context: InvocationContex
 
 app.http('UpdateUser', {
     methods: ['PUT'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/users/{id}',
     handler: updateUser,
 });

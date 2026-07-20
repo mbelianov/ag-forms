@@ -47,7 +47,7 @@ export async function logout(request: HttpRequest, context: InvocationContext): 
 
 app.http('Logout', {
     methods: ['POST'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/auth/logout',
     handler: logout
 });

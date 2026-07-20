@@ -98,7 +98,7 @@ export async function createPatient(request: HttpRequest, context: InvocationCon
 
 app.http('CreatePatient', {
     methods: ['POST'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'v1/patients',
     handler: createPatient
 });
