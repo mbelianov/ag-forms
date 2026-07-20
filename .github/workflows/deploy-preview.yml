@@ -28,18 +28,6 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install & build API
-        run: |
-          npm ci
-          npm run build
-        working-directory: api
-
-      - name: Install & build frontend
-        run: |
-          npm ci
-          npm run build
-        working-directory: frontend
-
       - name: Deploy preview to SWA staging slot
         uses: Azure/static-web-apps-deploy@v1
         with:
@@ -49,8 +37,8 @@ jobs:
           app_location: frontend
           output_location: dist
           api_location: api
-          skip_app_build: true
-          skip_api_build: true
+          app_build_command: "npm ci && npm run build"
+          api_build_command: "npm ci && npm run build"
           deployment_environment: pr-${{ github.event.pull_request.number }}
 
   close-preview:
