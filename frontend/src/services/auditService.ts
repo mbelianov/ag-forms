@@ -6,7 +6,7 @@ export interface AuditLogEntry {
   userId: string;
   username?: string;
   actionTimestamp: string;
-  details?: any;
+  details?: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
 }
@@ -19,6 +19,16 @@ export interface AuditLogsFilters {
   to_date?: string;
   month?: string;
   continuationToken?: string;
+}
+
+function extractMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const r = (err as { response?: { data?: { error?: { message?: string } | string } } }).response;
+    const e = r?.data?.error;
+    if (typeof e === 'object' && e?.message) return e.message;
+    if (typeof e === 'string') return e;
+  }
+  return fallback;
 }
 
 class AuditService {
@@ -39,9 +49,8 @@ class AuditService {
         this.AUDIT_BASE_URL, { params }
       );
       return response.data;
-    } catch (error: any) {
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch audit logs';
-      throw new Error(message);
+    } catch (err) {
+      throw new Error(extractMessage(err, 'Failed to fetch audit logs'), { cause: err });
     }
   }
 }

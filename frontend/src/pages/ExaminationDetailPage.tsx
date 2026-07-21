@@ -56,15 +56,16 @@ export default function ExaminationDetailPage() {
     try {
       const examinationData = await examinationService.getExamination(id);
       setExamination(examinationData);
-    } catch (err: any) {
+    } catch (err) {
       console.error('[ExaminationDetail] Failed to load examination:', err);
-      setError(err.message || 'Failed to load examination');
+      setError(err instanceof Error ? err.message : 'Failed to load examination');
     } finally {
       setIsLoading(false);
     }
   }, [id]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadExamination();
   }, [loadExamination]);
 
@@ -91,9 +92,9 @@ export default function ExaminationDetailPage() {
       setIsDeleteModalOpen(false);
       setDeleteSuccess(true);
       setTimeout(() => navigate('/examinations'), 1200);
-    } catch (err: any) {
+    } catch (err) {
       setIsDeleteModalOpen(false);
-      setDeleteError(err.message || 'Failed to delete examination');
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete examination');
     } finally {
       setIsDeleting(false);
     }

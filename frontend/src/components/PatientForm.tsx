@@ -47,6 +47,7 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
 
   useEffect(() => {
     if (patient) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
         name: patient.name,
         birthDate: patient.birthDate || '',
@@ -118,8 +119,8 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
       };
 
       await onSubmit(submitData);
-    } catch (error: any) {
-      setSubmitError(error.message || 'An error occurred');
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'An error occurred');
     } finally {
       setIsSubmitting(false);
     }

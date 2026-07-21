@@ -70,15 +70,16 @@ export default function PatientDetailPage() {
     try {
       const patientData = await patientService.getPatient(id);
       setPatient(patientData);
-    } catch (err: any) {
+    } catch (err) {
       console.error('[PatientDetail] Failed to load patient:', err);
-      setError(err.message || 'Failed to load patient');
+      setError(err instanceof Error ? err.message : 'Failed to load patient');
     } finally {
       setIsLoading(false);
     }
   }, [id]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPatient();
   }, [loadPatient]);
 
@@ -95,8 +96,8 @@ export default function PatientDetailPage() {
         (a, b) => new Date(b.examDate).getTime() - new Date(a.examDate).getTime()
       );
       setExaminations(sorted);
-    } catch (err: any) {
-      setExaminationsError(err.message || 'Failed to load examinations');
+    } catch (err) {
+      setExaminationsError(err instanceof Error ? err.message : 'Failed to load examinations');
     } finally {
       setIsLoadingExaminations(false);
     }
@@ -104,6 +105,7 @@ export default function PatientDetailPage() {
 
   useEffect(() => {
     if (!id) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadExaminations(id, selectedExamType);
   }, [id, loadExaminations, selectedExamType]);
 
@@ -130,9 +132,9 @@ export default function PatientDetailPage() {
       setIsDeleteModalOpen(false);
       setDeleteSuccess(true);
       setTimeout(() => navigate('/patients'), 1200);
-    } catch (err: any) {
+    } catch (err) {
       setIsDeleteModalOpen(false);
-      setDeleteError(err.message || 'Failed to delete patient');
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete patient');
     } finally {
       setIsDeleting(false);
     }

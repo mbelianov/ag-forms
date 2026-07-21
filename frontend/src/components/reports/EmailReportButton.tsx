@@ -69,9 +69,11 @@ export default function EmailReportButton({ examination }: EmailReportButtonProp
 
       setSendSuccess(true);
       setTimeout(() => setIsOpen(false), 1500);
-    } catch (err: any) {
-      const apiMsg = err.response?.data?.error?.message || err.response?.data?.error;
-      setSendError(apiMsg || err.message || 'Failed to send report');
+    } catch (err) {
+      const e = err as { response?: { data?: { error?: { message?: string } | string } }; message?: string };
+      const errorData = e.response?.data?.error;
+      const apiMsg = typeof errorData === 'object' ? errorData?.message : errorData;
+      setSendError(apiMsg || e.message || 'Failed to send report');
     } finally {
       setIsSending(false);
     }

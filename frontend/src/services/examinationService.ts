@@ -17,6 +17,29 @@ export interface GetExaminationsOptions {
   signal?: AbortSignal;
 }
 
+function extractMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const r = (err as { response?: { data?: { error?: { message?: string } | string } } }).response;
+    const e = r?.data?.error;
+    if (typeof e === 'object' && e?.message) return e.message;
+    if (typeof e === 'string') return e;
+  }
+  return fallback;
+}
+
+function getResponseStatus(err: unknown): number | undefined {
+  if (err && typeof err === 'object' && 'response' in err) {
+    return (err as { response?: { status?: number } }).response?.status;
+  }
+  return undefined;
+}
+
+function isCanceledError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: string; name?: string };
+  return e.code === 'ERR_CANCELED' || e.name === 'AbortError' || e.name === 'CanceledError';
+}
+
 /**
  * Examination service for handling examination-related API operations
  */
@@ -31,7 +54,7 @@ class ExaminationService {
     optsOrPatientId?: string | GetExaminationsOptions
   ): Promise<ExaminationsListResponse> {
     try {
-      let params: Record<string, string | undefined> = {};
+      const params: Record<string, string | undefined> = {};
       if (typeof optsOrPatientId === 'string') {
         // Legacy call: getExaminations(patientId)
         if (optsOrPatientId) params.patient_id = optsOrPatientId;
@@ -52,19 +75,18 @@ class ExaminationService {
       });
       // Backend returns { examinations: [...], continuationToken?: string }
       // After envelope unwrap, response.data is that inner object
-      const data = response.data as any;
+      const data = response.data as ExaminationsListResponse & { examinations?: Examination[] };
       if (data && Array.isArray(data.examinations)) {
         return { examinations: data.examinations, continuationToken: data.continuationToken };
       }
       // Fallback for legacy responses that return an array directly
       if (Array.isArray(data)) {
-        return { examinations: data };
+        return { examinations: data as unknown as Examination[] };
       }
       return { examinations: [] };
-    } catch (error: any) {
-      if (error.code === 'ERR_CANCELED' || error.name === 'AbortError' || (error as any).name === 'CanceledError') throw error;
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch examinations';
-      throw new Error(message);
+    } catch (err) {
+      if (isCanceledError(err)) throw err;
+      throw new Error(extractMessage(err, 'Failed to fetch examinations'), { cause: err });
     }
   }
 
@@ -77,9 +99,8 @@ class ExaminationService {
     try {
       const response = await api.get<{ examination: Examination }>(`${this.EXAMINATIONS_BASE_URL}/${id}`);
       return response.data.examination;
-    } catch (error: any) {
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch examination';
-      throw new Error(message);
+    } catch (err) {
+      throw new Error(extractMessage(err, 'Failed to fetch examination'), { cause: err });
     }
   }
 
@@ -92,9 +113,8 @@ class ExaminationService {
     try {
       const response = await api.post<{ examination: Examination }>(this.EXAMINATIONS_BASE_URL, data);
       return response.data.examination;
-    } catch (error: any) {
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to create examination';
-      throw new Error(message);
+    } catch (err) {
+      throw new Error(extractMessage(err, 'Failed to create examination'), { cause: err });
     }
   }
 
@@ -113,18 +133,18 @@ class ExaminationService {
         { ...data, etag }
       );
       return response.data.examination;
-    } catch (error: any) {
-      const status = error.response?.status;
+    } catch (err) {
+      const status = getResponseStatus(err);
       // Backend returns 409 for concurrency conflicts (conflictResponse helper)
       if (status === 409) {
-        const conflictError: any = new Error(
-          'This examination record was modified by another user. Please go back and reload before editing.'
-        );
+        const conflictError = new Error(
+          'This examination record was modified by another user. Please go back and reload before editing.',
+          { cause: err }
+        ) as Error & { isConcurrencyConflict: boolean };
         conflictError.isConcurrencyConflict = true;
         throw conflictError;
       }
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to update examination';
-      throw new Error(message);
+      throw new Error(extractMessage(err, 'Failed to update examination'), { cause: err });
     }
   }
 
@@ -135,9 +155,8 @@ class ExaminationService {
   async deleteExamination(id: string): Promise<void> {
     try {
       await api.delete(`${this.EXAMINATIONS_BASE_URL}/${id}`);
-    } catch (error: any) {
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to delete examination';
-      throw new Error(message);
+    } catch (err) {
+      throw new Error(extractMessage(err, 'Failed to delete examination'), { cause: err });
     }
   }
 
@@ -149,9 +168,8 @@ class ExaminationService {
     try {
       const response = await api.get<{ count: number }>('/v1/examinations-count');
       return response.data.count;
-    } catch (error: any) {
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch examination count';
-      throw new Error(message);
+    } catch (err) {
+      throw new Error(extractMessage(err, 'Failed to fetch examination count'), { cause: err });
     }
   }
 }

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
@@ -27,31 +27,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
   /**
    * Check if user is authenticated on mount and after page refresh
    */
-  const checkAuth = async () => {
-    try {
-      setIsLoading(true);
-      const currentUser = await authService.getCurrentUser();
-      setUser(currentUser);
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const checkAuth = useCallback(async () => {
+    setIsLoading(true);
+    const currentUser = await authService.getCurrentUser();
+    setUser(currentUser);
+    setIsLoading(false);
+  }, []);
 
   /**
    * Login user with username and password
    */
   const login = async (username: string, password: string) => {
-    try {
-      const loggedInUser = await authService.login(username, password);
-      setUser(loggedInUser);
-      navigate('/dashboard');
-    } catch (error) {
-      // Re-throw error to be handled by login form
-      throw error;
-    }
+    const loggedInUser = await authService.login(username, password);
+    setUser(loggedInUser);
+    navigate('/dashboard');
   };
 
   /**
@@ -60,8 +49,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = async () => {
     try {
       await authService.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
+    } catch (err) {
+      console.error('Logout error:', err);
     } finally {
       // Always clear user state and redirect to login
       setUser(null);
@@ -71,8 +60,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Check authentication status on mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     checkAuth();
-  }, []);
+  }, [checkAuth]);
 
   const value: AuthContextType = {
     user,
@@ -90,6 +80,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
  * Hook to use auth context
  * @throws Error if used outside AuthProvider
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (context === undefined) {

@@ -25,6 +25,16 @@ export interface UpdateUserRequest {
   isActive?: boolean;
 }
 
+function extractMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const r = (err as { response?: { data?: { error?: { message?: string } | string } } }).response;
+    const e = r?.data?.error;
+    if (typeof e === 'object' && e?.message) return e.message;
+    if (typeof e === 'string') return e;
+  }
+  return fallback;
+}
+
 class UserService {
   private readonly USERS_BASE_URL = '/v1/users';
 
@@ -32,9 +42,8 @@ class UserService {
     try {
       const response = await api.get<{ users: UserRecord[]; continuationToken?: string }>(this.USERS_BASE_URL);
       return response.data;
-    } catch (error: any) {
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch users';
-      throw new Error(message);
+    } catch (err) {
+      throw new Error(extractMessage(err, 'Failed to fetch users'), { cause: err });
     }
   }
 
@@ -42,9 +51,8 @@ class UserService {
     try {
       const response = await api.post<{ user: UserRecord }>(this.USERS_BASE_URL, data);
       return response.data.user;
-    } catch (error: any) {
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to create user';
-      throw new Error(message);
+    } catch (err) {
+      throw new Error(extractMessage(err, 'Failed to create user'), { cause: err });
     }
   }
 
@@ -52,9 +60,8 @@ class UserService {
     try {
       const response = await api.put<{ user: UserRecord }>(`${this.USERS_BASE_URL}/${id}`, data);
       return response.data.user;
-    } catch (error: any) {
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to update user';
-      throw new Error(message);
+    } catch (err) {
+      throw new Error(extractMessage(err, 'Failed to update user'), { cause: err });
     }
   }
 
@@ -63,18 +70,16 @@ class UserService {
       await api.delete(`${this.USERS_BASE_URL}/${id}`, {
         data: reassignTo ? { reassignTo } : undefined,
       });
-    } catch (error: any) {
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to delete user';
-      throw new Error(message);
+    } catch (err) {
+      throw new Error(extractMessage(err, 'Failed to delete user'), { cause: err });
     }
   }
 
   async resetUserPassword(id: string, newPassword: string): Promise<void> {
     try {
       await api.post(`${this.USERS_BASE_URL}/${id}/reset-password`, { newPassword });
-    } catch (error: any) {
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to reset password';
-      throw new Error(message);
+    } catch (err) {
+      throw new Error(extractMessage(err, 'Failed to reset password'), { cause: err });
     }
   }
 }

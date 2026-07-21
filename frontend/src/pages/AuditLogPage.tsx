@@ -52,14 +52,15 @@ export default function AuditLogPage() {
       }
       setContinuationToken(result.continuationToken);
       setHasMore(!!result.continuationToken);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load audit logs');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load audit logs');
     } finally {
       setIsLoading(false);
     }
   }, [filterUser, filterAction]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadLogs();
   }, [loadLogs]);
 

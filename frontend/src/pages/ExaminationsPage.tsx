@@ -142,9 +142,10 @@ export default function ExaminationsPage() {
       setExaminations(result.examinations);
       setContinuationToken(result.continuationToken);
       setHasMore(!!result.continuationToken);
-    } catch (err: any) {
-      if (err.code === 'ERR_CANCELED' || err.name === 'AbortError' || err.name === 'CanceledError') return;
-      setError(err.message || 'Failed to load examinations');
+    } catch (err) {
+      const e = err as { code?: string; name?: string; message?: string };
+      if (e.code === 'ERR_CANCELED' || e.name === 'AbortError' || e.name === 'CanceledError') return;
+      setError(e.message || 'Failed to load examinations');
     } finally {
       setIsLoading(false);
     }
@@ -180,9 +181,10 @@ export default function ExaminationsPage() {
       }
       setContinuationToken(undefined);
       setHasMore(false);
-    } catch (err: any) {
-      if (err.code === 'ERR_CANCELED' || err.name === 'AbortError' || err.name === 'CanceledError') return;
-      setError(err.message || 'Failed to load examinations');
+    } catch (err) {
+      const e = err as { code?: string; name?: string; message?: string };
+      if (e.code === 'ERR_CANCELED' || e.name === 'AbortError' || e.name === 'CanceledError') return;
+      setError(e.message || 'Failed to load examinations');
     } finally {
       setIsExhausting(false);
       setIsLoading(false);
@@ -199,6 +201,7 @@ export default function ExaminationsPage() {
     const hasFilter = !!(urlPatient || urlStatus || urlFrom || urlTo || urlType);
 
     if (hasFilter) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       startFilterExhaustion({ patientId: urlPatient, status: urlStatus, from_date: urlFrom, to_date: urlTo, examinationType: urlType });
     } else {
       startBrowse();
@@ -256,8 +259,9 @@ export default function ExaminationsPage() {
       try {
         const results = await patientService.searchPatients(value, controller.signal);
         setPatientSearchResults(results);
-      } catch (err: any) {
-        if (err.code === 'ERR_CANCELED' || err.name === 'AbortError' || err.name === 'CanceledError') return;
+      } catch (err) {
+        const e = err as { code?: string; name?: string };
+        if (e.code === 'ERR_CANCELED' || e.name === 'AbortError' || e.name === 'CanceledError') return;
         setPatientSearchResults([]);
       } finally {
         setIsPatientSearching(false);
@@ -356,9 +360,10 @@ export default function ExaminationsPage() {
       setExaminations((prev) => [...prev, ...result.examinations]);
       setContinuationToken(result.continuationToken);
       setHasMore(!!result.continuationToken);
-    } catch (err: any) {
-      if (err.code === 'ERR_CANCELED' || err.name === 'AbortError' || err.name === 'CanceledError') return;
-      setError(err.message || 'Failed to load more');
+    } catch (err) {
+      const e = err as { code?: string; name?: string; message?: string };
+      if (e.code === 'ERR_CANCELED' || e.name === 'AbortError' || e.name === 'CanceledError') return;
+      setError(e.message || 'Failed to load more');
     } finally {
       setIsLoading(false);
     }

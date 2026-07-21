@@ -58,8 +58,8 @@ export default function ChangePasswordPage() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (err: any) {
-      setSubmitError(err.message || 'Failed to change password');
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to change password');
     } finally {
       setIsSubmitting(false);
     }

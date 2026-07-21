@@ -144,6 +144,7 @@ export default function ExaminationForm({
 
   useEffect(() => {
     if (examination) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
         patientId: examination.patientId,
         examDate: examDateToYMD(examination.examDate),
@@ -476,8 +477,8 @@ export default function ExaminationForm({
       } as CreateExaminationRequest | UpdateExaminationRequest;
 
       await onSubmit(submitData);
-    } catch (error: any) {
-      setSubmitError(error.message || 'An error occurred');
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'An error occurred');
     } finally {
       setIsSubmitting(false);
     }

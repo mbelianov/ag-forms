@@ -57,7 +57,7 @@ export default function Layout({ children }: LayoutProps) {
     navigate('/change-password');
   };
 
-  const lastLoginStr = formatLastLogin((user as any)?.last_login);
+  const lastLoginStr = formatLastLogin(user?.last_login);
 
   return (
     <Theme theme="white">
