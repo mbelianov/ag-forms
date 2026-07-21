@@ -38,15 +38,16 @@ export default function EditExaminationPage() {
       ]);
       setExamination(examinationData);
       setPatients(patientsResponse.patients);
-    } catch (err: any) {
+    } catch (err) {
       console.error('[EditExamination] Failed to load data:', err);
-      setError(err.message || 'Failed to load examination');
+      setError(err instanceof Error ? err.message : 'Failed to load examination');
     } finally {
       setIsLoading(false);
     }
   }, [id]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, [loadData]);
 

@@ -35,7 +35,7 @@ const headers = [
 ];
 
 function roleBadge(role: string) {
-  const kindMap: Record<string, any> = { admin: 'red', doctor: 'blue', viewer: 'gray' };
+  const kindMap: Record<string, 'red' | 'blue' | 'gray'> = { admin: 'red', doctor: 'blue', viewer: 'gray' };
   return <Tag type={kindMap[role] ?? 'gray'}>{role}</Tag>;
 }
 
@@ -69,14 +69,15 @@ export default function UsersPage() {
       }
       setContinuationToken(result.continuationToken);
       setHasMore(!!result.continuationToken);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load users');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load users');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadUsers();
   }, [loadUsers]);
 
@@ -102,8 +103,8 @@ export default function UsersPage() {
       setUsers((prev) => prev.filter((u) => u.userId !== deleteTarget.userId));
       setDeleteModalOpen(false);
       setDeleteTarget(null);
-    } catch (err: any) {
-      setDeleteError(err.message || 'Failed to delete user');
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete user');
     } finally {
       setIsDeleting(false);
     }
@@ -137,7 +138,8 @@ export default function UsersPage() {
 
   // Check whether the delete button should be disabled for a given userId
   const isDeleteDisabled = (userId: string): boolean => {
-    if (userId === (currentUser as any)?.id || userId === (currentUser as any)?.userId) return true;
+    const cu = currentUser as { id?: string; userId?: string } | null;
+    if (userId === cu?.id || userId === cu?.userId) return true;
     const u = users.find((x) => x.userId === userId);
     if (!u) return false;
     return isLastAdmin(u);

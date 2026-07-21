@@ -7,6 +7,23 @@ export interface ChangePasswordRequest {
   confirmPassword: string;
 }
 
+function extractMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const r = (err as { response?: { data?: { error?: { message?: string } | string } } }).response;
+    const e = r?.data?.error;
+    if (typeof e === 'object' && e?.message) return e.message;
+    if (typeof e === 'string') return e;
+  }
+  return fallback;
+}
+
+function getResponseStatus(err: unknown): number | undefined {
+  if (err && typeof err === 'object' && 'response' in err) {
+    return (err as { response?: { status?: number } }).response?.status;
+  }
+  return undefined;
+}
+
 /**
  * Authentication service for handling user authentication operations
  */
@@ -33,10 +50,9 @@ class AuthService {
 
       // Interceptor unwraps the envelope; response.data is now { user: User }
       return response.data.user;
-    } catch (error: any) {
+    } catch (err) {
       // Return generic error message per security requirements
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Login failed. Please check your credentials.';
-      throw new Error(message);
+      throw new Error(extractMessage(err, 'Login failed. Please check your credentials.'), { cause: err });
     }
   }
 
@@ -46,9 +62,9 @@ class AuthService {
   async logout(): Promise<void> {
     try {
       await api.post(`${this.AUTH_BASE_URL}/logout`);
-    } catch (error: any) {
+    } catch (err) {
       // Log error but don't throw - allow logout to proceed
-      console.error('Logout error:', error);
+      console.error('Logout error:', err);
     }
   }
 
@@ -63,15 +79,16 @@ class AuthService {
         `${this.AUTH_BASE_URL}/me`
       );
       return response.data.user;
-    } catch (error: any) {
+    } catch (err) {
       // Return null if not authenticated (401) or any other error
-      if (error.response?.status === 401) {
+      if (getResponseStatus(err) === 401) {
         return null;
       }
-      console.error('Get current user error:', error);
+      console.error('Get current user error:', err);
       return null;
     }
   }
+
   /**
    * Change the current user's password
    * @param currentPassword - The current password
@@ -85,13 +102,11 @@ class AuthService {
         newPassword,
         confirmPassword,
       });
-    } catch (error: any) {
-      const status = error.response?.status;
-      if (status === 401) {
-        throw new Error('Current password is incorrect.');
+    } catch (err) {
+      if (getResponseStatus(err) === 401) {
+        throw new Error('Current password is incorrect.', { cause: err });
       }
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to change password';
-      throw new Error(message);
+      throw new Error(extractMessage(err, 'Failed to change password'), { cause: err });
     }
   }
 }

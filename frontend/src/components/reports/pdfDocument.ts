@@ -196,8 +196,6 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   await registerFonts(doc);
 
   const visibility = getSectionVisibility(vm.examinationType);
-  let y = 0;
-
   // ── 1. Header bar ────────────────────────────────────────────────────────────
   setFill(doc, C_HEADER_BG);
   doc.rect(0, 0, PAGE_W, 22, 'F');
@@ -213,7 +211,7 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   doc.text(`MRN: ${vm.mrn}`, MARGIN_L, 16);
   doc.text(`Exam Date: ${vm.examDate}`, MARGIN_R, 16, { align: 'right' });
 
-  y = 26;
+  let y = 26;
 
   // ── 2. Patient block ─────────────────────────────────────────────────────────
   doc.setFont(FONT_ID, 'bold');

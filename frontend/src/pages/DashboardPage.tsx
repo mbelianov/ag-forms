@@ -37,7 +37,7 @@ export default function DashboardPage() {
         ]);
         setPatients(patientRes.patients);
         setExaminations(examRes.examinations);
-      } catch (err: any) {
+      } catch (err) {
         console.error('[Dashboard] Failed to load data:', err);
         setError('Dashboard data could not be loaded. Statistics may be unavailable.');
       } finally {
@@ -47,14 +47,14 @@ export default function DashboardPage() {
       try {
         const count = await patientService.getPatientCount();
         setTotalPatients(count);
-      } catch (err: any) {
+      } catch (err) {
         console.error('[Dashboard] Failed to load patient count:', err);
       }
       // Fetch total examination count independently — failure here is non-fatal
       try {
         const exCount = await examinationService.getExaminationCount();
         setTotalExaminations(exCount);
-      } catch (err: any) {
+      } catch (err) {
         console.error('[Dashboard] Failed to load examination count:', err);
       }
     };

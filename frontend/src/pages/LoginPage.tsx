@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AppVersion from '../components/AppVersion';
 import {
   Form,
   TextInput,
@@ -32,6 +33,7 @@ export default function LoginPage() {
   useEffect(() => {
     if (sessionStorage.getItem('session_expired') === 'true') {
       sessionStorage.removeItem('session_expired');
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSessionExpired(true);
     }
   }, []);
@@ -46,11 +48,12 @@ export default function LoginPage() {
       // Username will be normalized to lowercase in authService
       await login(username, password);
       // Navigation handled by AuthContext after successful login
-    } catch (err: any) {
-      if (err.isAccountLocked) {
+    } catch (err) {
+      const e = err as { isAccountLocked?: boolean; message?: string };
+      if (e.isAccountLocked) {
         setIsLocked(true);
       } else {
-        setError(err.message || 'Login failed. Please check your credentials.');
+        setError(e.message || 'Login failed. Please check your credentials.');
       }
     } finally {
       setIsSubmitting(false);
@@ -122,6 +125,7 @@ export default function LoginPage() {
           </Button>
         </Stack>
       </Form>
+      <AppVersion />
     </div>
   );
 }

@@ -1,6 +1,29 @@
 import api from './api';
 import type { Patient, CreatePatientRequest, UpdatePatientRequest, PatientsListResponse, PatientCountResponse } from '../types';
 
+function extractMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const r = (err as { response?: { data?: { error?: { message?: string } | string } } }).response;
+    const e = r?.data?.error;
+    if (typeof e === 'object' && e?.message) return e.message;
+    if (typeof e === 'string') return e;
+  }
+  return fallback;
+}
+
+function getResponseStatus(err: unknown): number | undefined {
+  if (err && typeof err === 'object' && 'response' in err) {
+    return (err as { response?: { status?: number } }).response?.status;
+  }
+  return undefined;
+}
+
+function isCanceledError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: string; name?: string };
+  return e.code === 'ERR_CANCELED' || e.name === 'AbortError' || e.name === 'CanceledError';
+}
+
 /**
  * Patient service for handling patient-related API operations
  */
@@ -18,10 +41,9 @@ class PatientService {
       // Interceptor unwraps envelope; response.data is now { patients, continuationToken? }
       const response = await api.get<PatientsListResponse>(this.PATIENTS_BASE_URL, { params, signal });
       return response.data;
-    } catch (error: any) {
-      if (error.code === 'ERR_CANCELED' || error.name === 'AbortError' || (error as any).name === 'CanceledError') throw error;
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch patients';
-      throw new Error(message);
+    } catch (err) {
+      if (isCanceledError(err)) throw err;
+      throw new Error(extractMessage(err, 'Failed to fetch patients'), { cause: err });
     }
   }
 
@@ -34,9 +56,8 @@ class PatientService {
     try {
       const response = await api.get<{ patient: Patient }>(`${this.PATIENTS_BASE_URL}/${id}`);
       return response.data.patient;
-    } catch (error: any) {
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch patient';
-      throw new Error(message);
+    } catch (err) {
+      throw new Error(extractMessage(err, 'Failed to fetch patient'), { cause: err });
     }
   }
 
@@ -49,9 +70,8 @@ class PatientService {
     try {
       const response = await api.post<{ patient: Patient }>(this.PATIENTS_BASE_URL, data);
       return response.data.patient;
-    } catch (error: any) {
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to create patient';
-      throw new Error(message);
+    } catch (err) {
+      throw new Error(extractMessage(err, 'Failed to create patient'), { cause: err });
     }
   }
 
@@ -73,18 +93,18 @@ class PatientService {
       // Merge the top-level etag back into the patient object so callers can
       // use patient.etag for subsequent optimistic-concurrency updates.
       return { ...response.data.patient, etag: response.data.etag } as Patient;
-    } catch (error: any) {
-      const status = error.response?.status;
+    } catch (err) {
+      const status = getResponseStatus(err);
       // Backend returns 409 for concurrency conflicts (conflictResponse helper)
       if (status === 409) {
-        const conflictError: any = new Error(
-          'This patient record was modified by another user. Please go back and reload before editing.'
-        );
+        const conflictError = new Error(
+          'This patient record was modified by another user. Please go back and reload before editing.',
+          { cause: err }
+        ) as Error & { isConcurrencyConflict: boolean };
         conflictError.isConcurrencyConflict = true;
         throw conflictError;
       }
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to update patient';
-      throw new Error(message);
+      throw new Error(extractMessage(err, 'Failed to update patient'), { cause: err });
     }
   }
 
@@ -95,9 +115,8 @@ class PatientService {
   async deletePatient(id: string): Promise<void> {
     try {
       await api.delete(`${this.PATIENTS_BASE_URL}/${id}`);
-    } catch (error: any) {
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to delete patient';
-      throw new Error(message);
+    } catch (err) {
+      throw new Error(extractMessage(err, 'Failed to delete patient'), { cause: err });
     }
   }
 
@@ -109,9 +128,8 @@ class PatientService {
     try {
       const response = await api.get<PatientCountResponse>('/v1/patients-count');
       return response.data.count;
-    } catch (error: any) {
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch patient count';
-      throw new Error(message);
+    } catch (err) {
+      throw new Error(extractMessage(err, 'Failed to fetch patient count'), { cause: err });
     }
   }
 
@@ -129,10 +147,9 @@ class PatientService {
         signal,
       });
       return response.data.patients;
-    } catch (error: any) {
-      if (error.code === 'ERR_CANCELED' || error.name === 'AbortError' || (error as any).name === 'CanceledError') throw error;
-      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Failed to search patients';
-      throw new Error(message);
+    } catch (err) {
+      if (isCanceledError(err)) throw err;
+      throw new Error(extractMessage(err, 'Failed to search patients'), { cause: err });
     }
   }
 }

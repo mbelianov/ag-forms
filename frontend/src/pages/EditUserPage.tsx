@@ -34,7 +34,7 @@ function validatePasswordField(
     if (!/[A-Z]/.test(value))         msgs.push('an uppercase letter');
     if (!/[a-z]/.test(value))         msgs.push('a lowercase letter');
     if (!/[0-9]/.test(value))         msgs.push('a number');
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(value)) msgs.push('a special character');
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)) msgs.push('a special character');
     return msgs.length ? 'Password must contain ' + msgs.join(', ') : '';
   }
   if (!value) return 'Confirm password is required';
@@ -79,14 +79,17 @@ export default function EditUserPage() {
         setRole(found.role);
         setIsActive(found.isActive);
       }
-    } catch (err: any) {
-      setSubmitError(err.message || 'Failed to load user');
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to load user');
     } finally {
       setIsLoading(false);
     }
   }, [id]);
 
-  useEffect(() => { loadUser(); }, [loadUser]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadUser();
+  }, [loadUser]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,8 +105,8 @@ export default function EditUserPage() {
       await userService.updateUser(id!, { fullName, role, isActive });
       setSuccess(true);
       setTimeout(() => navigate('/users'), 1000);
-    } catch (err: any) {
-      setSubmitError(err.message || 'Failed to update user');
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to update user');
     } finally {
       setIsSubmitting(false);
     }
@@ -157,8 +160,8 @@ export default function EditUserPage() {
       await userService.resetUserPassword(id!, newPassword);
       setResetModalOpen(false);
       setResetSuccess('Password reset successfully');
-    } catch (err: any) {
-      setResetApiError(err.message || 'Failed to reset password');
+    } catch (err) {
+      setResetApiError(err instanceof Error ? err.message : 'Failed to reset password');
     } finally {
       setIsResetting(false);
     }
@@ -166,7 +169,8 @@ export default function EditUserPage() {
 
   // Determine if the user being edited is the currently logged-in user
   const isOwnAccount =
-    id === (currentUser as any)?.id || id === (currentUser as any)?.userId;
+    id === (currentUser as { id?: string; userId?: string })?.id ||
+    id === (currentUser as { id?: string; userId?: string })?.userId;
 
   if (isLoading) return <PageLoader description="Loading user..." />;
 
@@ -197,7 +201,7 @@ export default function EditUserPage() {
         <Form onSubmit={handleSubmit}>
           <Stack gap={6}>
             <TextInput id="fullName" labelText="Full Name" value={fullName} onChange={(e) => { setFullName(e.target.value); if (errors.fullName) setErrors((p) => { const n = {...p}; delete n.fullName; return n; }); }} invalid={!!errors.fullName} invalidText={errors.fullName} disabled={isSubmitting} />
-            <Select id="role" labelText="Role" value={role} onChange={(e) => setRole(e.target.value as any)} disabled={isSubmitting}>
+            <Select id="role" labelText="Role" value={role} onChange={(e) => setRole(e.target.value as 'admin' | 'doctor' | 'viewer')} disabled={isSubmitting}>
               <SelectItem value="admin" text="Admin" />
               <SelectItem value="doctor" text="Doctor" />
               <SelectItem value="viewer" text="Viewer" />

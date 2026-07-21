@@ -32,15 +32,16 @@ export default function EditPatientPage() {
     try {
       const patientData = await patientService.getPatient(id);
       setPatient(patientData);
-    } catch (err: any) {
+    } catch (err) {
       console.error('[EditPatient] Failed to load patient:', err);
-      setError(err.message || 'Failed to load patient');
+      setError(err instanceof Error ? err.message : 'Failed to load patient');
     } finally {
       setIsLoading(false);
     }
   }, [id]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPatient();
   }, [loadPatient]);
 

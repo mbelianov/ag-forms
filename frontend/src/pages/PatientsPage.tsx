@@ -83,33 +83,13 @@ export default function PatientsPage() {
         setFilteredPatients(response.patients);
       }
       setContinuationToken(response.continuationToken);
-    } catch (err: any) {
-      if (err.code === 'ERR_CANCELED' || err.name === 'AbortError' || err.name === 'CanceledError') return;
-      setError(err.message || 'Failed to load patients');
+    } catch (err) {
+      const e = err as { code?: string; name?: string; message?: string };
+      if (e.code === 'ERR_CANCELED' || e.name === 'AbortError' || e.name === 'CanceledError') return;
+      setError(e.message || 'Failed to load patients');
     } finally {
       setIsLoading(false);
     }
-  }, []);
-
-  // Task 5 / 9: mount effect — load patients, then restore search if q is set
-  useEffect(() => {
-    const q = searchParams.get('q') || '';
-    loadPatients();
-    // If q is 2+ chars, trigger a search to restore results
-    if (q.trim().length >= 2) {
-      // handleSearch will be called after initial loadPatients resolves;
-      // since searchPatients uses its own API call it is safe to fire in parallel.
-      handleSearch(q);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Cleanup abort controllers on unmount
-  useEffect(() => {
-    return () => {
-      loadAbortRef.current?.abort();
-      searchAbortRef.current?.abort();
-    };
   }, []);
 
   // T4-03: handleSearch is called only on Enter submission or explicit clear
@@ -157,15 +137,38 @@ export default function PatientsPage() {
       const results = await patientService.searchPatients(query, controller.signal);
       setFilteredPatients(results);
       setIsSearchActive(true); // T4-02: mark search as active after successful dispatch
-    } catch (err: any) {
-      if (err.code === 'ERR_CANCELED' || err.name === 'AbortError' || err.name === 'CanceledError') return;
-      setError(err.message || 'Search failed');
+    } catch (err) {
+      const e = err as { code?: string; name?: string; message?: string };
+      if (e.code === 'ERR_CANCELED' || e.name === 'AbortError' || e.name === 'CanceledError') return;
+      setError(e.message || 'Search failed');
       setFilteredPatients([]);
     } finally {
       setIsSearching(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patients, loadPatients]);
+
+  // Task 5 / 9: mount effect — load patients, then restore search if q is set
+  useEffect(() => {
+    const q = searchParams.get('q') || '';
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadPatients();
+    // If q is 2+ chars, trigger a search to restore results
+    if (q.trim().length >= 2) {
+      // handleSearch will be called after initial loadPatients resolves;
+      // since searchPatients uses its own API call it is safe to fire in parallel.
+      handleSearch(q);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cleanup abort controllers on unmount
+  useEffect(() => {
+    return () => {
+      loadAbortRef.current?.abort();
+      searchAbortRef.current?.abort();
+    };
+  }, []);
 
   const handleRowClick = (patientId: string) => {
     navigate(`/patients/${patientId}`);

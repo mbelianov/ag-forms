@@ -29,7 +29,7 @@ function validatePasswordField(
     if (!/[A-Z]/.test(value))         msgs.push('an uppercase letter');
     if (!/[a-z]/.test(value))         msgs.push('a lowercase letter');
     if (!/[0-9]/.test(value))         msgs.push('a number');
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(value)) msgs.push('a special character');
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)) msgs.push('a special character');
     return msgs.length ? 'Password must contain ' + msgs.join(', ') : '';
   }
   if (!value) return 'Confirm password is required';
@@ -82,7 +82,7 @@ export default function CreateUserPage() {
     setTouched((prev) => ({ ...prev, [field]: true }));
 
     if (field === 'username' || field === 'fullName' || field === 'email') {
-      const msg = validateSimpleField(field as any, value);
+      const msg = validateSimpleField(field as 'username' | 'fullName' | 'email', value);
       setErrors((prev) => msg ? { ...prev, [field]: msg } : { ...prev, [field]: '' });
     } else if (field === 'password') {
       const pwMsg = validatePasswordField('password', value, value);
@@ -110,8 +110,8 @@ export default function CreateUserPage() {
     try {
       await userService.createUser(formData);
       navigate('/users');
-    } catch (err: any) {
-      setSubmitError(err.message || 'Failed to create user');
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to create user');
     } finally {
       setIsSubmitting(false);
     }
