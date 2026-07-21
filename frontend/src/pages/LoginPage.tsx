@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AppVersion from '../components/AppVersion';
 import {
   Form,
   TextInput,
@@ -122,6 +123,7 @@ export default function LoginPage() {
           </Button>
         </Stack>
       </Form>
+      <AppVersion />
     </div>
   );
 }

@@ -18,7 +18,7 @@ const getConnectionString = (): string => {
  */
 let tableServiceClient: TableServiceClient | null = null;
 
-const getTableServiceClient = (): TableServiceClient => {
+export const getTableServiceClient = (): TableServiceClient => {
     if (!tableServiceClient) {
         const connectionString = getConnectionString();
         tableServiceClient = TableServiceClient.fromConnectionString(connectionString);

@@ -1,13 +1,26 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { getTableServiceClient } from "../utils/tableClient";
 
 export async function HealthCheck(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-    // No user input is read or reflected — static response only
+    let storage: 'healthy' | 'degraded' = 'degraded';
+    try {
+        const client = getTableServiceClient();
+        // Iterate at most one item to verify connectivity without loading all tables
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _table of client.listTables()) {
+            break;
+        }
+        storage = 'healthy';
+    } catch {
+        storage = 'degraded';
+    }
+
     return {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'healthy', timestamp: new Date().toISOString() })
+        body: JSON.stringify({ status: 'healthy', storage, timestamp: new Date().toISOString() })
     };
-};
+}
 
 app.http('HealthCheck', {
     methods: ['GET'],
