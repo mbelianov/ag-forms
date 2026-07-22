@@ -1,4 +1,4 @@
-declare const describe: any;
+﻿declare const describe: any;
 declare const test: any;
 declare const expect: any;
 declare const beforeEach: any;
@@ -112,7 +112,7 @@ describe('Auth Integration', () => {
             newPassword: 'NewStrongPassword123!',
             confirmPassword: 'NewStrongPassword123!'
         }, {
-            authorization: `Bearer ${created.token}`
+            cookie: `session_token=${created.token}`
         });
         const context = mockInvocationContext();
 
@@ -133,7 +133,7 @@ describe('Auth Integration', () => {
     test('should get current user from token', async () => {
         const created = await createTestUser('viewer');
         const request = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${created.token}`
+            cookie: `session_token=${created.token}`
         });
         const context = mockInvocationContext();
 
@@ -149,7 +149,7 @@ describe('Auth Integration', () => {
     test('should logout authenticated user', async () => {
         const created = await createTestUser('doctor');
         const request = mockHttpRequest('POST', undefined, {
-            authorization: `Bearer ${created.token}`
+            cookie: `session_token=${created.token}`
         });
         const context = mockInvocationContext();
 
@@ -188,7 +188,7 @@ describe('Auth Integration', () => {
             email: 'second@example.com',
             role: 'viewer'
         }, {
-            authorization: `Bearer ${admin.token}`
+            cookie: `session_token=${admin.token}`
         });
         const context = mockInvocationContext();
 
@@ -208,7 +208,7 @@ describe('Auth Integration', () => {
             newPassword: 'NewStrongPassword123!',
             confirmPassword: 'NewStrongPassword123!'
         }, {
-            authorization: `Bearer ${created.token}`
+            cookie: `session_token=${created.token}`
         });
         const context = mockInvocationContext();
 

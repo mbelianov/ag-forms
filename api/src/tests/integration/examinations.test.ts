@@ -1,4 +1,4 @@
-declare const describe: any;
+﻿declare const describe: any;
 declare const test: any;
 declare const expect: any;
 declare const beforeEach: any;
@@ -49,7 +49,7 @@ describe('Examinations Integration', () => {
             findings: 'Normal findings',
             notes: 'Test notes'
         }, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         const context = mockInvocationContext();
 
@@ -69,10 +69,10 @@ describe('Examinations Integration', () => {
         const examination = await createTestExamination(patient.patientId);
 
         const allRequest = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         const patientRequest = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         (patientRequest as any).query = new URLSearchParams(`patient_id=${patient.patientId}`);
         const context = mockInvocationContext();
@@ -94,7 +94,7 @@ describe('Examinations Integration', () => {
         const examination = await createTestExamination(patient.patientId);
 
         const request = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         (request as any).params = { id: examination.examinationId };
         const context = mockInvocationContext();
@@ -123,7 +123,7 @@ describe('Examinations Integration', () => {
             notes: 'Updated notes',
             etag: persisted.etag
         }, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         (request as any).params = { id: examination.examinationId };
         const context = mockInvocationContext();
@@ -143,7 +143,7 @@ describe('Examinations Integration', () => {
         const examination = await createTestExamination(patient.patientId);
 
         const request = mockHttpRequest('DELETE', undefined, {
-            authorization: `Bearer ${admin.token}`
+            cookie: `session_token=${admin.token}`
         });
         (request as any).params = { id: examination.examinationId };
         const context = mockInvocationContext();
@@ -167,7 +167,7 @@ describe('Examinations Integration', () => {
         await table.updateEntity(persisted, 'Merge');
 
         const request = mockHttpRequest('POST', undefined, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         (request as any).params = { id: examination.examinationId };
         const context = mockInvocationContext();
@@ -187,7 +187,7 @@ describe('Examinations Integration', () => {
         const request = mockHttpRequest('POST', {
             pdfData: Buffer.from('fake-pdf-content').toString('base64')
         }, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         (request as any).params = { id: examination.examinationId };
         const context = mockInvocationContext();
@@ -206,7 +206,7 @@ describe('Examinations Integration', () => {
         const examination = await createTestExamination(patient.patientId);
 
         const request = mockHttpRequest('DELETE', undefined, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         (request as any).params = { id: examination.examinationId };
         const context = mockInvocationContext();
@@ -224,7 +224,7 @@ describe('Examinations Integration', () => {
         const examination = await createTestExamination(patient.patientId);
 
         const request = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         (request as any).params = { mrn: examination.mrn };
         const context = mockInvocationContext();
@@ -240,7 +240,7 @@ describe('Examinations Integration', () => {
     test('should reject invalid MRN format on GetExaminationByMRN', async () => {
         const doctor = await createTestUser('doctor');
         const request = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         (request as any).params = { mrn: 'bad-mrn' };
         const context = mockInvocationContext();
@@ -255,7 +255,7 @@ describe('Examinations Integration', () => {
     test('should reject invalid page size', async () => {
         const doctor = await createTestUser('doctor');
         const request = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         (request as any).query = new URLSearchParams('pageSize=0');
         const context = mockInvocationContext();

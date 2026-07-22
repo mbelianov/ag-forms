@@ -77,12 +77,12 @@ export const verifyToken = (token: string): TokenPayload | null => {
  * @returns string | null - Extracted token or null if not found
  */
 export const extractTokenFromRequest = (req: HttpRequest): string | null => {
-    // Check Authorization header (Bearer token)
-    const authHeader = req.headers.get('authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-        return token;
-    }
+    // Authorization header is intentionally NOT checked.
+    // Azure Static Web Apps injects its own Bearer token (signed with SWA's internal key,
+    // not JWT_SECRET) into the Authorization header of every request it forwards to the
+    // Functions backend. Reading it would hand jwt.verify() the wrong token, causing an
+    // immediate "invalid signature" failure on every authenticated request.
+    // This app is cookie-only: the frontend sends session_token as an HttpOnly cookie.
 
     // Check cookies — only 'session_token' is accepted; the legacy 'token' cookie name has been removed
     const cookieHeader = req.headers.get('cookie');

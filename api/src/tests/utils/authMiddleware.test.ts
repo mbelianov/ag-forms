@@ -1,4 +1,4 @@
-declare const describe: any;
+﻿declare const describe: any;
 declare const test: any;
 declare const expect: any;
 
@@ -25,7 +25,7 @@ describe('Auth Middleware', () => {
     test('should authenticate valid token', () => {
         const token = generateToken(adminUser.userId, adminUser.username, adminUser.role);
         const request = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${token}`
+            cookie: `session_token=${token}`
         });
 
         const user = requireAuth(request);
@@ -42,7 +42,7 @@ describe('Auth Middleware', () => {
 
     test('should reject invalid token', () => {
         const request = mockHttpRequest('GET', undefined, {
-            authorization: 'Bearer invalid-token'
+            cookie: 'session_token=invalid-token'
         });
 
         expect(requireAuth(request)).toBeNull();
@@ -79,7 +79,7 @@ describe('Auth Middleware', () => {
     test('should authorize authenticated user without role restriction', () => {
         const token = generateToken(viewerUser.userId, viewerUser.username, viewerUser.role);
         const request = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${token}`
+            cookie: `session_token=${token}`
         });
 
         const result = authorize(request);
@@ -99,7 +99,7 @@ describe('Auth Middleware', () => {
     test('should reject insufficient permissions in authorize', () => {
         const token = generateToken(viewerUser.userId, viewerUser.username, viewerUser.role);
         const request = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${token}`
+            cookie: `session_token=${token}`
         });
 
         const result = authorize(request, ['admin']);
@@ -120,7 +120,7 @@ describe('Auth Middleware', () => {
     test('should extract user identity helpers from request', () => {
         const token = generateToken(doctorUser.userId, doctorUser.username, doctorUser.role);
         const request = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${token}`
+            cookie: `session_token=${token}`
         });
 
         expect(getUserId(request)).toBe(doctorUser.userId);
