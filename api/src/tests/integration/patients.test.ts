@@ -1,4 +1,4 @@
-declare const describe: any;
+﻿declare const describe: any;
 declare const test: any;
 declare const expect: any;
 declare const beforeEach: any;
@@ -34,7 +34,7 @@ describe('Patients Integration', () => {
             email: 'maria@example.com',
             address: 'Sofia'
         }, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         const context = mockInvocationContext();
 
@@ -59,7 +59,7 @@ describe('Patients Integration', () => {
         }
 
         const request = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         (request as any).query = new URLSearchParams('pageSize=2');
         const context = mockInvocationContext();
@@ -75,7 +75,7 @@ describe('Patients Integration', () => {
         const doctor = await createTestUser('doctor');
         const patient = await createTestPatient();
         const request = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         (request as any).params = { id: patient.patientId };
         const context = mockInvocationContext();
@@ -91,7 +91,7 @@ describe('Patients Integration', () => {
         const doctor = await createTestUser('doctor');
         const patient = await createTestPatient();
         const request = mockHttpRequest('GET', undefined, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         const prefix = patient.name.substring(0, 4);
         (request as any).query = new URLSearchParams(`name=${encodeURIComponent(prefix)}`);
@@ -118,7 +118,7 @@ describe('Patients Integration', () => {
             address: persisted.address,
             etag: persisted.etag
         }, {
-            authorization: `Bearer ${doctor.token}`
+            cookie: `session_token=${doctor.token}`
         });
         (request as any).params = { id: patient.patientId };
         const context = mockInvocationContext();
@@ -134,7 +134,7 @@ describe('Patients Integration', () => {
         const admin = await createTestUser('admin');
         const patient = await createTestPatient();
         const request = mockHttpRequest('DELETE', undefined, {
-            authorization: `Bearer ${admin.token}`
+            cookie: `session_token=${admin.token}`
         });
         (request as any).params = { id: patient.patientId };
         const context = mockInvocationContext();
@@ -152,7 +152,7 @@ describe('Patients Integration', () => {
         await createTestExamination(patient.patientId);
 
         const request = mockHttpRequest('DELETE', undefined, {
-            authorization: `Bearer ${admin.token}`
+            cookie: `session_token=${admin.token}`
         });
         (request as any).params = { id: patient.patientId };
         const context = mockInvocationContext();

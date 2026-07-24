@@ -46,19 +46,19 @@ describe('Token Service', () => {
     });
 
     describe('extractTokenFromRequest', () => {
-        test('should extract bearer token from authorization header', () => {
+        test('should extract token from session_token cookie', () => {
             const token = generateToken('user-1', 'doctor1', 'doctor');
             const request = mockHttpRequest('GET', undefined, {
-                authorization: `Bearer ${token}`
+                cookie: `session_token=${token}`
             });
 
             expect(extractTokenFromRequest(request)).toBe(token);
         });
 
-        test('should extract token from session_token cookie header', () => {
+        test('should extract token from session_token cookie alongside other cookies', () => {
             const token = generateToken('user-1', 'doctor1', 'doctor');
             const request = mockHttpRequest('GET', undefined, {
-                cookie: `theme=dark; session_token=${encodeURIComponent(token)}`
+                cookie: `theme=dark; session_token=${token}`
             });
 
             expect(extractTokenFromRequest(request)).toBe(token);
@@ -67,7 +67,7 @@ describe('Token Service', () => {
         test('should not extract token from legacy token cookie (removed)', () => {
             const token = generateToken('user-1', 'doctor1', 'doctor');
             const request = mockHttpRequest('GET', undefined, {
-                cookie: `token=${encodeURIComponent(token)}`
+                cookie: `token=${token}`
             });
 
             expect(extractTokenFromRequest(request)).toBeNull();
@@ -79,9 +79,10 @@ describe('Token Service', () => {
             expect(extractTokenFromRequest(request)).toBeNull();
         });
 
-        test('should ignore malformed authorization header', () => {
+        test('should ignore Authorization header (SWA injects its own Bearer token)', () => {
+            const token = generateToken('user-1', 'doctor1', 'doctor');
             const request = mockHttpRequest('GET', undefined, {
-                authorization: 'Basic abc123'
+                authorization: `Bearer ${token}`
             });
 
             expect(extractTokenFromRequest(request)).toBeNull();
