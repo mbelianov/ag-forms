@@ -83,14 +83,14 @@ export function validateGestationalAge(ga: string): string | undefined {
 }
 
 /**
- * Validate a biometry integer field.
+ * Validate a biometry float field.
  * Returns an error message string or undefined if valid.
  */
 export function validateBiometryField(value: string, fieldName: string): string | undefined {
   if (!value || !value.trim()) return undefined;
-  const parsed = parseInt(value);
-  if (isNaN(parsed) || parsed.toString() !== value.trim()) {
-    return `${fieldName} must be a whole number (integer)`;
+  const parsed = parseFloat(value);
+  if (isNaN(parsed) || !isFinite(parsed)) {
+    return `${fieldName} must be a positive number`;
   }
   if (parsed <= 0) {
     return `${fieldName} must be a positive number`;

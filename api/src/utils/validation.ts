@@ -146,45 +146,46 @@ const patientSchema = Joi.object({
 /**
  * Biometry data validation schema
  * TASK-034/035: Extended biometry parameters added.
+ * Fields accept floating-point values (e.g. 85.3 mm); integer inputs remain valid.
  */
 const biometrySchema = Joi.object({
-    bpd: Joi.number().integer().min(0).max(200).optional().messages({
-        'number.base': 'BPD must be an integer',
+    bpd: Joi.number().min(0).max(200).optional().messages({
+        'number.base': 'BPD must be a valid number',
         'number.min': 'BPD must be a positive value',
         'number.max': 'BPD value is out of valid range'
     }),
-    hc: Joi.number().integer().min(0).max(500).optional().messages({
-        'number.base': 'HC must be an integer',
+    hc: Joi.number().min(0).max(500).optional().messages({
+        'number.base': 'HC must be a valid number',
         'number.min': 'HC must be a positive value',
         'number.max': 'HC value is out of valid range'
     }),
-    ac: Joi.number().integer().min(0).max(500).optional().messages({
-        'number.base': 'AC must be an integer',
+    ac: Joi.number().min(0).max(500).optional().messages({
+        'number.base': 'AC must be a valid number',
         'number.min': 'AC must be a positive value',
         'number.max': 'AC value is out of valid range'
     }),
-    fl: Joi.number().integer().min(0).max(100).optional().messages({
-        'number.base': 'FL must be an integer',
+    fl: Joi.number().min(0).max(100).optional().messages({
+        'number.base': 'FL must be a valid number',
         'number.min': 'FL must be a positive value',
         'number.max': 'FL value is out of valid range'
     }),
-    efw: Joi.number().integer().min(0).max(10000).optional().messages({
-        'number.base': 'EFW must be an integer',
+    efw: Joi.number().min(0).max(10000).optional().messages({
+        'number.base': 'EFW must be a valid number',
         'number.min': 'EFW must be a positive value',
         'number.max': 'EFW value is out of valid range'
     }),
     // TASK-034: Extended biometry
-    ofd: Joi.number().integer().min(0).max(200).optional().messages({ 'number.base': 'OFD must be an integer' }),
-    vp:  Joi.number().integer().min(0).max(100).optional().messages({ 'number.base': 'Vp must be an integer' }),
-    tcd: Joi.number().integer().min(0).max(100).optional().messages({ 'number.base': 'TCD must be an integer' }),
-    cm:  Joi.number().integer().min(0).max(50).optional().messages({ 'number.base': 'CM must be an integer' }),
-    nuchalFold: Joi.number().integer().min(0).max(30).optional().messages({ 'number.base': 'Nuchal Fold must be an integer' }),
-    nb:  Joi.number().integer().min(0).max(30).optional().messages({ 'number.base': 'NB must be an integer' }),
-    apad: Joi.number().integer().min(0).max(200).optional().messages({ 'number.base': 'APAD must be an integer' }),
-    tad:  Joi.number().integer().min(0).max(200).optional().messages({ 'number.base': 'TAD must be an integer' }),
+    ofd: Joi.number().min(0).max(200).optional().messages({ 'number.base': 'OFD must be a valid number' }),
+    vp:  Joi.number().min(0).max(100).optional().messages({ 'number.base': 'Vp must be a valid number' }),
+    tcd: Joi.number().min(0).max(100).optional().messages({ 'number.base': 'TCD must be a valid number' }),
+    cm:  Joi.number().min(0).max(50).optional().messages({ 'number.base': 'CM must be a valid number' }),
+    nuchalFold: Joi.number().min(0).max(30).optional().messages({ 'number.base': 'Nuchal Fold must be a valid number' }),
+    nb:  Joi.number().min(0).max(30).optional().messages({ 'number.base': 'NB must be a valid number' }),
+    apad: Joi.number().min(0).max(200).optional().messages({ 'number.base': 'APAD must be a valid number' }),
+    tad:  Joi.number().min(0).max(200).optional().messages({ 'number.base': 'TAD must be a valid number' }),
     // TASK-035: LA and LC
-    la: Joi.number().integer().min(0).max(100).optional().messages({ 'number.base': 'LA must be an integer' }),
-    lc: Joi.number().integer().min(0).max(100).optional().messages({ 'number.base': 'LC must be an integer' })
+    la: Joi.number().min(0).max(100).optional().messages({ 'number.base': 'LA must be a valid number' }),
+    lc: Joi.number().min(0).max(100).optional().messages({ 'number.base': 'LC must be a valid number' })
 }).optional();
 
 /**

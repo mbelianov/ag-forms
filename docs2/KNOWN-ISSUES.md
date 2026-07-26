@@ -214,3 +214,27 @@ This goes to the Functions host trace — it is **not** written to the `AuditLog
   This is a one-line change to a shared field that fixes both `registerSchema` and `userSchema` simultaneously. No schema structure change, no new fields, no migration needed.
 - **Priority:** P1 · High — blocks first-user bootstrap via `manage-data.ps1` and blocks user creation via the UI for any email address with a non-public TLD
 - **Status:** Deferred — documented; fix is ready to apply
+
+---
+
+## KI-008 · `LA` and `LC` fields in `ExaminationForm` are inlined instead of using the shared `.map()` loop
+
+- **File:** `frontend/src/components/ExaminationForm.tsx` (lines 882–903)
+- **Symptom:** None — purely a code-style inconsistency with no functional impact.
+- **Root cause:** The biometry row that renders `tcd`, `cm`, `ofd`, `vp`, `nuchalFold`, `nb`, `apad`, and `tad` uses a single `.map()` loop with a shared `labels` lookup. `LA` and `LC` were added later as part of TASK-035 and were bolted on as two manually inlined `<TextInput>` elements after the loop, rather than being inserted into the existing array and `labels` map.
+- **Fix:** Add `'la'` and `'lc'` to the `.map()` field array at line 882 and their label strings to the `labels` object inside the loop:
+
+  ```tsx
+  {(['tcd', 'cm', 'ofd', 'vp', 'nuchalFold', 'nb', 'apad', 'tad', 'la', 'lc'] as const).map((field) => {
+    const labels: Record<string, string> = {
+      tcd: 'TCD (mm)', cm: 'CM (mm)', ofd: 'OFD (mm)', vp: 'Vp (mm)',
+      nuchalFold: 'Nuchal Fold (mm)', nb: 'NB (mm)', apad: 'APAD (mm)', tad: 'TAD (mm)',
+      la: 'LA — Left Atrium (mm)', lc: 'LC — Left Cardiac (mm)',
+    };
+    ...
+  })}
+  ```
+
+  Remove the two standalone `<TextInput>` elements for `la` and `lc` at lines 902–903.
+- **Priority:** P4 · Cosmetic — no functional or user-visible impact
+- **Status:** Deferred

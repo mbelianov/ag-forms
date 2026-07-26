@@ -72,24 +72,24 @@ export default function ExaminationForm({
     examDate: examination?.examDate ? examDateToYMD(examination.examDate) : toISODate(new Date()),
     status: (examination?.status || 'draft') as 'draft' | 'completed' | 'reviewed',
     examinationType: examination?.examinationType || 'ultrasound_prenatal', // TASK-033
-    // Biometry (integers only)
-    bpd: examination?.biometry?.bpd?.toString() || '',
-    hc: examination?.biometry?.hc?.toString() || '',
-    ac: examination?.biometry?.ac?.toString() || '',
-    fl: examination?.biometry?.fl?.toString() || '',
-    efw: examination?.biometry?.efw?.toString() || '',
+    // biometry floats, mm
+    bpd: examination?.biometry?.bpd != null ? examination.biometry.bpd.toFixed(2) : '',
+    hc: examination?.biometry?.hc != null ? examination.biometry.hc.toFixed(2) : '',
+    ac: examination?.biometry?.ac != null ? examination.biometry.ac.toFixed(2) : '',
+    fl: examination?.biometry?.fl != null ? examination.biometry.fl.toFixed(2) : '',
+    efw: examination?.biometry?.efw != null ? examination.biometry.efw.toFixed(2) : '',
     // TASK-034: Extended biometry
-    ofd: examination?.biometry?.ofd?.toString() || '',
-    vp: examination?.biometry?.vp?.toString() || '',
-    tcd: examination?.biometry?.tcd?.toString() || '',
-    cm: examination?.biometry?.cm?.toString() || '',
-    nuchalFold: examination?.biometry?.nuchalFold?.toString() || '',
-    nb: examination?.biometry?.nb?.toString() || '',
-    apad: examination?.biometry?.apad?.toString() || '',
-    tad: examination?.biometry?.tad?.toString() || '',
+    ofd: examination?.biometry?.ofd != null ? examination.biometry.ofd.toFixed(2) : '',
+    vp: examination?.biometry?.vp != null ? examination.biometry.vp.toFixed(2) : '',
+    tcd: examination?.biometry?.tcd != null ? examination.biometry.tcd.toFixed(2) : '',
+    cm: examination?.biometry?.cm != null ? examination.biometry.cm.toFixed(2) : '',
+    nuchalFold: examination?.biometry?.nuchalFold != null ? examination.biometry.nuchalFold.toFixed(2) : '',
+    nb: examination?.biometry?.nb != null ? examination.biometry.nb.toFixed(2) : '',
+    apad: examination?.biometry?.apad != null ? examination.biometry.apad.toFixed(2) : '',
+    tad: examination?.biometry?.tad != null ? examination.biometry.tad.toFixed(2) : '',
     // TASK-035: LA and LC
-    la: examination?.biometry?.la?.toString() || '',
-    lc: examination?.biometry?.lc?.toString() || '',
+    la: examination?.biometry?.la != null ? examination.biometry.la.toFixed(2) : '',
+    lc: examination?.biometry?.lc != null ? examination.biometry.lc.toFixed(2) : '',
     // GA fields (both stored separately)
     gestationalAge: examination?.gestationalAge || '',                         // GA from LMP
     gestationalAgeFromBiometry: examination?.gestationalAgeFromBiometry || '', // GA from Biometry
@@ -211,15 +211,15 @@ export default function ExaminationForm({
   // EDD is derived live whenever LMP changes — display-only, never stored separately
   const edd = calcEDD(formData.last_menstrual_period);
 
-  const biometryInts = {
-    bpd: formData.bpd ? parseInt(formData.bpd) : undefined,
-    hc: formData.hc ? parseInt(formData.hc) : undefined,
-    ac: formData.ac ? parseInt(formData.ac) : undefined,
-    fl: formData.fl ? parseInt(formData.fl) : undefined,
+  const biometryFloats = {
+    bpd: formData.bpd ? parseFloat(formData.bpd) : undefined,
+    hc: formData.hc ? parseFloat(formData.hc) : undefined,
+    ac: formData.ac ? parseFloat(formData.ac) : undefined,
+    fl: formData.fl ? parseFloat(formData.fl) : undefined,
   };
 
   const canCalcGAFromBiometry = !!(
-    biometryInts.bpd && biometryInts.hc && biometryInts.ac && biometryInts.fl
+    biometryFloats.bpd && biometryFloats.hc && biometryFloats.ac && biometryFloats.fl
   );
 
   const canCalcEFW = canCalcGAFromBiometry; // same four params required
@@ -235,20 +235,20 @@ export default function ExaminationForm({
 
   const handleCalcGAFromBiometry = () => {
     const result = calcGAFromBiometry(
-      biometryInts.bpd,
-      biometryInts.hc,
-      biometryInts.ac,
-      biometryInts.fl,
+      biometryFloats.bpd,
+      biometryFloats.hc,
+      biometryFloats.ac,
+      biometryFloats.fl,
     );
     if (result) {
       handleChange('gestationalAgeFromBiometry', result);
     }
     // Calculate percentiles using GA from LMP as the reference age
     const pct = calcBiometryPercentiles(
-      biometryInts.bpd,
-      biometryInts.hc,
-      biometryInts.ac,
-      biometryInts.fl,
+      biometryFloats.bpd,
+      biometryFloats.hc,
+      biometryFloats.ac,
+      biometryFloats.fl,
       formData.gestationalAge,
     );
     setPercentiles(pct);
@@ -256,10 +256,10 @@ export default function ExaminationForm({
 
   const handleCalcEFW = () => {
     const result = calcEFW(
-      biometryInts.bpd,
-      biometryInts.hc,
-      biometryInts.ac,
-      biometryInts.fl,
+      biometryFloats.bpd,
+      biometryFloats.hc,
+      biometryFloats.ac,
+      biometryFloats.fl,
     );
     if (result !== undefined) {
       handleChange('efw', result.toString());
@@ -310,14 +310,14 @@ export default function ExaminationForm({
       newErrors.gestationalAgeFromBiometry = 'Format must be "28w 3d"';
     }
 
-    // Biometry validation (integers, > 0 if provided) — TASK-034/035 extended fields
+    // Biometry validation (floats, > 0 if provided) — TASK-034/035 extended fields
     const biometryFields = ['bpd', 'hc', 'ac', 'fl', 'efw', 'ofd', 'vp', 'tcd', 'cm', 'nuchalFold', 'nb', 'apad', 'tad', 'la', 'lc'];
     biometryFields.forEach(field => {
       const value = formData[field as keyof typeof formData] as string;
       if (value && value.trim()) {
-        const parsed = parseInt(value);
-        if (isNaN(parsed) || parsed.toString() !== value.trim()) {
-          newErrors[field] = 'Must be a whole number (integer)';
+        const parsed = parseFloat(value);
+        if (isNaN(parsed) || !isFinite(parsed)) {
+          newErrors[field] = 'Must be a positive number';
         } else if (parsed <= 0) {
           newErrors[field] = 'Must be a positive number';
         }
@@ -365,7 +365,6 @@ export default function ExaminationForm({
     setIsSubmitting(true);
 
     try {
-      const intOrUndef = (v: string) => (v && v.trim() ? parseInt(v) : undefined);
       const floatOrUndef = (v: string) => (v && v.trim() ? parseFloat(v) : undefined);
 
       const biometry = (
@@ -373,21 +372,21 @@ export default function ExaminationForm({
         formData.ofd || formData.vp || formData.tcd || formData.cm || formData.nuchalFold ||
         formData.nb || formData.apad || formData.tad || formData.la || formData.lc
       ) ? {
-        bpd: intOrUndef(formData.bpd),
-        hc: intOrUndef(formData.hc),
-        ac: intOrUndef(formData.ac),
-        fl: intOrUndef(formData.fl),
-        efw: intOrUndef(formData.efw),
-        ofd: intOrUndef(formData.ofd),
-        vp: intOrUndef(formData.vp),
-        tcd: intOrUndef(formData.tcd),
-        cm: intOrUndef(formData.cm),
-        nuchalFold: intOrUndef(formData.nuchalFold),
-        nb: intOrUndef(formData.nb),
-        apad: intOrUndef(formData.apad),
-        tad: intOrUndef(formData.tad),
-        la: intOrUndef(formData.la),
-        lc: intOrUndef(formData.lc),
+        bpd: floatOrUndef(formData.bpd),
+        hc: floatOrUndef(formData.hc),
+        ac: floatOrUndef(formData.ac),
+        fl: floatOrUndef(formData.fl),
+        efw: floatOrUndef(formData.efw),
+        ofd: floatOrUndef(formData.ofd),
+        vp: floatOrUndef(formData.vp),
+        tcd: floatOrUndef(formData.tcd),
+        cm: floatOrUndef(formData.cm),
+        nuchalFold: floatOrUndef(formData.nuchalFold),
+        nb: floatOrUndef(formData.nb),
+        apad: floatOrUndef(formData.apad),
+        tad: floatOrUndef(formData.tad),
+        la: floatOrUndef(formData.la),
+        lc: floatOrUndef(formData.lc),
       } : undefined;
 
       const doppler = (
@@ -775,26 +774,26 @@ export default function ExaminationForm({
         {/* ── Biometry ── */}
         {visibility.biometry && (
         <>
-        <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Biometry (integers only, in mm/grams)</h4>
+        <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Biometry (decimal values accepted, in mm/grams)</h4>
         <FormGroup legendText="">
           <Stack gap={3}>
 
             {/* Row A: BPD | HC | AC | FL (row6, REQ-08 rule 4) */}
             <div style={row6}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <TextInput id="bpd" labelText="BPD (mm)" placeholder="e.g., 85" value={formData.bpd} onChange={(e) => handleChange('bpd', e.target.value)} invalid={!!errors.bpd} invalidText={errors.bpd} disabled={isSubmitting} />
+                <TextInput id="bpd" labelText="BPD (mm)" placeholder="e.g., 85.5" value={formData.bpd} onChange={(e) => handleChange('bpd', e.target.value)} invalid={!!errors.bpd} invalidText={errors.bpd} disabled={isSubmitting} />
                 <TextInput id="bpdPercentile" labelText="BPD Percentile" value={percentiles?.bpd !== undefined ? `${percentiles.bpd}th` : ''} readOnly />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <TextInput id="hc" labelText="HC (mm)" placeholder="e.g., 310" value={formData.hc} onChange={(e) => handleChange('hc', e.target.value)} invalid={!!errors.hc} invalidText={errors.hc} disabled={isSubmitting} />
+                <TextInput id="hc" labelText="HC (mm)" placeholder="e.g., 310.5" value={formData.hc} onChange={(e) => handleChange('hc', e.target.value)} invalid={!!errors.hc} invalidText={errors.hc} disabled={isSubmitting} />
                 <TextInput id="hcPercentile" labelText="HC Percentile" value={percentiles?.hc !== undefined ? `${percentiles.hc}th` : ''} readOnly />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <TextInput id="ac" labelText="AC (mm)" placeholder="e.g., 280" value={formData.ac} onChange={(e) => handleChange('ac', e.target.value)} invalid={!!errors.ac} invalidText={errors.ac} disabled={isSubmitting} />
+                <TextInput id="ac" labelText="AC (mm)" placeholder="e.g., 280.5" value={formData.ac} onChange={(e) => handleChange('ac', e.target.value)} invalid={!!errors.ac} invalidText={errors.ac} disabled={isSubmitting} />
                 <TextInput id="acPercentile" labelText="AC Percentile" value={percentiles?.ac !== undefined ? `${percentiles.ac}th` : ''} readOnly />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <TextInput id="fl" labelText="FL (mm)" placeholder="e.g., 55" value={formData.fl} onChange={(e) => handleChange('fl', e.target.value)} invalid={!!errors.fl} invalidText={errors.fl} disabled={isSubmitting} />
+                <TextInput id="fl" labelText="FL (mm)" placeholder="e.g., 55.5" value={formData.fl} onChange={(e) => handleChange('fl', e.target.value)} invalid={!!errors.fl} invalidText={errors.fl} disabled={isSubmitting} />
                 <TextInput id="flPercentile" labelText="FL Percentile" value={percentiles?.fl !== undefined ? `${percentiles.fl}th` : ''} readOnly />
               </div>
             </div>
@@ -889,7 +888,7 @@ export default function ExaminationForm({
                     key={field}
                     id={field}
                     labelText={labels[field]}
-                    placeholder="e.g., 0"
+                    placeholder="e.g., 0.0"
                     value={formData[field] ?? ''}
                     onChange={(e) => handleChange(field, e.target.value)}
                     invalid={!!errors[field]}
@@ -899,8 +898,8 @@ export default function ExaminationForm({
                   />
                 );
               })}
-              <TextInput id="la" labelText="LA — Left Atrium (mm)" placeholder="e.g., 0" value={formData.la} onChange={(e) => handleChange('la', e.target.value)} invalid={!!errors.la} invalidText={errors.la} disabled={isSubmitting} autoComplete="off" />
-              <TextInput id="lc" labelText="LC — Left Cardiac (mm)" placeholder="e.g., 0" value={formData.lc} onChange={(e) => handleChange('lc', e.target.value)} invalid={!!errors.lc} invalidText={errors.lc} disabled={isSubmitting} autoComplete="off" />
+              <TextInput id="la" labelText="LA — Left Atrium (mm)" placeholder="e.g., 0.0" value={formData.la} onChange={(e) => handleChange('la', e.target.value)} invalid={!!errors.la} invalidText={errors.la} disabled={isSubmitting} autoComplete="off" />
+              <TextInput id="lc" labelText="LC — Left Cardiac (mm)" placeholder="e.g., 0.0" value={formData.lc} onChange={(e) => handleChange('lc', e.target.value)} invalid={!!errors.lc} invalidText={errors.lc} disabled={isSubmitting} autoComplete="off" />
             </div>
           </Stack>
         </FormGroup>

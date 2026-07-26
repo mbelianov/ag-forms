@@ -104,11 +104,12 @@ export function calcEFW(
 
   // Hadlock formula expects cm; inputs are in mm — convert before applying.
   const logEFW =
-    1.335 -
-    0.0034 * (ac / 10) * (fl / 10) +
-    0.0316 * (bpd / 10) +
-    0.0457 * (ac / 10) +
-    0.1623 * (fl / 10);
+    1.35960 -
+    0.00386 * (ac / 10) * (fl / 10) +
+    0.00640 * (hc / 10) +
+    0.00061 * (bpd / 10) * (ac / 10) +
+    0.04240 * (ac / 10) +
+    0.17400 * (fl / 10);
 
   return Math.round(Math.pow(10, logEFW));
 }
@@ -134,13 +135,18 @@ function normalCDF(z: number): number {
 }
 
 /**
- * Parse a gestational-age string ("28w 3d" or "28w3d") and return the
- * whole-weeks integer, or undefined if the string is blank / unparseable.
+ * Parse a gestational-age string ("28w 3d" or "28w3d") 
+ * into continuous decimal weeks, or undefined if the string is blank/unparseable.
  */
-function parseGAWeeks(ga: string): number | undefined {
-  if (!ga) return undefined;
-  const match = ga.match(/^(\d{1,2})w/);
-  return match ? parseInt(match[1], 10) : undefined;
+
+function parseGAWeeks(gaStr: string): number | undefined {
+  if (!gaStr) return undefined;
+    const match = gaStr.match(/^(\d{1,2})\s*w(?:\s*(\d)\s*d)?/i);
+    if (!match) return undefined;
+    
+    const weeks = parseInt(match[1], 10);
+    const days = match[2] ? parseInt(match[2], 10) : 0;
+    return weeks + (days / 7.0);
 }
 
 export interface BiometryPercentiles {
@@ -154,10 +160,19 @@ export interface BiometryPercentiles {
  * Calculate biometry percentiles from four measurements and GA from LMP.
  *
  * Formulas (all means are in cm; inputs supplied in mm and converted):
- *   BPD  mean = -3.08    + (0.41   × ga) - (0.000061  × ga³)   SD = 0.30
- *   HC   mean = -11.48   + (1.56   × ga) - (0.0002548  × ga³)   SD = 1.00
- *   AC   mean = -13.3    + (1.61   × ga) - (0.00998    × ga²)   SD = 1.34
- *   FL   mean = -3.91    + (0.427  × ga) - (0.0034     × ga²)   SD = 0.30
+ *   BPD  mean = -3.08    + (0.41   × ga) - (0.000061  × ga³)
+ *   HC   mean = -11.48   + (1.56   × ga) - (0.0002548  × ga³)
+ *   AC   mean = -13.3    + (1.61   × ga) - (0.00998    × ga²)
+ *   FL   mean = -3.91    + (0.427  × ga) - (0.0034     × ga²)
+ * 
+ *   percentile calculate using dynamic standard deviations
+ *   const sdBPD = meanBPD * 0.043;
+ *   const sdHC  = meanHC  * 0.041;
+ *   const sdAC  = meanAC  * 0.057;
+ *   const sdFL  = meanFL  * 0.050;
+ * 
+ *   alternatively you can use standard deviations but not recommended
+ *   sdBPD = 0.3; sdHC = 1; sdAC = 1.34; sdFL = 0.3
  *
  *   z          = (observed_cm - mean) / SD
  *   percentile = round(Φ(z) × 100), clamped to [1, 99]
@@ -190,18 +205,25 @@ export function calcBiometryPercentiles(
   const ac  = ac_mm  / 10;
   const fl  = fl_mm  / 10;
 
+  // Hadlock 1984 Expected Means (cm)
   const meanBPD = -3.08    + (0.41    * ga) - (0.000061  * ga3);
   const meanHC  = -11.48   + (1.56    * ga) - (0.0002548 * ga3);
   const meanAC  = -13.3    + (1.61    * ga) - (0.00998   * ga2);
   const meanFL  = -3.91    + (0.427   * ga) - (0.0034    * ga2);
 
+  // Dynamic SDs based on proportional population variance (Coefficient of Variation)
+  const sdBPD = meanBPD * 0.043;
+  const sdHC  = meanHC  * 0.041;
+  const sdAC  = meanAC  * 0.057;
+  const sdFL  = meanFL  * 0.050;
+
   const clamp = (p: number) => Math.max(1, Math.min(99, Math.round(p)));
 
   return {
-    bpd: clamp(normalCDF((bpd - meanBPD) / 0.30) * 100),
-    hc:  clamp(normalCDF((hc  - meanHC)  / 1.00) * 100),
-    ac:  clamp(normalCDF((ac  - meanAC)  / 1.34) * 100),
-    fl:  clamp(normalCDF((fl  - meanFL)  / 0.30) * 100),
+    bpd: clamp(normalCDF((bpd - meanBPD) / sdBPD) * 100),
+    hc:  clamp(normalCDF((hc  - meanHC)  / sdHC) * 100),
+    ac:  clamp(normalCDF((ac  - meanAC)  / sdAC) * 100),
+    fl:  clamp(normalCDF((fl  - meanFL)  / sdFL) * 100),
   };
 }
 
@@ -225,11 +247,29 @@ export function calcEFWPercentile(
   const ga = parseGAWeeks(gaFromLMP);
   if (ga === undefined) return undefined;
 
+  // Combs 1993 log-mean expected weight
   const muLn = 0.578 + 0.332 * ga - 0.00354 * ga * ga;
+
+  // Log-scale Z-score with constant sigma = 0.127
   const z = (Math.log(efw_grams) - muLn) / 0.127;
-  return Math.max(1, Math.min(99, Math.round(normalCDF(z) * 100)));
+
+  // Convert to clamped percentile [1, 99]
+  const clamp = (p: number) => Math.max(1, Math.min(99, Math.round(p)));
+  return clamp(normalCDF(z) * 100);
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Biometry display formatter
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Format a biometry measurement to exactly two decimal places.
+ * e.g. 85.3 → "85.30",  85 → "85.00"
+ */
+export function fmtBiometry(value: number): string {
+  return value.toFixed(2);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TASK-037: Patient age at reference date

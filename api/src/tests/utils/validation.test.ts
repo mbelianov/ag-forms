@@ -169,13 +169,27 @@ describe('Validation Utilities', () => {
             expect(result.errors).toContain('Gestational age must be in format "28w 3d"');
         });
 
-        test('should reject non-integer biometry values', () => {
+        test('should accept float biometry values', () => {
+            // Float biometry values are now valid (migration from integer-only constraint)
             const result = validateExamination({
                 patientId: 'patient-1',
                 examDate: new Date().toISOString(),
                 status: 'draft',
                 biometry: {
                     bpd: 70.5
+                }
+            });
+
+            expect(result.valid).toBe(true);
+        });
+
+        test('should reject out-of-range float biometry values', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                biometry: {
+                    bpd: 999.9
                 }
             });
 

@@ -115,23 +115,23 @@ export interface ExaminationData {
  * Biometry measurements for ultrasound examination
  */
 export interface BiometryData {
-    bpd?: number; // Biparietal Diameter (integer, mm)
-    hc?: number;  // Head Circumference (integer, mm)
-    ac?: number;  // Abdominal Circumference (integer, mm)
-    fl?: number;  // Femur Length (integer, mm)
-    efw?: number; // Estimated Fetal Weight (integer, grams)
+    bpd?: number; // Biparietal Diameter (float, mm)
+    hc?: number;  // Head Circumference (float, mm)
+    ac?: number;  // Abdominal Circumference (float, mm)
+    fl?: number;  // Femur Length (float, mm)
+    efw?: number; // Estimated Fetal Weight (float, grams)
     // TASK-034: Extended biometry parameters
-    ofd?: number;         // Occipito-frontal Diameter (integer, mm)
-    vp?: number;          // Vermis (integer, mm)
-    tcd?: number;         // Transcerebellar Diameter (integer, mm)
-    cm?: number;          // Cisterna Magna (integer, mm)
-    nuchalFold?: number;  // Nuchal Fold (integer, mm)
-    nb?: number;          // Nasal Bone (integer, mm)
-    apad?: number;        // Antero-Posterior Abdominal Diameter (integer, mm)
-    tad?: number;         // Transverse Abdominal Diameter (integer, mm)
+    ofd?: number;         // Occipito-frontal Diameter (float, mm)
+    vp?: number;          // Vermis (float, mm)
+    tcd?: number;         // Transcerebellar Diameter (float, mm)
+    cm?: number;          // Cisterna Magna (float, mm)
+    nuchalFold?: number;  // Nuchal Fold (float, mm)
+    nb?: number;          // Nasal Bone (float, mm)
+    apad?: number;        // Antero-Posterior Abdominal Diameter (float, mm)
+    tad?: number;         // Transverse Abdominal Diameter (float, mm)
     // TASK-035: LA and LC
-    la?: number;          // Left Atrium (integer, mm)
-    lc?: number;          // Left Cardiac (integer, mm)
+    la?: number;          // Left Atrium (float, mm)
+    lc?: number;          // Left Cardiac (float, mm)
 }
 
 /**
