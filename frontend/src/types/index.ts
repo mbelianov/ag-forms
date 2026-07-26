@@ -54,11 +54,11 @@ export interface PatientCountResponse {
 // Examination types
 export interface Biometry {
   // Core (original)
-  bpd?: number; // integer, mm
-  hc?: number;  // integer, mm
-  ac?: number;  // integer, mm
-  fl?: number;  // integer, mm
-  efw?: number; // integer, grams
+  bpd?: number; // float, mm
+  hc?: number;  // float, mm
+  ac?: number;  // float, mm
+  fl?: number;  // float, mm
+  efw?: number; // float, grams
   // TASK-034: Extended biometry parameters
   ofd?: number;         // Occipito-frontal Diameter, mm
   vp?: number;          // Vermis, mm

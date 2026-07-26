@@ -15,7 +15,7 @@ import { examinationService } from '../services/examinationService';
 import PageLoader from '../components/PageLoader';
 import ErrorMessage from '../components/ErrorMessage';
 import { getStatusTag } from '../utils/statusHelpers';
-import { calcEDD, calcBiometryPercentiles, calcEFWPercentile } from '../utils/calculations';
+import { calcEDD, calcBiometryPercentiles, calcEFWPercentile, fmtBiometry } from '../utils/calculations';
 import PrintButton from '../components/reports/PrintButton';
 import EmailReportButton from '../components/reports/EmailReportButton';
 import { useAuth } from '../contexts/AuthContext';
@@ -329,45 +329,45 @@ export default function ExaminationDetailPage() {
             <div>
               <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>BPD (Biparietal Diameter)</div>
               <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                {examination.biometry?.bpd !== undefined ? `${examination.biometry.bpd} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.bpd)}
+                {examination.biometry?.bpd !== undefined ? `${fmtBiometry(examination.biometry.bpd)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.bpd)}
               </div>
             </div>
             <div>
               <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>HC (Head Circumference)</div>
               <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                {examination.biometry?.hc !== undefined ? `${examination.biometry.hc} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.hc)}
+                {examination.biometry?.hc !== undefined ? `${fmtBiometry(examination.biometry.hc)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.hc)}
               </div>
             </div>
             <div>
               <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>AC (Abdominal Circumference)</div>
               <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                {examination.biometry?.ac !== undefined ? `${examination.biometry.ac} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.ac)}
+                {examination.biometry?.ac !== undefined ? `${fmtBiometry(examination.biometry.ac)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.ac)}
               </div>
             </div>
             <div>
               <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>FL (Femur Length)</div>
               <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                {examination.biometry?.fl !== undefined ? `${examination.biometry.fl} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.fl)}
+                {examination.biometry?.fl !== undefined ? `${fmtBiometry(examination.biometry.fl)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.fl)}
               </div>
             </div>
             <div>
               <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>EFW (Estimated Fetal Weight)</div>
               <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                {examination.biometry?.efw !== undefined ? `${examination.biometry.efw} g` : '—'}{pctBadge(efwPercentile)}
+                {examination.biometry?.efw !== undefined ? `${fmtBiometry(examination.biometry.efw)} g` : '—'}{pctBadge(efwPercentile)}
               </div>
             </div>
             {/* TASK-034: Extended biometry */}
-            {fieldBlock('OFD (Occipito-frontal Diameter)', examination.biometry?.ofd !== undefined ? `${examination.biometry.ofd} mm` : '—')}
-            {fieldBlock('Vp (Vermis)', examination.biometry?.vp !== undefined ? `${examination.biometry.vp} mm` : '—')}
-            {fieldBlock('TCD (Transcerebellar Diameter)', examination.biometry?.tcd !== undefined ? `${examination.biometry.tcd} mm` : '—')}
-            {fieldBlock('CM (Cisterna Magna)', examination.biometry?.cm !== undefined ? `${examination.biometry.cm} mm` : '—')}
-            {fieldBlock('Nuchal Fold', examination.biometry?.nuchalFold !== undefined ? `${examination.biometry.nuchalFold} mm` : '—')}
-            {fieldBlock('NB (Nasal Bone)', examination.biometry?.nb !== undefined ? `${examination.biometry.nb} mm` : '—')}
-            {fieldBlock('APAD', examination.biometry?.apad !== undefined ? `${examination.biometry.apad} mm` : '—')}
-            {fieldBlock('TAD', examination.biometry?.tad !== undefined ? `${examination.biometry.tad} mm` : '—')}
+            {fieldBlock('OFD (Occipito-frontal Diameter)', examination.biometry?.ofd !== undefined ? `${fmtBiometry(examination.biometry.ofd)} mm` : '—')}
+            {fieldBlock('Vp (Vermis)', examination.biometry?.vp !== undefined ? `${fmtBiometry(examination.biometry.vp)} mm` : '—')}
+            {fieldBlock('TCD (Transcerebellar Diameter)', examination.biometry?.tcd !== undefined ? `${fmtBiometry(examination.biometry.tcd)} mm` : '—')}
+            {fieldBlock('CM (Cisterna Magna)', examination.biometry?.cm !== undefined ? `${fmtBiometry(examination.biometry.cm)} mm` : '—')}
+            {fieldBlock('Nuchal Fold', examination.biometry?.nuchalFold !== undefined ? `${fmtBiometry(examination.biometry.nuchalFold)} mm` : '—')}
+            {fieldBlock('NB (Nasal Bone)', examination.biometry?.nb !== undefined ? `${fmtBiometry(examination.biometry.nb)} mm` : '—')}
+            {fieldBlock('APAD', examination.biometry?.apad !== undefined ? `${fmtBiometry(examination.biometry.apad)} mm` : '—')}
+            {fieldBlock('TAD', examination.biometry?.tad !== undefined ? `${fmtBiometry(examination.biometry.tad)} mm` : '—')}
             {/* TASK-035: LA and LC */}
-            {fieldBlock('LA (Left Atrium)', examination.biometry?.la !== undefined ? `${examination.biometry.la} mm` : '—')}
-            {fieldBlock('LC (Left Cardiac)', examination.biometry?.lc !== undefined ? `${examination.biometry.lc} mm` : '—')}
+            {fieldBlock('LA (Left Atrium)', examination.biometry?.la !== undefined ? `${fmtBiometry(examination.biometry.la)} mm` : '—')}
+            {fieldBlock('LC (Left Cardiac)', examination.biometry?.lc !== undefined ? `${fmtBiometry(examination.biometry.lc)} mm` : '—')}
           </div>
         </Tile>
         )}
