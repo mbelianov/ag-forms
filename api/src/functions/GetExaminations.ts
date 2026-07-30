@@ -102,7 +102,14 @@ export async function getExaminations(request: HttpRequest, context: InvocationC
                         : exam.biometry,
                     doppler: exam.doppler && typeof exam.doppler === 'string'
                         ? JSON.parse(exam.doppler)
-                        : exam.doppler
+                        : exam.doppler,
+                    // uzd-twins: Twin 2 deserialization
+                    biometry2: exam.biometry2 && typeof exam.biometry2 === 'string'
+                        ? JSON.parse(exam.biometry2)
+                        : exam.biometry2,
+                    doppler2: exam.doppler2 && typeof exam.doppler2 === 'string'
+                        ? JSON.parse(exam.doppler2)
+                        : exam.doppler2
                 } as Examination);
             }
             nextContinuationToken = page.continuationToken;

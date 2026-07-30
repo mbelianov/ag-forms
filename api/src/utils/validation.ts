@@ -269,6 +269,9 @@ const examinationDataSchema = Joi.object({
     pregnancy_data: pregnancyDataSchema,
     ultrasound_findings: ultrasoundFindingsSchema,
     anatomy: anatomySchema,
+    // uzd-twins: Twin 2 fields
+    twin2_ultrasound_findings: ultrasoundFindingsSchema,
+    twin2_anatomy: anatomySchema,
     comments: Joi.string().max(5000).optional().allow('')
 }).optional();
 
@@ -318,6 +321,16 @@ const examinationSchema = Joi.object({
     examinationType: Joi.string().valid(...EXAM_TYPE_KEYS).optional().allow(''), // FLAG-03, REQ-01
     biometry: biometrySchema,
     doppler: dopplerSchema,
+    // uzd-twins: Twin 2 fields
+    biometry2: biometrySchema,
+    doppler2: dopplerSchema,
+    gestationalAgeFromBiometry2: Joi.string()
+        .pattern(/^\d{1,2}w\s?\d{1}d$/)
+        .optional()
+        .allow('')
+        .messages({
+            'string.pattern.base': 'Gestational age from biometry (Twin 2) must be in format "28w 3d"'
+        }),
     notes: Joi.string()
         .max(5000)
         .optional()

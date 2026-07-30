@@ -158,6 +158,21 @@ export default function ExaminationDetailPage() {
   // Type-driven section visibility
   const visibility = getSectionVisibility(examination.examinationType);
 
+  // uzd-twins: detect twins exam type
+  const isTwins = examination.examinationType === 'ultrasound_prenatal_twins';
+
+  // uzd-twins: T2 percentiles (same Hadlock formulas, singleton reference values)
+  const biometryPercentiles2 = isTwins ? calcBiometryPercentiles(
+    examination.biometry2?.bpd,
+    examination.biometry2?.hc,
+    examination.biometry2?.ac,
+    examination.biometry2?.fl,
+    gaForPercentiles ?? '',
+  ) : undefined;
+  const efwPercentile2 = (isTwins && examination.biometry2?.efw && gaForPercentiles)
+    ? calcEFWPercentile(examination.biometry2.efw, gaForPercentiles)
+    : undefined;
+
 
   const fieldBlock = (label: string, value: React.ReactNode) => (
     <div>
@@ -321,108 +336,280 @@ export default function ExaminationDetailPage() {
           </Tile>
         )}
 
-        {/* Biometry */}
-        {visibility.biometry && (
-        <Tile>
-          <h3 style={{ marginBottom: '1.5rem' }}>Biometry Measurements</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-            <div>
-              <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>BPD (Biparietal Diameter)</div>
-              <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                {examination.biometry?.bpd !== undefined ? `${fmtBiometry(examination.biometry.bpd)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.bpd)}
+        {/* Biometry, Doppler, Ultrasound Findings, Anatomy — single-fetus path */}
+        {!isTwins && (
+          <>
+            {visibility.biometry && (
+            <Tile>
+              <h3 style={{ marginBottom: '1.5rem' }}>Biometry Measurements</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>BPD (Biparietal Diameter)</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 500 }}>
+                    {examination.biometry?.bpd !== undefined ? `${fmtBiometry(examination.biometry.bpd)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.bpd)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>HC (Head Circumference)</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 500 }}>
+                    {examination.biometry?.hc !== undefined ? `${fmtBiometry(examination.biometry.hc)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.hc)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>AC (Abdominal Circumference)</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 500 }}>
+                    {examination.biometry?.ac !== undefined ? `${fmtBiometry(examination.biometry.ac)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.ac)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>FL (Femur Length)</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 500 }}>
+                    {examination.biometry?.fl !== undefined ? `${fmtBiometry(examination.biometry.fl)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.fl)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>EFW (Estimated Fetal Weight)</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 500 }}>
+                    {examination.biometry?.efw !== undefined ? `${fmtBiometry(examination.biometry.efw)} g` : '—'}{pctBadge(efwPercentile)}
+                  </div>
+                </div>
+                {fieldBlock('OFD (Occipito-frontal Diameter)', examination.biometry?.ofd !== undefined ? `${fmtBiometry(examination.biometry.ofd)} mm` : '—')}
+                {fieldBlock('Vp (Vermis)', examination.biometry?.vp !== undefined ? `${fmtBiometry(examination.biometry.vp)} mm` : '—')}
+                {fieldBlock('TCD (Transcerebellar Diameter)', examination.biometry?.tcd !== undefined ? `${fmtBiometry(examination.biometry.tcd)} mm` : '—')}
+                {fieldBlock('CM (Cisterna Magna)', examination.biometry?.cm !== undefined ? `${fmtBiometry(examination.biometry.cm)} mm` : '—')}
+                {fieldBlock('Nuchal Fold', examination.biometry?.nuchalFold !== undefined ? `${fmtBiometry(examination.biometry.nuchalFold)} mm` : '—')}
+                {fieldBlock('NB (Nasal Bone)', examination.biometry?.nb !== undefined ? `${fmtBiometry(examination.biometry.nb)} mm` : '—')}
+                {fieldBlock('APAD', examination.biometry?.apad !== undefined ? `${fmtBiometry(examination.biometry.apad)} mm` : '—')}
+                {fieldBlock('TAD', examination.biometry?.tad !== undefined ? `${fmtBiometry(examination.biometry.tad)} mm` : '—')}
+                {fieldBlock('LA (Left Atrium)', examination.biometry?.la !== undefined ? `${fmtBiometry(examination.biometry.la)} mm` : '—')}
+                {fieldBlock('LC (Left Cardiac)', examination.biometry?.lc !== undefined ? `${fmtBiometry(examination.biometry.lc)} mm` : '—')}
               </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>HC (Head Circumference)</div>
-              <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                {examination.biometry?.hc !== undefined ? `${fmtBiometry(examination.biometry.hc)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.hc)}
+            </Tile>
+            )}
+
+            {visibility.doppler && (
+            <Tile>
+              <h3 style={{ marginBottom: '1.5rem' }}>Doppler Measurements</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+                {fieldBlock('PI (Pulsatility Index)', examination.doppler?.pi !== undefined ? examination.doppler.pi : '—')}
+                {fieldBlock('RI (Resistance Index)', examination.doppler?.ri !== undefined ? examination.doppler.ri : '—')}
+                {fieldBlock('Vessel', examination.doppler?.vessel || '—')}
+                {fieldBlock('A.ut. Dex PI', examination.doppler?.utADexPI !== undefined ? examination.doppler.utADexPI : '—')}
+                {fieldBlock('A.ut. Dex RI', examination.doppler?.utADexRI !== undefined ? examination.doppler.utADexRI : '—')}
+                {fieldBlock('A.ut. Sin PI', examination.doppler?.utASinPI !== undefined ? examination.doppler.utASinPI : '—')}
+                {fieldBlock('A.ut. Sin RI', examination.doppler?.utASinRI !== undefined ? examination.doppler.utASinRI : '—')}
+                {fieldBlock('CMA', examination.doppler?.cma !== undefined ? examination.doppler.cma : '—')}
+                {fieldBlock('PSV', examination.doppler?.psv !== undefined ? examination.doppler.psv : '—')}
+                {fieldBlock('CPR', examination.doppler?.cpr !== undefined ? examination.doppler.cpr : '—')}
+                {fieldBlock('Duc.Ven', examination.doppler?.ducVen || '—')}
               </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>AC (Abdominal Circumference)</div>
-              <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                {examination.biometry?.ac !== undefined ? `${fmtBiometry(examination.biometry.ac)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.ac)}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>FL (Femur Length)</div>
-              <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                {examination.biometry?.fl !== undefined ? `${fmtBiometry(examination.biometry.fl)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.fl)}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>EFW (Estimated Fetal Weight)</div>
-              <div style={{ fontSize: '1rem', fontWeight: 500 }}>
-                {examination.biometry?.efw !== undefined ? `${fmtBiometry(examination.biometry.efw)} g` : '—'}{pctBadge(efwPercentile)}
-              </div>
-            </div>
-            {/* TASK-034: Extended biometry */}
-            {fieldBlock('OFD (Occipito-frontal Diameter)', examination.biometry?.ofd !== undefined ? `${fmtBiometry(examination.biometry.ofd)} mm` : '—')}
-            {fieldBlock('Vp (Vermis)', examination.biometry?.vp !== undefined ? `${fmtBiometry(examination.biometry.vp)} mm` : '—')}
-            {fieldBlock('TCD (Transcerebellar Diameter)', examination.biometry?.tcd !== undefined ? `${fmtBiometry(examination.biometry.tcd)} mm` : '—')}
-            {fieldBlock('CM (Cisterna Magna)', examination.biometry?.cm !== undefined ? `${fmtBiometry(examination.biometry.cm)} mm` : '—')}
-            {fieldBlock('Nuchal Fold', examination.biometry?.nuchalFold !== undefined ? `${fmtBiometry(examination.biometry.nuchalFold)} mm` : '—')}
-            {fieldBlock('NB (Nasal Bone)', examination.biometry?.nb !== undefined ? `${fmtBiometry(examination.biometry.nb)} mm` : '—')}
-            {fieldBlock('APAD', examination.biometry?.apad !== undefined ? `${fmtBiometry(examination.biometry.apad)} mm` : '—')}
-            {fieldBlock('TAD', examination.biometry?.tad !== undefined ? `${fmtBiometry(examination.biometry.tad)} mm` : '—')}
-            {/* TASK-035: LA and LC */}
-            {fieldBlock('LA (Left Atrium)', examination.biometry?.la !== undefined ? `${fmtBiometry(examination.biometry.la)} mm` : '—')}
-            {fieldBlock('LC (Left Cardiac)', examination.biometry?.lc !== undefined ? `${fmtBiometry(examination.biometry.lc)} mm` : '—')}
-          </div>
-        </Tile>
+            </Tile>
+            )}
+
+            {visibility.ultrasoundFindings && (
+              <Tile>
+                <h3 style={{ marginBottom: '1.5rem' }}>Ultrasound Findings</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+                  {fieldBlock('Presentation', examination.data?.ultrasound_findings?.presentation ? <span style={{ textTransform: 'capitalize' }}>{examination.data.ultrasound_findings.presentation}</span> : '—')}
+                  {fieldBlock('Gender', examination.data?.ultrasound_findings?.gender ? <span style={{ textTransform: 'capitalize' }}>{examination.data.ultrasound_findings.gender}</span> : '—')}
+                  {fieldBlock('Fetal Heart Rate', examination.data?.ultrasound_findings?.heart_rate !== undefined ? `${examination.data.ultrasound_findings.heart_rate} bpm` : '—')}
+                  {fieldBlock('Fetal Movement', examination.data?.ultrasound_findings?.fetal_movement ? <span style={{ textTransform: 'capitalize' }}>{examination.data.ultrasound_findings.fetal_movement}</span> : '—')}
+                  {fieldBlock('Placenta', examination.data?.ultrasound_findings?.placenta || '—')}
+                  {fieldBlock('Umbilical Cord', examination.data?.ultrasound_findings?.umbilical_cord || '—')}
+                </div>
+              </Tile>
+            )}
+
+            {visibility.anatomy && (
+              <Tile>
+                <h3 style={{ marginBottom: '1.5rem' }}>Anatomy</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.5rem' }}>
+                  {fieldBlock('Head', examination.data?.anatomy?.head || '—')}
+                  {fieldBlock('Brain', examination.data?.anatomy?.brain || '—')}
+                  {fieldBlock('Heart', examination.data?.anatomy?.heart || '—')}
+                  {fieldBlock('Abdomen', examination.data?.anatomy?.abdomen || '—')}
+                  {fieldBlock('Kidneys', examination.data?.anatomy?.kidneys || '—')}
+                  {fieldBlock('Limbs', examination.data?.anatomy?.limbs || '—')}
+                  {fieldBlock('Skeleton', examination.data?.anatomy?.skeleton || '—')}
+                  {fieldBlock('Face', examination.data?.anatomy?.face || '—')}
+                  {fieldBlock('Neck / Skin', examination.data?.anatomy?.neckSkin || '—')}
+                  {fieldBlock('Spine', examination.data?.anatomy?.spine || '—')}
+                  {fieldBlock('Thorax', examination.data?.anatomy?.thorax || '—')}
+                </div>
+              </Tile>
+            )}
+          </>
         )}
 
-        {/* Doppler */}
-        {visibility.doppler && (
-        <Tile>
-          <h3 style={{ marginBottom: '1.5rem' }}>Doppler Measurements</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-            {fieldBlock('PI (Pulsatility Index)', examination.doppler?.pi !== undefined ? examination.doppler.pi : '—')}
-            {fieldBlock('RI (Resistance Index)', examination.doppler?.ri !== undefined ? examination.doppler.ri : '—')}
-            {fieldBlock('Vessel', examination.doppler?.vessel || '—')}
-            {fieldBlock('A.ut. Dex PI', examination.doppler?.utADexPI !== undefined ? examination.doppler.utADexPI : '—')}
-            {fieldBlock('A.ut. Dex RI', examination.doppler?.utADexRI !== undefined ? examination.doppler.utADexRI : '—')}
-            {fieldBlock('A.ut. Sin PI', examination.doppler?.utASinPI !== undefined ? examination.doppler.utASinPI : '—')}
-            {fieldBlock('A.ut. Sin RI', examination.doppler?.utASinRI !== undefined ? examination.doppler.utASinRI : '—')}
-            {fieldBlock('CMA', examination.doppler?.cma !== undefined ? examination.doppler.cma : '—')}
-            {fieldBlock('PSV', examination.doppler?.psv !== undefined ? examination.doppler.psv : '—')}
-            {fieldBlock('CPR', examination.doppler?.cpr !== undefined ? examination.doppler.cpr : '—')}
-            {fieldBlock('Duc.Ven', examination.doppler?.ducVen || '—')}
-          </div>
-        </Tile>
-        )}
-
-        {/* Ultrasound Findings */}
-        {visibility.ultrasoundFindings && (
+        {/* uzd-twins: Two-column layout for twins exam */}
+        {isTwins && (
           <Tile>
-            <h3 style={{ marginBottom: '1.5rem' }}>Ultrasound Findings</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-              {fieldBlock('Presentation', examination.data?.ultrasound_findings?.presentation ? <span style={{ textTransform: 'capitalize' }}>{examination.data.ultrasound_findings.presentation}</span> : '—')}
-              {fieldBlock('Gender', examination.data?.ultrasound_findings?.gender ? <span style={{ textTransform: 'capitalize' }}>{examination.data.ultrasound_findings.gender}</span> : '—')}
-              {fieldBlock('Fetal Heart Rate', examination.data?.ultrasound_findings?.heart_rate !== undefined ? `${examination.data.ultrasound_findings.heart_rate} bpm` : '—')}
-              {fieldBlock('Fetal Movement', examination.data?.ultrasound_findings?.fetal_movement ? <span style={{ textTransform: 'capitalize' }}>{examination.data.ultrasound_findings.fetal_movement}</span> : '—')}
-              {fieldBlock('Placenta', examination.data?.ultrasound_findings?.placenta || '—')}
-              {fieldBlock('Umbilical Cord', examination.data?.ultrasound_findings?.umbilical_cord || '—')}
-            </div>
-          </Tile>
-        )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '2rem' }}>
+              {/* Twin 1 column */}
+              <div>
+                <h3 style={{ marginBottom: '1rem', borderBottom: '2px solid #0f62fe', paddingBottom: '0.5rem' }}>Twin 1</h3>
+                {visibility.biometry && (
+                  <>
+                    <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Biometry</h4>
+                    {fieldBlock('GA from Biometry', examination.gestationalAgeFromBiometry || '—')}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.875rem', color: '#525252' }}>BPD</div>
+                        <div>{examination.biometry?.bpd !== undefined ? `${fmtBiometry(examination.biometry.bpd)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.bpd)}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.875rem', color: '#525252' }}>HC</div>
+                        <div>{examination.biometry?.hc !== undefined ? `${fmtBiometry(examination.biometry.hc)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.hc)}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.875rem', color: '#525252' }}>AC</div>
+                        <div>{examination.biometry?.ac !== undefined ? `${fmtBiometry(examination.biometry.ac)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.ac)}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.875rem', color: '#525252' }}>FL</div>
+                        <div>{examination.biometry?.fl !== undefined ? `${fmtBiometry(examination.biometry.fl)} mm` : '—'}{biometryPercentiles && pctBadge(biometryPercentiles.fl)}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.875rem', color: '#525252' }}>EFW</div>
+                        <div>{examination.biometry?.efw !== undefined ? `${fmtBiometry(examination.biometry.efw)} g` : '—'}{pctBadge(efwPercentile)}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#525252', marginTop: '0.25rem', fontStyle: 'italic' }}>Percentiles based on singleton Hadlock reference values</div>
+                  </>
+                )}
+                {visibility.doppler && (
+                  <>
+                    <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Doppler</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+                      {fieldBlock('PI', examination.doppler?.pi !== undefined ? String(examination.doppler.pi) : '—')}
+                      {fieldBlock('RI', examination.doppler?.ri !== undefined ? String(examination.doppler.ri) : '—')}
+                      {fieldBlock('Vessel', examination.doppler?.vessel || '—')}
+                      {fieldBlock('Duc.Ven', examination.doppler?.ducVen || '—')}
+                      {fieldBlock('A.ut.Dex PI', examination.doppler?.utADexPI !== undefined ? String(examination.doppler.utADexPI) : '—')}
+                      {fieldBlock('A.ut.Dex RI', examination.doppler?.utADexRI !== undefined ? String(examination.doppler.utADexRI) : '—')}
+                      {fieldBlock('A.ut.Sin PI', examination.doppler?.utASinPI !== undefined ? String(examination.doppler.utASinPI) : '—')}
+                      {fieldBlock('A.ut.Sin RI', examination.doppler?.utASinRI !== undefined ? String(examination.doppler.utASinRI) : '—')}
+                      {fieldBlock('CMA', examination.doppler?.cma !== undefined ? String(examination.doppler.cma) : '—')}
+                      {fieldBlock('PSV', examination.doppler?.psv !== undefined ? String(examination.doppler.psv) : '—')}
+                      {fieldBlock('CPR', examination.doppler?.cpr !== undefined ? String(examination.doppler.cpr) : '—')}
+                    </div>
+                  </>
+                )}
+                {visibility.ultrasoundFindings && (
+                  <>
+                    <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Ultrasound Findings</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+                      {fieldBlock('Presentation', examination.data?.ultrasound_findings?.presentation || '—')}
+                      {fieldBlock('Gender', examination.data?.ultrasound_findings?.gender || '—')}
+                      {fieldBlock('Heart Rate', examination.data?.ultrasound_findings?.heart_rate !== undefined ? `${examination.data.ultrasound_findings.heart_rate} bpm` : '—')}
+                      {fieldBlock('Fetal Movement', examination.data?.ultrasound_findings?.fetal_movement || '—')}
+                      {fieldBlock('Placenta', examination.data?.ultrasound_findings?.placenta || '—')}
+                      {fieldBlock('Umbilical Cord', examination.data?.ultrasound_findings?.umbilical_cord || '—')}
+                    </div>
+                  </>
+                )}
+                {visibility.anatomy && (
+                  <>
+                    <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Anatomy</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem' }}>
+                      {fieldBlock('Head', examination.data?.anatomy?.head || '—')}
+                      {fieldBlock('Brain', examination.data?.anatomy?.brain || '—')}
+                      {fieldBlock('Heart', examination.data?.anatomy?.heart || '—')}
+                      {fieldBlock('Abdomen', examination.data?.anatomy?.abdomen || '—')}
+                      {fieldBlock('Kidneys', examination.data?.anatomy?.kidneys || '—')}
+                      {fieldBlock('Limbs', examination.data?.anatomy?.limbs || '—')}
+                      {fieldBlock('Skeleton', examination.data?.anatomy?.skeleton || '—')}
+                      {fieldBlock('Face', examination.data?.anatomy?.face || '—')}
+                      {fieldBlock('Neck / Skin', examination.data?.anatomy?.neckSkin || '—')}
+                      {fieldBlock('Spine', examination.data?.anatomy?.spine || '—')}
+                      {fieldBlock('Thorax', examination.data?.anatomy?.thorax || '—')}
+                    </div>
+                  </>
+                )}
+              </div>
 
-        {/* Anatomy */}
-        {visibility.anatomy && (
-          <Tile>
-            <h3 style={{ marginBottom: '1.5rem' }}>Anatomy</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.5rem' }}>
-              {fieldBlock('Head', examination.data?.anatomy?.head || '—')}
-              {fieldBlock('Brain', examination.data?.anatomy?.brain || '—')}
-              {fieldBlock('Heart', examination.data?.anatomy?.heart || '—')}
-              {fieldBlock('Abdomen', examination.data?.anatomy?.abdomen || '—')}
-              {fieldBlock('Kidneys', examination.data?.anatomy?.kidneys || '—')}
-              {fieldBlock('Limbs', examination.data?.anatomy?.limbs || '—')}
-              {fieldBlock('Skeleton', examination.data?.anatomy?.skeleton || '—')}
-              {fieldBlock('Face', examination.data?.anatomy?.face || '—')}
-              {fieldBlock('Neck / Skin', examination.data?.anatomy?.neckSkin || '—')}
-              {fieldBlock('Spine', examination.data?.anatomy?.spine || '—')}
-              {fieldBlock('Thorax', examination.data?.anatomy?.thorax || '—')}
+              {/* Twin 2 column */}
+              <div>
+                <h3 style={{ marginBottom: '1rem', borderBottom: '2px solid #6929c4', paddingBottom: '0.5rem' }}>Twin 2</h3>
+                {visibility.biometry && (
+                  <>
+                    <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Biometry</h4>
+                    {fieldBlock('GA from Biometry', examination.gestationalAgeFromBiometry2 || '—')}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.875rem', color: '#525252' }}>BPD</div>
+                        <div>{examination.biometry2?.bpd !== undefined ? `${fmtBiometry(examination.biometry2.bpd)} mm` : '—'}{biometryPercentiles2 && pctBadge(biometryPercentiles2.bpd)}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.875rem', color: '#525252' }}>HC</div>
+                        <div>{examination.biometry2?.hc !== undefined ? `${fmtBiometry(examination.biometry2.hc)} mm` : '—'}{biometryPercentiles2 && pctBadge(biometryPercentiles2.hc)}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.875rem', color: '#525252' }}>AC</div>
+                        <div>{examination.biometry2?.ac !== undefined ? `${fmtBiometry(examination.biometry2.ac)} mm` : '—'}{biometryPercentiles2 && pctBadge(biometryPercentiles2.ac)}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.875rem', color: '#525252' }}>FL</div>
+                        <div>{examination.biometry2?.fl !== undefined ? `${fmtBiometry(examination.biometry2.fl)} mm` : '—'}{biometryPercentiles2 && pctBadge(biometryPercentiles2.fl)}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.875rem', color: '#525252' }}>EFW</div>
+                        <div>{examination.biometry2?.efw !== undefined ? `${fmtBiometry(examination.biometry2.efw)} g` : '—'}{pctBadge(efwPercentile2)}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#525252', marginTop: '0.25rem', fontStyle: 'italic' }}>Percentiles based on singleton Hadlock reference values</div>
+                  </>
+                )}
+                {visibility.doppler && (
+                  <>
+                    <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Doppler</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+                      {fieldBlock('PI', examination.doppler2?.pi !== undefined ? String(examination.doppler2.pi) : '—')}
+                      {fieldBlock('RI', examination.doppler2?.ri !== undefined ? String(examination.doppler2.ri) : '—')}
+                      {fieldBlock('Vessel', examination.doppler2?.vessel || '—')}
+                      {fieldBlock('Duc.Ven', examination.doppler2?.ducVen || '—')}
+                      {fieldBlock('A.ut.Dex PI', examination.doppler2?.utADexPI !== undefined ? String(examination.doppler2.utADexPI) : '—')}
+                      {fieldBlock('A.ut.Dex RI', examination.doppler2?.utADexRI !== undefined ? String(examination.doppler2.utADexRI) : '—')}
+                      {fieldBlock('A.ut.Sin PI', examination.doppler2?.utASinPI !== undefined ? String(examination.doppler2.utASinPI) : '—')}
+                      {fieldBlock('A.ut.Sin RI', examination.doppler2?.utASinRI !== undefined ? String(examination.doppler2.utASinRI) : '—')}
+                      {fieldBlock('CMA', examination.doppler2?.cma !== undefined ? String(examination.doppler2.cma) : '—')}
+                      {fieldBlock('PSV', examination.doppler2?.psv !== undefined ? String(examination.doppler2.psv) : '—')}
+                      {fieldBlock('CPR', examination.doppler2?.cpr !== undefined ? String(examination.doppler2.cpr) : '—')}
+                    </div>
+                  </>
+                )}
+                {visibility.ultrasoundFindings && (
+                  <>
+                    <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Ultrasound Findings</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+                      {fieldBlock('Presentation', examination.data?.twin2_ultrasound_findings?.presentation || '—')}
+                      {fieldBlock('Gender', examination.data?.twin2_ultrasound_findings?.gender || '—')}
+                      {fieldBlock('Heart Rate', examination.data?.twin2_ultrasound_findings?.heart_rate !== undefined ? `${examination.data.twin2_ultrasound_findings.heart_rate} bpm` : '—')}
+                      {fieldBlock('Fetal Movement', examination.data?.twin2_ultrasound_findings?.fetal_movement || '—')}
+                      {fieldBlock('Placenta', examination.data?.twin2_ultrasound_findings?.placenta || '—')}
+                      {fieldBlock('Umbilical Cord', examination.data?.twin2_ultrasound_findings?.umbilical_cord || '—')}
+                    </div>
+                  </>
+                )}
+                {visibility.anatomy && (
+                  <>
+                    <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Anatomy</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem' }}>
+                      {fieldBlock('Head', examination.data?.twin2_anatomy?.head || '—')}
+                      {fieldBlock('Brain', examination.data?.twin2_anatomy?.brain || '—')}
+                      {fieldBlock('Heart', examination.data?.twin2_anatomy?.heart || '—')}
+                      {fieldBlock('Abdomen', examination.data?.twin2_anatomy?.abdomen || '—')}
+                      {fieldBlock('Kidneys', examination.data?.twin2_anatomy?.kidneys || '—')}
+                      {fieldBlock('Limbs', examination.data?.twin2_anatomy?.limbs || '—')}
+                      {fieldBlock('Skeleton', examination.data?.twin2_anatomy?.skeleton || '—')}
+                      {fieldBlock('Face', examination.data?.twin2_anatomy?.face || '—')}
+                      {fieldBlock('Neck / Skin', examination.data?.twin2_anatomy?.neckSkin || '—')}
+                      {fieldBlock('Spine', examination.data?.twin2_anatomy?.spine || '—')}
+                      {fieldBlock('Thorax', examination.data?.twin2_anatomy?.thorax || '—')}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </Tile>
         )}

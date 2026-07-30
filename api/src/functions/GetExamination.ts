@@ -51,6 +51,13 @@ export async function getExamination(request: HttpRequest, context: InvocationCo
             data: examination.data && typeof examination.data === 'string'
                 ? JSON.parse(examination.data as any)
                 : examination.data,
+            // uzd-twins: Twin 2 deserialization
+            biometry2: examination.biometry2 && typeof examination.biometry2 === 'string'
+                ? JSON.parse(examination.biometry2 as any)
+                : examination.biometry2,
+            doppler2: examination.doppler2 && typeof examination.doppler2 === 'string'
+                ? JSON.parse(examination.doppler2 as any)
+                : examination.doppler2,
         };
 
         return successResponse({

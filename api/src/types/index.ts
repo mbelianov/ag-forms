@@ -108,6 +108,8 @@ export interface ExaminationData {
     pregnancy_data?: PregnancyData;
     ultrasound_findings?: UltrasoundFindings;
     anatomy?: AnatomyFindings;
+    twin2_ultrasound_findings?: UltrasoundFindings; // uzd-twins: Twin 2
+    twin2_anatomy?: AnatomyFindings;                // uzd-twins: Twin 2
     comments?: string;
 }
 
@@ -169,6 +171,10 @@ export interface Examination extends BaseEntity {
     examinationType?: string; // TASK-033: e.g. "ultrasound_prenatal"
     biometry?: BiometryData;
     doppler?: DopplerData;
+    // uzd-twins: Twin 2 fields (absent on single-fetus exams)
+    biometry2?: BiometryData;
+    doppler2?: DopplerData;
+    gestationalAgeFromBiometry2?: string; // e.g., "28w 3d" — GA from biometry for Twin 2
     notes?: string;
     findings?: string;
     data?: ExaminationData; // nested clinical sub-data (serialized as JSON in Table Storage)

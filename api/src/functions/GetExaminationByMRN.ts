@@ -56,7 +56,14 @@ export async function getExaminationByMRN(request: HttpRequest, context: Invocat
                 : examination.biometry,
             doppler: examination.doppler && typeof examination.doppler === 'string'
                 ? JSON.parse(examination.doppler as any)
-                : examination.doppler
+                : examination.doppler,
+            // uzd-twins: Twin 2 deserialization
+            biometry2: examination.biometry2 && typeof examination.biometry2 === 'string'
+                ? JSON.parse(examination.biometry2 as any)
+                : examination.biometry2,
+            doppler2: examination.doppler2 && typeof examination.doppler2 === 'string'
+                ? JSON.parse(examination.doppler2 as any)
+                : examination.doppler2,
         };
 
         context.log('Examination retrieved by MRN:', { mrn, examinationId: examination.examinationId, requestedBy: user.userId });

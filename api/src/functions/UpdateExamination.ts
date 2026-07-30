@@ -38,6 +38,10 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             gestationalAgeFromBiometry?: string;
             biometry?: any;
             doppler?: any;
+            // uzd-twins: Twin 2 fields
+            biometry2?: any;
+            doppler2?: any;
+            gestationalAgeFromBiometry2?: string;
             findings?: string;
             notes?: string;
             status?: string;
@@ -48,7 +52,7 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
         }
         const body = await request.json() as ExaminationBody;
         // Strip any client-supplied mrn — MRN is immutable once assigned
-        const { mrn: _discardedMrn, examDate, gestationalAge, gestationalAgeFromBiometry, biometry, doppler, findings, notes, status, data, etag, examinationType, patientAgeAtExam } = body;
+        const { mrn: _discardedMrn, examDate, gestationalAge, gestationalAgeFromBiometry, biometry, doppler, biometry2, doppler2, gestationalAgeFromBiometry2, findings, notes, status, data, etag, examinationType, patientAgeAtExam } = body;
 
         // Require ETag for optimistic concurrency
         if (!etag) {
@@ -62,6 +66,10 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
         if (gestationalAgeFromBiometry !== undefined) updateData.gestationalAgeFromBiometry = gestationalAgeFromBiometry;
         if (biometry !== undefined) updateData.biometry = biometry;
         if (doppler !== undefined) updateData.doppler = doppler;
+        // uzd-twins: Twin 2 fields
+        if (biometry2 !== undefined) updateData.biometry2 = biometry2;
+        if (doppler2 !== undefined) updateData.doppler2 = doppler2;
+        if (gestationalAgeFromBiometry2 !== undefined) updateData.gestationalAgeFromBiometry2 = gestationalAgeFromBiometry2;
         if (findings !== undefined) updateData.findings = findings;
         if (notes !== undefined) updateData.notes = notes;
         if (status !== undefined) updateData.status = status;
@@ -112,6 +120,10 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             gestationalAgeFromBiometry: gestationalAgeFromBiometry !== undefined ? gestationalAgeFromBiometry : existingExam.gestationalAgeFromBiometry,
             biometry: biometry !== undefined ? biometry : existingExam.biometry,
             doppler: doppler !== undefined ? doppler : existingExam.doppler,
+            // uzd-twins: Twin 2 fields
+            biometry2: biometry2 !== undefined ? biometry2 : existingExam.biometry2,
+            doppler2: doppler2 !== undefined ? doppler2 : existingExam.doppler2,
+            gestationalAgeFromBiometry2: gestationalAgeFromBiometry2 !== undefined ? gestationalAgeFromBiometry2 : existingExam.gestationalAgeFromBiometry2,
             findings: findings !== undefined ? findings : existingExam.findings,
             notes: notes !== undefined ? notes : existingExam.notes,
             data: data !== undefined ? data : undefined,
@@ -156,6 +168,19 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             // Serialize to JSON string for Azure Table Storage
             updatedLookupEntity.doppler = (typeof doppler === 'string' ? doppler : JSON.stringify(doppler)) as any;
             changedFields.push('doppler');
+        }
+        // uzd-twins: Twin 2 fields
+        if (biometry2 !== undefined) {
+            updatedLookupEntity.biometry2 = (typeof biometry2 === 'string' ? biometry2 : JSON.stringify(biometry2)) as any;
+            changedFields.push('biometry2');
+        }
+        if (doppler2 !== undefined) {
+            updatedLookupEntity.doppler2 = (typeof doppler2 === 'string' ? doppler2 : JSON.stringify(doppler2)) as any;
+            changedFields.push('doppler2');
+        }
+        if (gestationalAgeFromBiometry2 !== undefined && gestationalAgeFromBiometry2 !== existingExam.gestationalAgeFromBiometry2) {
+            updatedLookupEntity.gestationalAgeFromBiometry2 = gestationalAgeFromBiometry2;
+            changedFields.push('gestationalAgeFromBiometry2');
         }
         if (findings !== undefined && findings !== existingExam.findings) {
             updatedLookupEntity.findings = findings;
@@ -210,6 +235,10 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
                 gestationalAgeFromBiometry: updatedLookupEntity.gestationalAgeFromBiometry,
                 biometry: updatedLookupEntity.biometry,
                 doppler: updatedLookupEntity.doppler,
+                // uzd-twins: Twin 2 fields synced to primary entity
+                biometry2: updatedLookupEntity.biometry2,
+                doppler2: updatedLookupEntity.doppler2,
+                gestationalAgeFromBiometry2: updatedLookupEntity.gestationalAgeFromBiometry2,
                 findings: updatedLookupEntity.findings,
                 notes: updatedLookupEntity.notes,
                 status: updatedLookupEntity.status,

@@ -1,0 +1,34 @@
+Wave 1 (implemented):
+new examination form type Ultrasound Prenatal Exam for Twins
+same content as Ultrasound Prenatal Exam but sections Biometry, Doppler, Ultrasound findings and Anatomy are presented twice (separate sections for each Twins)
+same validation and input rules per section as Ultrasound Prenatal Exam
+Visually the sections of same type must be present next two each other (left for Twin 1 and right for Twin 2)
+when printed and visualized on pdf, content of the examination must fit single A4 page
+
+Wave 2:
+On Examination Input form, type Ultrasound Prenatal Exam for Twins 
+- wider Examination Type drop down (5 columns), shorter Examination Date (3 columns)
+- no Singletone ref. mark in Biometry section
+- BPD, HC, AC, FL + associated percentiles -> 4 columns per row (for each twin section)
+- TCD, CM, OFD, Vp, Nuhcal Fold, NB, APAD, TAD, LA, LC -> 4 columns per row (for each twin section)
+- Nuchal Fold -> just NF
+- LA — Left Atrium -> just LA
+- LC - Left Caridac -> just LC
+- Doppler sections -> 4 columns per row
+- Ultrasound findings sections -> 4 columns per row
+- Anatomy sections -> 4 columns per row
+
+Wave 3:
+On Examination Input form, type Ultrasound Prenatal Exam for Twins: 
+- PI (Pulsatility Index) -> just PI
+- RI (Resistance Index) -> just RI
+- Fetal Heart Rate (bpm) -> just FHR (bpm)
+- Ultrasound findings section -> 3 colums per row, in pdf report -> 2 columns per row
+- Exclude read-only fields from Tab sequence. In general tab sequence shall be:
+  -- from left to right
+  -- from top to bottom
+  -- Left twin section, right twin section
+  
+On the PDF report, type Ultrasound Prenatal Exam for Twins
+- In Ultrasound findings section - 2 columns per row (in each twin sectoin) as label overlaps with values
+- GA from Bio age (in common sections) -> composite fiels with following format - "GA Twin 1 / GA Twin 2" e.g. 28w 5d / 28w 3d

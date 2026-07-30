@@ -23,6 +23,10 @@ import type {
 import { calcGAFromLMP, calcGAFromBiometry, calcEFW, calcEDD, calcBiometryPercentiles, calcEFWPercentile, calculateAgeAtDate } from '../utils/calculations';
 import { EXAM_TYPES, getExamTypeLabel, getSectionVisibility } from '../constants/examinationTypes';
 import type { BiometryPercentiles } from '../utils/calculations';
+import BiometrySection from './sections/BiometrySection';
+import DopplerSection from './sections/DopplerSection';
+import UltrasoundFindingsSection from './sections/UltrasoundFindingsSection';
+import AnatomySection from './sections/AnatomySection';
 
 interface ExaminationFormProps {
   examination?: Examination;
@@ -134,6 +138,54 @@ export default function ExaminationForm({
     anat_thorax: examination?.data?.anatomy?.thorax || '',
     // Top-level data comment
     comments: examination?.data?.comments || '',
+    // uzd-twins: Twin 2 biometry fields
+    t2_bpd: examination?.biometry2?.bpd != null ? examination.biometry2.bpd.toFixed(2) : '',
+    t2_hc: examination?.biometry2?.hc != null ? examination.biometry2.hc.toFixed(2) : '',
+    t2_ac: examination?.biometry2?.ac != null ? examination.biometry2.ac.toFixed(2) : '',
+    t2_fl: examination?.biometry2?.fl != null ? examination.biometry2.fl.toFixed(2) : '',
+    t2_efw: examination?.biometry2?.efw != null ? examination.biometry2.efw.toFixed(2) : '',
+    t2_ofd: examination?.biometry2?.ofd != null ? examination.biometry2.ofd.toFixed(2) : '',
+    t2_vp: examination?.biometry2?.vp != null ? examination.biometry2.vp.toFixed(2) : '',
+    t2_tcd: examination?.biometry2?.tcd != null ? examination.biometry2.tcd.toFixed(2) : '',
+    t2_cm: examination?.biometry2?.cm != null ? examination.biometry2.cm.toFixed(2) : '',
+    t2_nuchalFold: examination?.biometry2?.nuchalFold != null ? examination.biometry2.nuchalFold.toFixed(2) : '',
+    t2_nb: examination?.biometry2?.nb != null ? examination.biometry2.nb.toFixed(2) : '',
+    t2_apad: examination?.biometry2?.apad != null ? examination.biometry2.apad.toFixed(2) : '',
+    t2_tad: examination?.biometry2?.tad != null ? examination.biometry2.tad.toFixed(2) : '',
+    t2_la: examination?.biometry2?.la != null ? examination.biometry2.la.toFixed(2) : '',
+    t2_lc: examination?.biometry2?.lc != null ? examination.biometry2.lc.toFixed(2) : '',
+    t2_gestationalAgeFromBiometry: examination?.gestationalAgeFromBiometry2 || '',
+    // uzd-twins: Twin 2 doppler fields
+    t2_pi: examination?.doppler2?.pi?.toString() || '',
+    t2_ri: examination?.doppler2?.ri?.toString() || '',
+    t2_vessel: examination?.doppler2?.vessel || '',
+    t2_ducVen: examination?.doppler2?.ducVen || '',
+    t2_utADexPI: examination?.doppler2?.utADexPI?.toString() || '',
+    t2_utADexRI: examination?.doppler2?.utADexRI?.toString() || '',
+    t2_utASinPI: examination?.doppler2?.utASinPI?.toString() || '',
+    t2_utASinRI: examination?.doppler2?.utASinRI?.toString() || '',
+    t2_cma: examination?.doppler2?.cma?.toString() || '',
+    t2_psv: examination?.doppler2?.psv?.toString() || '',
+    t2_cpr: examination?.doppler2?.cpr?.toString() || '',
+    // uzd-twins: Twin 2 ultrasound findings
+    t2_presentation: examination?.data?.twin2_ultrasound_findings?.presentation || '',
+    t2_gender: examination?.data?.twin2_ultrasound_findings?.gender || '',
+    t2_heart_rate: examination?.data?.twin2_ultrasound_findings?.heart_rate?.toString() || '',
+    t2_fetal_movement: examination?.data?.twin2_ultrasound_findings?.fetal_movement || '',
+    t2_placenta: examination?.data?.twin2_ultrasound_findings?.placenta || '',
+    t2_umbilical_cord: examination?.data?.twin2_ultrasound_findings?.umbilical_cord || '',
+    // uzd-twins: Twin 2 anatomy
+    t2_anat_head: examination?.data?.twin2_anatomy?.head || '',
+    t2_anat_brain: examination?.data?.twin2_anatomy?.brain || '',
+    t2_anat_heart: examination?.data?.twin2_anatomy?.heart || '',
+    t2_anat_abdomen: examination?.data?.twin2_anatomy?.abdomen || '',
+    t2_anat_kidneys: examination?.data?.twin2_anatomy?.kidneys || '',
+    t2_anat_limbs: examination?.data?.twin2_anatomy?.limbs || '',
+    t2_anat_skeleton: examination?.data?.twin2_anatomy?.skeleton || '',
+    t2_anat_face: examination?.data?.twin2_anatomy?.face || '',
+    t2_anat_neckSkin: examination?.data?.twin2_anatomy?.neckSkin || '',
+    t2_anat_spine: examination?.data?.twin2_anatomy?.spine || '',
+    t2_anat_thorax: examination?.data?.twin2_anatomy?.thorax || '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -201,11 +253,62 @@ export default function ExaminationForm({
         anat_spine: examination.data?.anatomy?.spine || '',
         anat_thorax: examination.data?.anatomy?.thorax || '',
         comments: examination.data?.comments || '',
+        // uzd-twins: Twin 2 biometry
+        t2_bpd: examination.biometry2?.bpd?.toString() || '',
+        t2_hc: examination.biometry2?.hc?.toString() || '',
+        t2_ac: examination.biometry2?.ac?.toString() || '',
+        t2_fl: examination.biometry2?.fl?.toString() || '',
+        t2_efw: examination.biometry2?.efw?.toString() || '',
+        t2_ofd: examination.biometry2?.ofd?.toString() || '',
+        t2_vp: examination.biometry2?.vp?.toString() || '',
+        t2_tcd: examination.biometry2?.tcd?.toString() || '',
+        t2_cm: examination.biometry2?.cm?.toString() || '',
+        t2_nuchalFold: examination.biometry2?.nuchalFold?.toString() || '',
+        t2_nb: examination.biometry2?.nb?.toString() || '',
+        t2_apad: examination.biometry2?.apad?.toString() || '',
+        t2_tad: examination.biometry2?.tad?.toString() || '',
+        t2_la: examination.biometry2?.la?.toString() || '',
+        t2_lc: examination.biometry2?.lc?.toString() || '',
+        t2_gestationalAgeFromBiometry: examination.gestationalAgeFromBiometry2 || '',
+        // uzd-twins: Twin 2 doppler
+        t2_pi: examination.doppler2?.pi?.toString() || '',
+        t2_ri: examination.doppler2?.ri?.toString() || '',
+        t2_vessel: examination.doppler2?.vessel || '',
+        t2_ducVen: examination.doppler2?.ducVen || '',
+        t2_utADexPI: examination.doppler2?.utADexPI?.toString() || '',
+        t2_utADexRI: examination.doppler2?.utADexRI?.toString() || '',
+        t2_utASinPI: examination.doppler2?.utASinPI?.toString() || '',
+        t2_utASinRI: examination.doppler2?.utASinRI?.toString() || '',
+        t2_cma: examination.doppler2?.cma?.toString() || '',
+        t2_psv: examination.doppler2?.psv?.toString() || '',
+        t2_cpr: examination.doppler2?.cpr?.toString() || '',
+        // uzd-twins: Twin 2 ultrasound findings
+        t2_presentation: examination.data?.twin2_ultrasound_findings?.presentation || '',
+        t2_gender: examination.data?.twin2_ultrasound_findings?.gender || '',
+        t2_heart_rate: examination.data?.twin2_ultrasound_findings?.heart_rate?.toString() || '',
+        t2_fetal_movement: examination.data?.twin2_ultrasound_findings?.fetal_movement || '',
+        t2_placenta: examination.data?.twin2_ultrasound_findings?.placenta || '',
+        t2_umbilical_cord: examination.data?.twin2_ultrasound_findings?.umbilical_cord || '',
+        // uzd-twins: Twin 2 anatomy
+        t2_anat_head: examination.data?.twin2_anatomy?.head || '',
+        t2_anat_brain: examination.data?.twin2_anatomy?.brain || '',
+        t2_anat_heart: examination.data?.twin2_anatomy?.heart || '',
+        t2_anat_abdomen: examination.data?.twin2_anatomy?.abdomen || '',
+        t2_anat_kidneys: examination.data?.twin2_anatomy?.kidneys || '',
+        t2_anat_limbs: examination.data?.twin2_anatomy?.limbs || '',
+        t2_anat_skeleton: examination.data?.twin2_anatomy?.skeleton || '',
+        t2_anat_face: examination.data?.twin2_anatomy?.face || '',
+        t2_anat_neckSkin: examination.data?.twin2_anatomy?.neckSkin || '',
+        t2_anat_spine: examination.data?.twin2_anatomy?.spine || '',
+        t2_anat_thorax: examination.data?.twin2_anatomy?.thorax || '',
       });
     }
   }, [examination]);
 
   // ── Derived values ────────────────────────────────────────────────────────
+  // uzd-twins: detect twins exam type
+  const isTwins = formData.examinationType === 'ultrasound_prenatal_twins';
+
   const canCalcGAFromLMP = !!(formData.last_menstrual_period && formData.examDate);
 
   // EDD is derived live whenever LMP changes — display-only, never stored separately
@@ -348,6 +451,45 @@ export default function ExaminationForm({
       }
     }
 
+    // uzd-twins: validate T2 fields when twins exam type is selected
+    if (isTwins) {
+      // T2 biometry
+      const t2BiometryFields = ['t2_bpd', 't2_hc', 't2_ac', 't2_fl', 't2_efw', 't2_ofd', 't2_vp', 't2_tcd', 't2_cm', 't2_nuchalFold', 't2_nb', 't2_apad', 't2_tad', 't2_la', 't2_lc'];
+      t2BiometryFields.forEach(field => {
+        const value = formData[field as keyof typeof formData] as string;
+        if (value && value.trim()) {
+          const parsed = parseFloat(value);
+          if (isNaN(parsed) || !isFinite(parsed) || parsed <= 0) {
+            newErrors[field] = 'Must be a positive number';
+          }
+        }
+      });
+      // T2 GA from Biometry format
+      if (formData.t2_gestationalAgeFromBiometry && !gaRegex.test(formData.t2_gestationalAgeFromBiometry)) {
+        newErrors.t2_gestationalAgeFromBiometry = 'Format must be "28w 3d"';
+      }
+      // T2 doppler
+      const t2DopplerFields = ['t2_pi', 't2_ri', 't2_utADexPI', 't2_utADexRI', 't2_utASinPI', 't2_utASinRI', 't2_cma', 't2_psv', 't2_cpr'];
+      t2DopplerFields.forEach(field => {
+        const value = formData[field as keyof typeof formData] as string;
+        if (value && value.trim()) {
+          const parsed = parseFloat(value);
+          if (isNaN(parsed) || parsed < 0) {
+            newErrors[field] = 'Must be a valid number';
+          }
+        }
+      });
+      // T2 heart rate
+      if (formData.t2_heart_rate && formData.t2_heart_rate.trim()) {
+        const parsed = parseInt(formData.t2_heart_rate);
+        if (isNaN(parsed) || parsed.toString() !== formData.t2_heart_rate.trim()) {
+          newErrors.t2_heart_rate = 'Must be a whole number (bpm)';
+        } else if (parsed <= 0) {
+          newErrors.t2_heart_rate = 'Must be a positive number';
+        }
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -453,10 +595,69 @@ export default function ExaminationForm({
         thorax: formData.anat_thorax.trim() || undefined,
       } : undefined;
 
-      const data: ExaminationData | undefined = (pregnancy_data || ultrasound_findings || anatomy || formData.comments.trim()) ? {
+      // uzd-twins: build Twin 2 objects when twins exam type
+      let biometry2: CreateExaminationRequest['biometry2'] | undefined;
+      let doppler2: CreateExaminationRequest['doppler2'] | undefined;
+      let twin2_ultrasound_findings: ExaminationData['twin2_ultrasound_findings'] | undefined;
+      let twin2_anatomy: ExaminationData['twin2_anatomy'] | undefined;
+      if (isTwins) {
+        biometry2 = (
+          formData.t2_bpd || formData.t2_hc || formData.t2_ac || formData.t2_fl || formData.t2_efw ||
+          formData.t2_ofd || formData.t2_vp || formData.t2_tcd || formData.t2_cm || formData.t2_nuchalFold ||
+          formData.t2_nb || formData.t2_apad || formData.t2_tad || formData.t2_la || formData.t2_lc
+        ) ? {
+          bpd: floatOrUndef(formData.t2_bpd), hc: floatOrUndef(formData.t2_hc),
+          ac: floatOrUndef(formData.t2_ac), fl: floatOrUndef(formData.t2_fl),
+          efw: floatOrUndef(formData.t2_efw), ofd: floatOrUndef(formData.t2_ofd),
+          vp: floatOrUndef(formData.t2_vp), tcd: floatOrUndef(formData.t2_tcd),
+          cm: floatOrUndef(formData.t2_cm), nuchalFold: floatOrUndef(formData.t2_nuchalFold),
+          nb: floatOrUndef(formData.t2_nb), apad: floatOrUndef(formData.t2_apad),
+          tad: floatOrUndef(formData.t2_tad), la: floatOrUndef(formData.t2_la),
+          lc: floatOrUndef(formData.t2_lc),
+        } : undefined;
+        doppler2 = (
+          formData.t2_pi || formData.t2_ri || formData.t2_vessel ||
+          formData.t2_utADexPI || formData.t2_utADexRI || formData.t2_utASinPI || formData.t2_utASinRI ||
+          formData.t2_cma || formData.t2_psv || formData.t2_cpr || formData.t2_ducVen
+        ) ? {
+          pi: floatOrUndef(formData.t2_pi), ri: floatOrUndef(formData.t2_ri),
+          vessel: formData.t2_vessel.trim() || undefined,
+          utADexPI: floatOrUndef(formData.t2_utADexPI), utADexRI: floatOrUndef(formData.t2_utADexRI),
+          utASinPI: floatOrUndef(formData.t2_utASinPI), utASinRI: floatOrUndef(formData.t2_utASinRI),
+          cma: floatOrUndef(formData.t2_cma), psv: floatOrUndef(formData.t2_psv),
+          cpr: floatOrUndef(formData.t2_cpr), ducVen: formData.t2_ducVen.trim() || undefined,
+        } : undefined;
+        twin2_ultrasound_findings = (
+          formData.t2_presentation || formData.t2_gender || formData.t2_heart_rate ||
+          formData.t2_fetal_movement || formData.t2_placenta || formData.t2_umbilical_cord
+        ) ? {
+          presentation: formData.t2_presentation.trim() || undefined,
+          gender: formData.t2_gender || undefined,
+          heart_rate: formData.t2_heart_rate ? parseInt(formData.t2_heart_rate) : undefined,
+          fetal_movement: formData.t2_fetal_movement.trim() || undefined,
+          placenta: formData.t2_placenta.trim() || undefined,
+          umbilical_cord: formData.t2_umbilical_cord.trim() || undefined,
+        } : undefined;
+        twin2_anatomy = (
+          formData.t2_anat_head || formData.t2_anat_brain || formData.t2_anat_heart ||
+          formData.t2_anat_abdomen || formData.t2_anat_kidneys || formData.t2_anat_limbs ||
+          formData.t2_anat_skeleton || formData.t2_anat_face || formData.t2_anat_neckSkin ||
+          formData.t2_anat_spine || formData.t2_anat_thorax
+        ) ? {
+          head: formData.t2_anat_head.trim() || undefined, brain: formData.t2_anat_brain.trim() || undefined,
+          heart: formData.t2_anat_heart.trim() || undefined, abdomen: formData.t2_anat_abdomen.trim() || undefined,
+          kidneys: formData.t2_anat_kidneys.trim() || undefined, limbs: formData.t2_anat_limbs.trim() || undefined,
+          skeleton: formData.t2_anat_skeleton.trim() || undefined, face: formData.t2_anat_face.trim() || undefined,
+          neckSkin: formData.t2_anat_neckSkin.trim() || undefined, spine: formData.t2_anat_spine.trim() || undefined,
+          thorax: formData.t2_anat_thorax.trim() || undefined,
+        } : undefined;
+      }
+
+      const data: ExaminationData | undefined = (pregnancy_data || ultrasound_findings || anatomy || formData.comments.trim() || twin2_ultrasound_findings || twin2_anatomy) ? {
         pregnancy_data,
         ultrasound_findings,
         anatomy,
+        ...(isTwins ? { twin2_ultrasound_findings, twin2_anatomy } : {}),
         comments: formData.comments.trim() || undefined,
       } : undefined;
 
@@ -469,6 +670,12 @@ export default function ExaminationForm({
         examinationType: formData.examinationType || 'ultrasound_prenatal',
         biometry,
         doppler,
+        // uzd-twins: Twin 2 fields (only when twins exam type)
+        ...(isTwins ? {
+          biometry2,
+          doppler2,
+          gestationalAgeFromBiometry2: formData.t2_gestationalAgeFromBiometry.trim() || undefined,
+        } : {}),
         notes: formData.notes.trim() || undefined,
         findings: formData.findings.trim() || undefined,
         data,
@@ -494,10 +701,18 @@ export default function ExaminationForm({
     }
   };
 
+  // uzd-twins: adapter for T1 section components — BiometrySection emits "t1_bpd" style
+  // but T1 data is stored under the unprefixed keys (bpd, hc, …).
+  // This adapter strips the "t1_" prefix before forwarding to handleChange.
+  const handleChangeT1 = (field: string, value: string) => {
+    const stripped = field.startsWith('t1_') ? field.slice(3) : field;
+    handleChange(stripped, value);
+  };
+
   // ── Layout helpers ────────────────────────────────────────────────────────
   const row2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' };
   const row3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' };
-  const row4: React.CSSProperties = { display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '0.75rem' };
+  const row4: React.CSSProperties = { display: 'grid', gridTemplateColumns: '5fr 3fr 2fr 2fr', gap: '0.75rem' };
   const row6: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.75rem' };
 
   // Inline style for a "Calc" button vertically aligned with an adjacent input.
@@ -715,8 +930,8 @@ export default function ExaminationForm({
           </div>
           )}
 
-          {/* ── Ultrasound Findings ── */}
-          {visibility.ultrasoundFindings && (
+          {/* ── Ultrasound Findings (single-fetus path) ── */}
+          {visibility.ultrasoundFindings && !isTwins && (
           <div>
             <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Ultrasound Findings</h4>
               {/* Single row6 — Presentation, Gender, HeartRate, FetalMovement, Placenta, UmbilicalCord (REQ-08 rule 7) */}
@@ -748,8 +963,8 @@ export default function ExaminationForm({
           </div>
           )}
 
-          {/* ── Anatomy ── */}
-          {visibility.anatomy && (
+          {/* ── Anatomy (single-fetus path) ── */}
+          {visibility.anatomy && !isTwins && (
           <div>
             <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Anatomy</h4>
             {/* Single row6 — 11 fields across 2 auto rows via CSS grid (REQ-08 rule 6) */}
@@ -771,8 +986,173 @@ export default function ExaminationForm({
 
         </div>
 
-        {/* ── Biometry ── */}
-        {visibility.biometry && (
+        {/* ── uzd-twins: Twin side-by-side layout (Biometry, Doppler, Ultrasound Findings, Anatomy) ── */}
+        {/* Breakpoint: collapses to single column below 1024px */}
+        {isTwins && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }} className="twins-grid">
+              <h4 style={{ marginBottom: '0.75rem', fontWeight: 700, borderBottom: '2px solid #0f62fe', paddingBottom: '0.5rem' }}>Twin 1</h4>
+              <h4 style={{ marginBottom: '0.75rem', fontWeight: 700, borderBottom: '2px solid #6929c4', paddingBottom: '0.5rem' }}>Twin 2</h4>
+            </div>
+
+            {visibility.biometry && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }} className="twins-grid">
+                <div>
+                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Biometry</h5>
+                  <BiometrySection
+                    prefix="t1"
+                    columns={4}
+                    data={{
+                      bpd: formData.bpd, hc: formData.hc, ac: formData.ac, fl: formData.fl,
+                      efw: formData.efw, ofd: formData.ofd, vp: formData.vp, tcd: formData.tcd,
+                      cm: formData.cm, nuchalFold: formData.nuchalFold, nb: formData.nb,
+                      apad: formData.apad, tad: formData.tad, la: formData.la, lc: formData.lc,
+                      gestationalAgeFromBiometry: formData.gestationalAgeFromBiometry,
+                      gestationalAge: formData.gestationalAge,
+                    }}
+                    errors={errors}
+                    onChange={handleChangeT1}
+                    isSubmitting={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Biometry</h5>
+                  <BiometrySection
+                    prefix="t2"
+                    columns={4}
+                    data={{
+                      bpd: formData.t2_bpd, hc: formData.t2_hc, ac: formData.t2_ac, fl: formData.t2_fl,
+                      efw: formData.t2_efw, ofd: formData.t2_ofd, vp: formData.t2_vp, tcd: formData.t2_tcd,
+                      cm: formData.t2_cm, nuchalFold: formData.t2_nuchalFold, nb: formData.t2_nb,
+                      apad: formData.t2_apad, tad: formData.t2_tad, la: formData.t2_la, lc: formData.t2_lc,
+                      gestationalAgeFromBiometry: formData.t2_gestationalAgeFromBiometry,
+                      gestationalAge: formData.gestationalAge,
+                    }}
+                    errors={errors}
+                    onChange={handleChange}
+                    isSubmitting={isSubmitting}
+                  />
+                </div>
+              </div>
+            )}
+
+            {visibility.doppler && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }} className="twins-grid">
+                <div>
+                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Doppler</h5>
+                  <DopplerSection
+                    prefix="t1"
+                    columns={4}
+                    data={{
+                      pi: formData.pi, ri: formData.ri, vessel: formData.vessel,
+                      ducVen: formData.ducVen, utADexPI: formData.utADexPI, utADexRI: formData.utADexRI,
+                      utASinPI: formData.utASinPI, utASinRI: formData.utASinRI,
+                      cma: formData.cma, psv: formData.psv, cpr: formData.cpr,
+                    }}
+                    errors={errors}
+                    onChange={handleChangeT1}
+                    isSubmitting={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Doppler</h5>
+                  <DopplerSection
+                    prefix="t2"
+                    columns={4}
+                    data={{
+                      pi: formData.t2_pi, ri: formData.t2_ri, vessel: formData.t2_vessel,
+                      ducVen: formData.t2_ducVen, utADexPI: formData.t2_utADexPI, utADexRI: formData.t2_utADexRI,
+                      utASinPI: formData.t2_utASinPI, utASinRI: formData.t2_utASinRI,
+                      cma: formData.t2_cma, psv: formData.t2_psv, cpr: formData.t2_cpr,
+                    }}
+                    errors={errors}
+                    onChange={handleChange}
+                    isSubmitting={isSubmitting}
+                  />
+                </div>
+              </div>
+            )}
+
+            {visibility.ultrasoundFindings && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }} className="twins-grid">
+                <div>
+                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Ultrasound Findings</h5>
+                  <UltrasoundFindingsSection
+                    prefix="t1"
+                    columns={3}
+                    data={{
+                      presentation: formData.presentation, gender: formData.gender,
+                      heart_rate: formData.heart_rate, fetal_movement: formData.fetal_movement,
+                      placenta: formData.placenta, umbilical_cord: formData.umbilical_cord,
+                    }}
+                    errors={errors}
+                    onChange={handleChangeT1}
+                    isSubmitting={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Ultrasound Findings</h5>
+                  <UltrasoundFindingsSection
+                    prefix="t2"
+                    columns={3}
+                    data={{
+                      presentation: formData.t2_presentation, gender: formData.t2_gender,
+                      heart_rate: formData.t2_heart_rate, fetal_movement: formData.t2_fetal_movement,
+                      placenta: formData.t2_placenta, umbilical_cord: formData.t2_umbilical_cord,
+                    }}
+                    errors={errors}
+                    onChange={handleChange}
+                    isSubmitting={isSubmitting}
+                  />
+                </div>
+              </div>
+            )}
+
+            {visibility.anatomy && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }} className="twins-grid">
+                <div>
+                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Anatomy</h5>
+                  <AnatomySection
+                    prefix="t1"
+                    columns={4}
+                    data={{
+                      anat_head: formData.anat_head, anat_brain: formData.anat_brain,
+                      anat_heart: formData.anat_heart, anat_abdomen: formData.anat_abdomen,
+                      anat_kidneys: formData.anat_kidneys, anat_limbs: formData.anat_limbs,
+                      anat_skeleton: formData.anat_skeleton, anat_face: formData.anat_face,
+                      anat_neckSkin: formData.anat_neckSkin, anat_spine: formData.anat_spine,
+                      anat_thorax: formData.anat_thorax,
+                    }}
+                    errors={errors}
+                    onChange={handleChangeT1}
+                    isSubmitting={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Anatomy</h5>
+                  <AnatomySection
+                    prefix="t2"
+                    columns={4}
+                    data={{
+                      anat_head: formData.t2_anat_head, anat_brain: formData.t2_anat_brain,
+                      anat_heart: formData.t2_anat_heart, anat_abdomen: formData.t2_anat_abdomen,
+                      anat_kidneys: formData.t2_anat_kidneys, anat_limbs: formData.t2_anat_limbs,
+                      anat_skeleton: formData.t2_anat_skeleton, anat_face: formData.t2_anat_face,
+                      anat_neckSkin: formData.t2_anat_neckSkin, anat_spine: formData.t2_anat_spine,
+                      anat_thorax: formData.t2_anat_thorax,
+                    }}
+                    errors={errors}
+                    onChange={handleChange}
+                    isSubmitting={isSubmitting}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Biometry (single-fetus path) ── */}
+        {visibility.biometry && !isTwins && (
         <>
         <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Biometry (decimal values accepted, in mm/grams)</h4>
         <FormGroup legendText="">
@@ -906,8 +1286,8 @@ export default function ExaminationForm({
         </>
         )}
 
-        {/* ── Doppler — PI | RI | Vessel on one row ── */}
-        {visibility.doppler && (
+        {/* ── Doppler (single-fetus path) ── */}
+        {visibility.doppler && !isTwins && (
         <>
         <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Doppler (floats allowed)</h4>
         <FormGroup legendText="">

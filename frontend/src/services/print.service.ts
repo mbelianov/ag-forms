@@ -8,6 +8,61 @@ import type { Examination } from '../types';
 
 // ─── View model ──────────────────────────────────────────────────────────────
 
+export interface BiometryViewModel {
+  bpd?: string;
+  hc?: string;
+  ac?: string;
+  fl?: string;
+  efw?: string;
+  ofd?: string;
+  vp?: string;
+  tcd?: string;
+  cm?: string;
+  nuchalFold?: string;
+  nb?: string;
+  apad?: string;
+  tad?: string;
+  la?: string;
+  lc?: string;
+}
+
+export interface DopplerViewModel {
+  pi?: string;
+  ri?: string;
+  vessel?: string;
+  utADexPI?: string;
+  utADexRI?: string;
+  utASinPI?: string;
+  utASinRI?: string;
+  cma?: string;
+  psv?: string;
+  cpr?: string;
+  ducVen?: string;
+}
+
+export interface UltrasoundViewModel {
+  presentation?: string;
+  gender?: string;
+  heartRate?: string;
+  fetalMovement?: string;
+  placenta?: string;
+  umbilicalCord?: string;
+}
+
+export interface AnatomyViewModel {
+  head?: string;
+  brain?: string;
+  heart?: string;
+  abdomen?: string;
+  kidneys?: string;
+  limbs?: string;
+  skeleton?: string;
+  face?: string;
+  neckSkin?: string;
+  spine?: string;
+  thorax?: string;
+}
+
 export interface ExamPdfViewModel {
   patientName: string;
   mrn: string;
@@ -19,6 +74,13 @@ export interface ExamPdfViewModel {
   gestationalAge?: string;
   gestationalAgeFromBiometry?: string;
   expectedDeliveryDate?: string;
+
+  // uzd-twins: T2 blocks (absent for single-fetus exams)
+  gestationalAgeFromBiometry2?: string;
+  biometry2?: BiometryViewModel;
+  doppler2?: DopplerViewModel;
+  ultrasound2?: UltrasoundViewModel;
+  anatomy2?: AnatomyViewModel;
 
   biometry: {
     // Core
@@ -41,20 +103,7 @@ export interface ExamPdfViewModel {
     lc?: string;
   };
 
-  doppler: {
-    pi?: string;
-    ri?: string;
-    vessel?: string;
-    // TASK-036: Extended vascular
-    utADexPI?: string;
-    utADexRI?: string;
-    utASinPI?: string;
-    utASinRI?: string;
-    cma?: string;
-    psv?: string;
-    cpr?: string;
-    ducVen?: string;
-  };
+  doppler: DopplerViewModel;
 
   pregnancy: {
     lmp?: string;
@@ -62,29 +111,9 @@ export interface ExamPdfViewModel {
     familyHistory?: string;
   };
 
-  ultrasound: {
-    presentation?: string;
-    gender?: string;
-    heartRate?: string;
-    fetalMovement?: string;
-    placenta?: string;
-    umbilicalCord?: string;
-  };
+  ultrasound: UltrasoundViewModel;
 
-  anatomy: {
-    head?: string;
-    brain?: string;
-    heart?: string;
-    abdomen?: string;
-    kidneys?: string;
-    limbs?: string;
-    skeleton?: string;
-    // TASK-036: Extended anatomy
-    face?: string;
-    neckSkin?: string;
-    spine?: string;
-    thorax?: string;
-  };
+  anatomy: AnatomyViewModel;
 
   findings?: string;
   notes?: string;
@@ -134,6 +163,82 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
       ? calcEFWPercentile(exam.biometry.efw, gaForPct)
       : undefined;
 
+  // uzd-twins: build T2 blocks when twins exam type
+  const isTwins = exam.examinationType === 'ultrasound_prenatal_twins';
+  let biometry2: ExamPdfViewModel['biometry2'] | undefined;
+  let doppler2: ExamPdfViewModel['doppler2'] | undefined;
+  let ultrasound2: ExamPdfViewModel['ultrasound2'] | undefined;
+  let anatomy2: ExamPdfViewModel['anatomy2'] | undefined;
+
+  if (isTwins) {
+    const percentiles2 = calcBiometryPercentiles(
+      exam.biometry2?.bpd, exam.biometry2?.hc, exam.biometry2?.ac, exam.biometry2?.fl,
+      gaForPct ?? '',
+    );
+    const efwPct2 = exam.biometry2?.efw && gaForPct
+      ? calcEFWPercentile(exam.biometry2.efw, gaForPct)
+      : undefined;
+
+    biometry2 = {
+      bpd: exam.biometry2?.bpd != null ? withPct(exam.biometry2.bpd, percentiles2?.bpd) : undefined,
+      hc:  exam.biometry2?.hc  != null ? withPct(exam.biometry2.hc,  percentiles2?.hc)  : undefined,
+      ac:  exam.biometry2?.ac  != null ? withPct(exam.biometry2.ac,  percentiles2?.ac)  : undefined,
+      fl:  exam.biometry2?.fl  != null ? withPct(exam.biometry2.fl,  percentiles2?.fl)  : undefined,
+      efw: exam.biometry2?.efw != null
+        ? (efwPct2 !== undefined ? `${fmtBiometry(exam.biometry2.efw)} g (${ordinal(efwPct2)} %ile)` : `${fmtBiometry(exam.biometry2.efw)} g`)
+        : undefined,
+      ofd:       exam.biometry2?.ofd       != null ? `${fmtBiometry(exam.biometry2.ofd)} mm`       : undefined,
+      vp:        exam.biometry2?.vp        != null ? `${fmtBiometry(exam.biometry2.vp)} mm`        : undefined,
+      tcd:       exam.biometry2?.tcd       != null ? `${fmtBiometry(exam.biometry2.tcd)} mm`       : undefined,
+      cm:        exam.biometry2?.cm        != null ? `${fmtBiometry(exam.biometry2.cm)} mm`        : undefined,
+      nuchalFold: exam.biometry2?.nuchalFold != null ? `${fmtBiometry(exam.biometry2.nuchalFold)} mm` : undefined,
+      nb:        exam.biometry2?.nb        != null ? `${fmtBiometry(exam.biometry2.nb)} mm`        : undefined,
+      apad:      exam.biometry2?.apad      != null ? `${fmtBiometry(exam.biometry2.apad)} mm`      : undefined,
+      tad:       exam.biometry2?.tad       != null ? `${fmtBiometry(exam.biometry2.tad)} mm`       : undefined,
+      la:  exam.biometry2?.la != null ? `${fmtBiometry(exam.biometry2.la)} mm` : undefined,
+      lc:  exam.biometry2?.lc != null ? `${fmtBiometry(exam.biometry2.lc)} mm` : undefined,
+    };
+
+    doppler2 = {
+      pi:     exam.doppler2?.pi     != null ? String(exam.doppler2.pi)     : undefined,
+      ri:     exam.doppler2?.ri     != null ? String(exam.doppler2.ri)     : undefined,
+      vessel: exam.doppler2?.vessel ?? undefined,
+      utADexPI: exam.doppler2?.utADexPI != null ? String(exam.doppler2.utADexPI) : undefined,
+      utADexRI: exam.doppler2?.utADexRI != null ? String(exam.doppler2.utADexRI) : undefined,
+      utASinPI: exam.doppler2?.utASinPI != null ? String(exam.doppler2.utASinPI) : undefined,
+      utASinRI: exam.doppler2?.utASinRI != null ? String(exam.doppler2.utASinRI) : undefined,
+      cma:    exam.doppler2?.cma     != null ? String(exam.doppler2.cma)    : undefined,
+      psv:    exam.doppler2?.psv     != null ? String(exam.doppler2.psv)    : undefined,
+      cpr:    exam.doppler2?.cpr     != null ? String(exam.doppler2.cpr)    : undefined,
+      ducVen: exam.doppler2?.ducVen  ?? undefined,
+    };
+
+    ultrasound2 = {
+      presentation: exam.data?.twin2_ultrasound_findings?.presentation,
+      gender: exam.data?.twin2_ultrasound_findings?.gender,
+      heartRate: exam.data?.twin2_ultrasound_findings?.heart_rate != null
+        ? `${exam.data.twin2_ultrasound_findings.heart_rate} bpm`
+        : undefined,
+      fetalMovement: exam.data?.twin2_ultrasound_findings?.fetal_movement,
+      placenta: exam.data?.twin2_ultrasound_findings?.placenta,
+      umbilicalCord: exam.data?.twin2_ultrasound_findings?.umbilical_cord,
+    };
+
+    anatomy2 = {
+      head:     exam.data?.twin2_anatomy?.head,
+      brain:    exam.data?.twin2_anatomy?.brain,
+      heart:    exam.data?.twin2_anatomy?.heart,
+      abdomen:  exam.data?.twin2_anatomy?.abdomen,
+      kidneys:  exam.data?.twin2_anatomy?.kidneys,
+      limbs:    exam.data?.twin2_anatomy?.limbs,
+      skeleton: exam.data?.twin2_anatomy?.skeleton,
+      face:     exam.data?.twin2_anatomy?.face,
+      neckSkin: exam.data?.twin2_anatomy?.neckSkin,
+      spine:    exam.data?.twin2_anatomy?.spine,
+      thorax:   exam.data?.twin2_anatomy?.thorax,
+    };
+  }
+
   return {
     patientName: exam.patientName,
     mrn: exam.mrn,
@@ -145,6 +250,12 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
     gestationalAge: exam.gestationalAge,
     gestationalAgeFromBiometry: exam.gestationalAgeFromBiometry,
     expectedDeliveryDate: lmp ? calcEDD(lmp) : undefined,
+    // uzd-twins: T2 fields
+    gestationalAgeFromBiometry2: exam.gestationalAgeFromBiometry2,
+    biometry2,
+    doppler2,
+    ultrasound2,
+    anatomy2,
 
     biometry: {
       bpd: exam.biometry?.bpd != null ? withPct(exam.biometry.bpd, percentiles?.bpd) : undefined,
