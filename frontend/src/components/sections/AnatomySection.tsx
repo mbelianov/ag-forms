@@ -28,7 +28,7 @@ interface AnatomySectionProps {
   columns?: 4 | 6;
 }
 
-export default function AnatomySection({ prefix, data, errors: _errors, onChange, isSubmitting, columns = 6 }: AnatomySectionProps) {
+export default function AnatomySection({ prefix, data, onChange, isSubmitting, columns = 6 }: AnatomySectionProps) {
   const p = (field: string) => `${prefix}_${field}`;
   const gridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: '0.75rem' };
 
