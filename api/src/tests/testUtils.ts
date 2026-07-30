@@ -197,7 +197,14 @@ export async function createTestExamination(patientId: string): Promise<Examinat
     return {
         ...lookupEntity,
         biometry: JSON.parse(lookupEntity.biometry as any),
-        doppler: JSON.parse(lookupEntity.doppler as any)
+        doppler: JSON.parse(lookupEntity.doppler as any),
+        // uzd-twins: parse Twin 2 fields if present
+        biometry2: lookupEntity.biometry2 && typeof lookupEntity.biometry2 === 'string'
+            ? JSON.parse(lookupEntity.biometry2 as any)
+            : lookupEntity.biometry2,
+        doppler2: lookupEntity.doppler2 && typeof lookupEntity.doppler2 === 'string'
+            ? JSON.parse(lookupEntity.doppler2 as any)
+            : lookupEntity.doppler2,
     } as Examination & any;
 }
 

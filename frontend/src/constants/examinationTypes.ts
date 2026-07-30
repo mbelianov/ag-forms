@@ -5,6 +5,7 @@
 
 export const EXAM_TYPES: ReadonlyArray<{ key: string; label: string }> = [
   { key: 'ultrasound_prenatal', label: 'Ultrasound Prenatal Exam' },
+  { key: 'ultrasound_prenatal_twins', label: 'Ultrasound Prenatal Exam for Twins' },
 ];
 
 /** Returns the human-readable label for a type key; falls back to the key itself. */
@@ -17,6 +18,13 @@ export function getExamTypeLabel(key: string): string {
 // Without an entry the fallback to 'ultrasound_prenatal' silently applies.
 export const SECTION_VISIBILITY: Record<string, Record<string, boolean>> = {
   ultrasound_prenatal: {
+    pregnancyData:      true,
+    ultrasoundFindings: true,
+    anatomy:            true,
+    biometry:           true,
+    doppler:            true,
+  },
+  ultrasound_prenatal_twins: {
     pregnancyData:      true,
     ultrasoundFindings: true,
     anatomy:            true,

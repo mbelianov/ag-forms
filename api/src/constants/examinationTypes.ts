@@ -6,6 +6,7 @@
 
 export const EXAM_TYPES: ReadonlyArray<{ key: string; label: string }> = [
     { key: 'ultrasound_prenatal', label: 'Ultrasound Prenatal Exam' },
+    { key: 'ultrasound_prenatal_twins', label: 'Ultrasound Prenatal Exam for Twins' },
 ];
 
 /** Derived array of valid key strings — use with Joi.valid(...EXAM_TYPE_KEYS) */

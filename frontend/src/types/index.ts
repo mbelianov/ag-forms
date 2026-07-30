@@ -122,6 +122,8 @@ export interface ExaminationData {
   pregnancy_data?: PregnancyData;
   ultrasound_findings?: UltrasoundFindings;
   anatomy?: AnatomyFindings;
+  twin2_ultrasound_findings?: UltrasoundFindings; // uzd-twins: Twin 2
+  twin2_anatomy?: AnatomyFindings;                // uzd-twins: Twin 2
   comments?: string;
 }
 
@@ -137,6 +139,10 @@ export interface Examination {
   examinationType?: string; // TASK-033: e.g. "ultrasound_prenatal"
   biometry?: Biometry;
   doppler?: Doppler;
+  // uzd-twins: Twin 2 fields (absent on single-fetus exams)
+  biometry2?: Biometry;
+  doppler2?: Doppler;
+  gestationalAgeFromBiometry2?: string; // "Xw Yd" — GA from biometry for Twin 2
   notes?: string;
   findings?: string;
   data?: ExaminationData;
@@ -158,6 +164,10 @@ export interface CreateExaminationRequest {
   examinationType?: string; // TASK-033
   biometry?: Biometry;
   doppler?: Doppler;
+  // uzd-twins: Twin 2 fields
+  biometry2?: Biometry;
+  doppler2?: Doppler;
+  gestationalAgeFromBiometry2?: string;
   notes?: string;
   findings?: string;
   data?: ExaminationData;
@@ -172,6 +182,10 @@ export interface UpdateExaminationRequest {
   examinationType?: string; // TASK-033
   biometry?: Biometry;
   doppler?: Doppler;
+  // uzd-twins: Twin 2 fields
+  biometry2?: Biometry;
+  doppler2?: Doppler;
+  gestationalAgeFromBiometry2?: string;
   notes?: string;
   findings?: string;
   data?: ExaminationData;

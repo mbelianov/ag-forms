@@ -105,7 +105,7 @@ Integration tests are excluded from CI — run them locally before pushing.
 ```bash
 git add .
 git commit -m "feat: describe what this commit does"
-git push origin feature/uzd-42-my-feature
+git push origin HEAD # or git push origin feature/uzd-42-my-feature
 ```
 
 This triggers `ci.yml` — unit tests and frontend build run automatically.

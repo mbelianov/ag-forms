@@ -32,6 +32,10 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             gestationalAgeFromBiometry?: string;
             biometry?: any;
             doppler?: any;
+            // uzd-twins: Twin 2 fields
+            biometry2?: any;
+            doppler2?: any;
+            gestationalAgeFromBiometry2?: string;
             findings?: string;
             notes?: string;
             status?: string;
@@ -40,7 +44,7 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             patientAgeAtExam?: number;
         }
         const body = await request.json() as ExaminationCreateBody;
-        const { patientId, examDate, gestationalAge, gestationalAgeFromBiometry, biometry, doppler, findings, notes, status, data, examinationType, patientAgeAtExam } = body;
+        const { patientId, examDate, gestationalAge, gestationalAgeFromBiometry, biometry, doppler, biometry2, doppler2, gestationalAgeFromBiometry2, findings, notes, status, data, examinationType, patientAgeAtExam } = body;
 
         const validation = validateExamination({
             patientId,
@@ -49,6 +53,9 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             gestationalAgeFromBiometry,
             biometry,
             doppler,
+            biometry2,
+            doppler2,
+            gestationalAgeFromBiometry2,
             findings,
             notes,
             status,
@@ -95,6 +102,9 @@ export async function createExamination(request: HttpRequest, context: Invocatio
         const biometryStr = biometry ? JSON.stringify(biometry) : undefined;
         const dopplerStr = doppler ? JSON.stringify(doppler) : undefined;
         const dataStr = data ? JSON.stringify(data) : undefined;
+        // uzd-twins: Twin 2 serialization
+        const biometry2Str = biometry2 ? JSON.stringify(biometry2) : undefined;
+        const doppler2Str = doppler2 ? JSON.stringify(doppler2) : undefined;
 
         // Create primary examination entity (for patient's exam list)
         const primaryExamEntity: Examination & { updatedBy: string; patientNameLower: string } = {
@@ -112,6 +122,10 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             examinationType: examinationType || undefined,
             biometry: biometryStr as any,
             doppler: dopplerStr as any,
+            // uzd-twins: Twin 2 fields
+            biometry2: biometry2Str as any,
+            doppler2: doppler2Str as any,
+            gestationalAgeFromBiometry2: gestationalAgeFromBiometry2 || undefined,
             findings: findings || undefined,
             notes: notes || undefined,
             data: dataStr as any,
@@ -140,6 +154,10 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             examinationType: examinationType || undefined,
             biometry: biometryStr as any,
             doppler: dopplerStr as any,
+            // uzd-twins: Twin 2 fields
+            biometry2: biometry2Str as any,
+            doppler2: doppler2Str as any,
+            gestationalAgeFromBiometry2: gestationalAgeFromBiometry2 || undefined,
             findings: findings || undefined,
             notes: notes || undefined,
             data: dataStr as any,
