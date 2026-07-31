@@ -201,10 +201,7 @@ const dopplerSchema = Joi.object({
         'number.min': 'RI must be a positive value',
         'number.max': 'RI must be between 0 and 1'
     }),
-    vessel: Joi.string().max(100).optional().allow('').messages({
-        'string.max': 'Vessel name must not exceed 100 characters'
-    }),
-    // TASK-036: Extended vascular parameters
+    // TASK-036: Extended vascular parameters (HF-3: vessel removed)
     utADexPI: Joi.number().min(0).max(10).optional(),
     utADexRI: Joi.number().min(0).max(1).optional(),
     utASinPI: Joi.number().min(0).max(10).optional(),
@@ -263,6 +260,43 @@ const anatomySchema = Joi.object({
 }).optional();
 
 /**
+ * UZPT — First Trimester sub-schemas
+ */
+const ftBiometrySchema = Joi.object({
+    crl:       Joi.number().min(0).max(200).optional(),
+    gaFromCrl: Joi.string().pattern(/^\d{1,2}w\s?\d{1}d$/).optional().allow(''),
+    nt:        Joi.number().min(0).max(30).optional(),
+    nb:        Joi.number().min(0).max(30).optional(),
+    puls:      Joi.number().integer().min(0).max(300).optional(),
+}).optional();
+
+const ftMarkersSchema = Joi.object({
+    arrhythmia:              Joi.string().valid('yes', 'no', '').optional().allow(''),
+    tricuspidRegurgitation:  Joi.string().valid('yes', 'no', '').optional().allow(''),
+    abnormalDvFlow:          Joi.string().valid('yes', 'no', '').optional().allow(''),
+    echogenicCardiacFocus:   Joi.string().valid('yes', 'no', '').optional().allow(''),
+    singleUmbilicalArtery:   Joi.string().valid('yes', 'no', '').optional().allow(''),
+    choroidPlexusCysts:      Joi.string().valid('yes', 'no', '').optional().allow(''),
+    exomphalos:              Joi.string().valid('yes', 'no', '').optional().allow(''),
+    megacystis:              Joi.string().valid('yes', 'no', '').optional().allow(''),
+    placenta:                Joi.string().max(500).optional().allow(''),
+    cordInsertion:           Joi.string().max(500).optional().allow(''),
+}).optional();
+
+const ftUltrasoundSchema = Joi.object({
+    placenta:      Joi.string().max(500).optional().allow(''),
+    heartRate:     Joi.number().integer().min(1).max(300).optional(),
+    umbilicalCord: Joi.string().max(500).optional().allow(''),
+}).optional();
+
+const ftDopplerSchema = Joi.object({
+    utADexPI: Joi.number().min(0).max(10).optional(),
+    utADexRI: Joi.number().min(0).max(1).optional(),
+    utASinPI: Joi.number().min(0).max(10).optional(),
+    utASinRI: Joi.number().min(0).max(1).optional(),
+}).optional();
+
+/**
  * Examination clinical data sub-schema
  */
 const examinationDataSchema = Joi.object({
@@ -272,6 +306,17 @@ const examinationDataSchema = Joi.object({
     // uzd-twins: Twin 2 fields
     twin2_ultrasound_findings: ultrasoundFindingsSchema,
     twin2_anatomy: anatomySchema,
+    // UZPT — First Trimester fields
+    ft_biometry:           ftBiometrySchema,
+    ft_markers:            ftMarkersSchema,
+    ft_ultrasound:         ftUltrasoundSchema,
+    ft_anatomy:            anatomySchema,
+    ft_doppler:            ftDopplerSchema,
+    twin2_ft_biometry:     ftBiometrySchema,
+    twin2_ft_markers:      ftMarkersSchema,
+    twin2_ft_ultrasound:   ftUltrasoundSchema,
+    twin2_ft_anatomy:      anatomySchema,
+    twin2_ft_doppler:      ftDopplerSchema,
     comments: Joi.string().max(5000).optional().allow('')
 }).optional();
 

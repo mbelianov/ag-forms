@@ -1,6 +1,8 @@
 import { jsPDF } from 'jspdf';
 import type { ExamPdfViewModel } from '../../services/print.service';
-import { getSectionVisibility } from '../../constants/examinationTypes';
+import { getSectionVisibility, isFirstTrimester, isFtTwins } from '../../constants/examinationTypes';
+import { renderClinicalSections } from './pdfSections';
+import type { PdfDrawHelpers } from './pdfSections';
 
 // ─── Layout constants (mm on A4: 210 × 297) ──────────────────────────────────
 
@@ -165,14 +167,14 @@ function kvGridAt(
     col++;
     if (col >= cols) {
       col = 0;
-      rowY = rowBottom + 5.5;
+      rowY = rowBottom + 3.85;
       rowBottom = rowY;
     }
   });
 
   // col === 0: last row was complete and already flushed; rowY holds the next-row start.
   // col > 0:  last row was partial and never flushed; add pitch from rowBottom.
-  return col === 0 ? rowY : rowBottom + 5.5;
+  return col === 0 ? rowY : rowBottom + 3.85;
 }
 
 /**
@@ -220,6 +222,8 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   const visibility = getSectionVisibility(vm.examinationType);
   // uzd-twins: detect twins exam type
   const isTwins = vm.examinationType === 'ultrasound_prenatal_twins';
+  const isFt = isFirstTrimester(vm.examinationType);
+  const isFtTwinsExam = isFtTwins(vm.examinationType);
   const gaBioDisplay = isTwins
     ? `${vm.gestationalAgeFromBiometry || '—'} / ${vm.gestationalAgeFromBiometry2 || '—'}`
     : vm.gestationalAgeFromBiometry;
@@ -236,7 +240,12 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   doc.setFont(FONT_ID, 'bold');
   doc.setFontSize(13);
   setTextColor(doc, C_DARK);
-  doc.text('Prenatal Ultrasound Report', MARGIN_L, 10);
+  const headerTitle = isFtTwinsExam
+    ? 'УЛТРАЗВУК ПЪРВИ ТРИМЕСТЪР (БЛИЗНАЦИ)'
+    : isFt
+    ? 'УЛТРАЗВУК ПЪРВИ ТРИМЕСТЪР'
+    : 'Prenatal Ultrasound Report';
+  doc.text(headerTitle, MARGIN_L, 10);
 
   doc.setFont(FONT_ID, 'normal');
   doc.setFontSize(8);
@@ -319,97 +328,11 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   }
 
   // ── 3–7. Per-fetus sections ───────────────────────────────────────────────────
-  // Helper to build biometry pairs from a vm.biometry-shaped object
-  const mkBiometryPairs = (b: typeof vm.biometry, gaLabel: string | undefined): Array<[string, string | undefined]> => [
-    ...(gaLabel ? [['GA Bio', gaLabel] as [string, string]] : []),
-    ['BPD', b.bpd], ['HC', b.hc], ['AC', b.ac], ['FL', b.fl], ['EFW', b.efw],
-    ['OFD', b.ofd], ['Vp', b.vp], ['TCD', b.tcd], ['CM', b.cm],
-    ['Nuchal', b.nuchalFold], ['NB', b.nb], ['APAD', b.apad], ['TAD', b.tad],
-    ['LA', b.la], ['LC', b.lc],
-  ];
-  const mkDopplerPairs = (d: typeof vm.doppler): Array<[string, string | undefined]> => [
-    ['PI', d.pi], ['RI', d.ri], ['Vessel', d.vessel], ['Duc.Ven', d.ducVen],
-    ['Dex PI', d.utADexPI], ['Dex RI', d.utADexRI], ['Sin PI', d.utASinPI], ['Sin RI', d.utASinRI],
-    ['CMA', d.cma], ['PSV', d.psv], ['CPR', d.cpr],
-  ];
-  const mkUltraPairs = (u: typeof vm.ultrasound): Array<[string, string | undefined]> => [
-    ['Presentation', u.presentation], ['Gender', u.gender],
-    ['Heart Rate', u.heartRate], ['Fetal Mvmt', u.fetalMovement],
-    ['Placenta', u.placenta], ['Umbilical', u.umbilicalCord],
-  ];
-  const mkAnatomyPairs = (a: typeof vm.anatomy): Array<[string, string | undefined]> => [
-    ['Head', a.head], ['Brain', a.brain], ['Heart', a.heart], ['Abdomen', a.abdomen],
-    ['Kidneys', a.kidneys], ['Limbs', a.limbs], ['Skeleton', a.skeleton],
-    ['Face', a.face], ['Neck Skin', a.neckSkin], ['Spine', a.spine], ['Thorax', a.thorax],
-  ];
-
-  if (!isTwins) {
-    // ── Single-fetus layout (unchanged) ───────────────────────────────────────
-    if (visibility.biometry) {
-      rule(doc, y); y += 4;
-      y = sectionHeading(doc, 'Biometry Measurements', y);
-      y = kvGrid(doc, mkBiometryPairs(vm.biometry, vm.gestationalAgeFromBiometry), y, 3);
-      y += 1;
-    }
-    if (visibility.doppler) {
-      rule(doc, y); y += 4;
-      y = sectionHeading(doc, 'Doppler Measurements', y);
-      y = kvGrid(doc, mkDopplerPairs(vm.doppler), y, 3);
-      y += 1;
-    }
-    if (visibility.ultrasoundFindings) {
-      rule(doc, y); y += 4;
-      y = sectionHeading(doc, 'Ultrasound Findings', y);
-      y = kvGrid(doc, mkUltraPairs(vm.ultrasound), y, 3);
-      y += 1;
-    }
-    if (visibility.anatomy) {
-      rule(doc, y); y += 4;
-      y = sectionHeading(doc, 'Anatomy', y);
-      y = kvGrid(doc, mkAnatomyPairs(vm.anatomy), y, 3);
-      y += 1;
-    }
-  } else {
-    // ── uzd-twins: two-column layout at 8 pt ──────────────────────────────────
-    // Layout: T1 at x=14, T2 at x=108, each 88 mm wide.
-    // Sections rendered in pairs; y advances by max height of each pair.
-    const T1_XEND = T1_X + TWIN_COL_W;
-    const T2_XEND = T2_X + TWIN_COL_W;
-
-    // Twin 1 / Twin 2 column headings
-    rule(doc, y); y += 3;
-    doc.setFont(FONT_ID, 'bold'); doc.setFontSize(9); setTextColor(doc, C_DARK);
-    doc.text('TWIN 1', T1_X, y);
-    doc.text('TWIN 2', T2_X, y);
-    y += 5;
-
-    const renderTwinSection = (
-      label: string,
-      pairs1: Array<[string, string | undefined]>,
-      pairs2: Array<[string, string | undefined]>,
-      cols = 3,
-    ) => {
-      const yStart = y;
-      y = sectionHeadingAt(doc, label, y, T1_X, T1_XEND);
-      const y1after = kvGridAt(doc, pairs1, y, cols, T1_X, TWIN_COL_W, 8);
-      const yH2 = sectionHeadingAt(doc, label, yStart, T2_X, T2_XEND);
-      const y2after = kvGridAt(doc, pairs2, yH2, cols, T2_X, TWIN_COL_W, 8);
-      y = Math.max(y1after, y2after) + 1;
-    };
-
-    if (visibility.biometry && vm.biometry2) {
-      renderTwinSection('Biometry', mkBiometryPairs(vm.biometry, vm.gestationalAgeFromBiometry), mkBiometryPairs(vm.biometry2, vm.gestationalAgeFromBiometry2));
-    }
-    if (visibility.doppler && vm.doppler2) {
-      renderTwinSection('Doppler', mkDopplerPairs(vm.doppler), mkDopplerPairs(vm.doppler2));
-    }
-    if (visibility.ultrasoundFindings && vm.ultrasound2) {
-      renderTwinSection('Ultrasound', mkUltraPairs(vm.ultrasound), mkUltraPairs(vm.ultrasound2), 2);
-    }
-    if (visibility.anatomy && vm.anatomy2) {
-      renderTwinSection('Anatomy', mkAnatomyPairs(vm.anatomy), mkAnatomyPairs(vm.anatomy2));
-    }
-  }
+  const pdfHelpers: PdfDrawHelpers = {
+    rule, sectionHeading, sectionHeadingAt, kvGrid, kvGridAt,
+    TWIN_COL_W, TWIN_GUTTER, T1_X, T2_X, FONT_ID,
+  };
+  y = renderClinicalSections(doc, vm, y, visibility, isTwins, pdfHelpers, isFt, isFtTwinsExam);
 
   // ── 8. Clinical Information — always rendered (matches UI behaviour) ──────────
   rule(doc, y);
@@ -423,11 +346,11 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   y += 2;
 
   // ── 9. Doctor Signature ──────────────────────────────────────────────────────
-  // Dynamic position: pins to bottom on normal reports; overflows to page 2 when
-  // clinical text is unusually long.
-  let sigY = Math.max(y + 12, PAGE_H - 28);
+  const SIG_MAX = PAGE_H - 24.5;
+  const sigYIdeal = Math.max(y + 6, PAGE_H - 28);
+  let sigY = Math.min(sigYIdeal, SIG_MAX);
   let totalPages = 1;
-  if (sigY + 20 > PAGE_H) {
+  if (sigYIdeal > SIG_MAX) {
     // Content overflows page 1 — draw page-1 footer before the page break.
     const p1FooterY = PAGE_H - 8;
     rule(doc, p1FooterY - 3);

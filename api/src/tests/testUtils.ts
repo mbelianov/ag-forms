@@ -160,7 +160,6 @@ export async function createTestExamination(patientId: string): Promise<Examinat
         doppler: JSON.stringify({
             pi: 1.2,
             ri: 0.7,
-            vessel: 'Umbilical Artery'
         }) as any,
         findings: 'Normal findings',
         notes: 'Test notes',

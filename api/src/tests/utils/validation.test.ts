@@ -136,7 +136,6 @@ describe('Validation Utilities', () => {
                 doppler: {
                     pi: 1.2,
                     ri: 0.7,
-                    vessel: 'Umbilical Artery'
                 },
                 notes: 'Normal notes',
                 findings: 'Normal findings'

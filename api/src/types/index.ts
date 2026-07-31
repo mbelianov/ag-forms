@@ -104,12 +104,58 @@ export interface AnatomyFindings {
     thorax?: string;
 }
 
+// UZPT — First Trimester examination interfaces
+export interface FtBiometry {
+    crl?: number;        // Crown-Rump Length, mm
+    gaFromCrl?: string;  // "Xw Yd" — GA calculated from CRL
+    nt?: number;         // Nuchal Translucency, mm
+    nb?: number;         // Nasal Bone, mm
+    puls?: number;       // Fetal heart rate (Puls), bpm
+}
+
+export interface FtMarkers {
+    arrhythmia?: string;
+    tricuspidRegurgitation?: string;
+    abnormalDvFlow?: string;
+    echogenicCardiacFocus?: string;
+    singleUmbilicalArtery?: string;
+    choroidPlexusCysts?: string;
+    exomphalos?: string;
+    megacystis?: string;
+    placenta?: string;        // free-text placenta description
+    cordInsertion?: string;   // free-text cord insertion
+}
+
+export interface FtUltrasoundFindings {
+    placenta?: string;
+    heartRate?: number;    // СЧП, bpm
+    umbilicalCord?: string;
+}
+
+export interface FtDoppler {
+    utADexPI?: number;
+    utADexRI?: number;
+    utASinPI?: number;
+    utASinRI?: number;
+}
+
 export interface ExaminationData {
     pregnancy_data?: PregnancyData;
     ultrasound_findings?: UltrasoundFindings;
     anatomy?: AnatomyFindings;
     twin2_ultrasound_findings?: UltrasoundFindings; // uzd-twins: Twin 2
     twin2_anatomy?: AnatomyFindings;                // uzd-twins: Twin 2
+    // UZPT — First Trimester fields
+    ft_biometry?: FtBiometry;
+    ft_markers?: FtMarkers;
+    ft_ultrasound?: FtUltrasoundFindings;
+    ft_anatomy?: AnatomyFindings;       // reuses existing type
+    ft_doppler?: FtDoppler;
+    twin2_ft_biometry?: FtBiometry;
+    twin2_ft_markers?: FtMarkers;
+    twin2_ft_ultrasound?: FtUltrasoundFindings;
+    twin2_ft_anatomy?: AnatomyFindings;
+    twin2_ft_doppler?: FtDoppler;
     comments?: string;
 }
 
@@ -142,8 +188,7 @@ export interface BiometryData {
 export interface DopplerData {
     pi?: number;     // Pulsatility Index (float)
     ri?: number;     // Resistance Index (float)
-    vessel?: string; // Vessel name (e.g., "Umbilical Artery")
-    // TASK-036: Extended vascular parameters
+    // TASK-036: Extended vascular parameters (HF-3: vessel removed)
     utADexPI?: number;  // A.ut. Dex PI
     utADexRI?: number;  // A.ut. Dex RI
     utASinPI?: number;  // A.ut. Sin PI

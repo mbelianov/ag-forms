@@ -88,6 +88,31 @@ export function calcGAFromBiometry(
 }
 
 /**
+ * Calculate Gestational Age from Crown-Rump Length (CRL).
+ *
+ * Formula:
+ *   GA_days = 8.052 × √( CRL_mm × 1.037 ) + 23.73
+ *
+ * Source:
+ *   Robinson HP. "Sonar measurement of fetal crown-rump length as means of
+ *   assessing maturity in first trimester of pregnancy."
+ *   Br Med J. 1975 Oct 4;4(5986):28–31. PMID 1182090.
+ *   DOI: 10.1136/bmj.4.5986.28
+ *
+ * Valid CRL range: 10–65 mm (approx. 7+0 to 13+6 weeks).
+ * Input must be in mm. Result is rounded to the nearest whole day.
+ *
+ * @param crl - Crown-Rump Length in mm
+ * @returns Gestational age string in "Xw Yd" format, or undefined if input is absent or ≤ 0
+ */
+export function calcGAFromCRL(crl: number | undefined): string | undefined {
+  if (!crl || crl <= 0) return undefined;
+  const totalDays = 8.052 * Math.sqrt(crl * 1.037) + 23.73;
+  // Convert total days to fractional weeks for formatGestationalAge
+  return formatGestationalAge(totalDays / 7);
+}
+
+/**
  * Calculate Estimated Fetal Weight using the Hadlock four-parameter formula.
  * log₁₀(EFW) = 1.335 − 0.0034(AC_cm×FL_cm) + 0.0316(BPD_cm) + 0.0457(AC_cm) + 0.1623(FL_cm)
  * All four parameters are required; returns undefined if any is missing or ≤ 0.
