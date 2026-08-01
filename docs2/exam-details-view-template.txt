@@ -150,33 +150,36 @@ PATH A — ultrasound_prenatal  /  ultrasound_prenatal_twins
   TILE A2 — BIOMETRY MEASUREMENTS
   ────────────────────────────────
                     "BIOMETRY MEASUREMENTS"
-  Layout: 3-column grid (Label | Measurement | GA from Bio)
-  The "GA from Bio" column spans only one row (header + single value cell);
-  the remaining rows in col 3 are empty.
+  Layout: 4-column grid (Measurement | Value | Percentile | GA from Bio)
+  • Col 2 (Value): measurement only, right-aligned (e.g. "10.00 mm")
+  • Col 3 (Percentile): percentile when available (e.g. "1 %-ile"), "—" otherwise
+  • Col 4 (GA from Bio): spans only one row (header + single value cell on BPD row);
+    remaining rows in col 4 are empty.
 
-  ┌──────────────────────┬──────────────────────────┬────────────────┐
-  │ "Measurement"        │ "Value"                  │ "GA from Bio"  │
-  ├──────────────────────┼──────────────────────────┼────────────────┤
-  │ "BPD (mm)"           │ [value] - [N] "%-ile"    │ [ga from bio]  │
-  │ "OFD (mm)"           │ [value]                  │                │
-  │ "HC (mm)"            │ [value] - [N] "%-ile"    │                │
-  │ "TAD (mm)"           │ [value]                  │                │
-  │ "APAD (mm)"          │ [value]                  │                │
-  │ "AC (mm)"            │ [value] - [N] "%-ile"    │                │
-  │ "FL (mm)"            │ [value] - [N] "%-ile"    │                │
-  │ "TCD (mm)"           │ [value]                  │                │
-  │ "Vp (mm)"            │ [value]                  │                │
-  │ "CM (mm)"            │ [value]                  │                │
-  │ "NF (mm)"            │ [value]                  │                │
-  │ "NB (mm)"            │ [value]                  │                │
-  │ "EFW (grams)"        │ [value] - [N] "%-ile"    │                │
-  │ "LA (mm)"            │ [value]                  │                │
-  │ "LC (mm)"            │ [value]                  │                │
-  └──────────────────────┴──────────────────────────┴────────────────┘
+  ┌──────────────────────┬────────────────┬──────────────┬────────────────┐
+  │ "Measurement"        │ "Value"        │ "Percentile" │ "GA from Bio"  │
+  ├──────────────────────┼────────────────┼──────────────┼────────────────┤
+  │ "BPD (mm)"           │ [value]        │ [N] "%-ile"  │ [ga from bio]  │
+  │ "OFD (mm)"           │ [value]        │ "—"          │                │
+  │ "HC (mm)"            │ [value]        │ [N] "%-ile"  │                │
+  │ "TAD (mm)"           │ [value]        │ "—"          │                │
+  │ "APAD (mm)"          │ [value]        │ "—"          │                │
+  │ "AC (mm)"            │ [value]        │ [N] "%-ile"  │                │
+  │ "FL (mm)"            │ [value]        │ [N] "%-ile"  │                │
+  │ "TCD (mm)"           │ [value]        │ "—"          │                │
+  │ "Vp (mm)"            │ [value]        │ "—"          │                │
+  │ "CM (mm)"            │ [value]        │ "—"          │                │
+  │ "NF (mm)"            │ [value]        │ "—"          │                │
+  │ "NB (mm)"            │ [value]        │ "—"          │                │
+  │ "EFW (grams)"        │ [value]        │ [N] "%-ile"  │                │
+  │ "LA (mm)"            │ [value]        │ "—"          │                │
+  │ "LC (mm)"            │ [value]        │ "—"          │                │
+  └──────────────────────┴────────────────┴──────────────┴────────────────┘
 
   Field notes:
-  • Fields with "%-ile" show a percentile only when a reference
-    value exists; otherwise only [value] is displayed.
+  • Percentile fields (BPD, HC, AC, FL, EFW) show "[N] %-ile" when a reference
+    value exists; all other rows show "—" in the Percentile column.
+  • Col 2 (Value) is right-aligned; col 3 (Percentile) is left-aligned.
   • [ga from bio] — gestational age derived from biometry measurements;
     format: Xw Yd (e.g. "28w 3d")
 

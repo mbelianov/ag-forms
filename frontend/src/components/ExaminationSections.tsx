@@ -50,14 +50,28 @@ export default function ExaminationSections({
   const bioLabelStyle: React.CSSProperties = { fontSize: '0.75rem', color: '#525252', whiteSpace: 'nowrap', textAlign: 'left' };
   const bioValueStyle: React.CSSProperties = { fontSize: '0.875rem', color: '#161616', fontWeight: 600, textAlign: 'left' };
 
-  // Sub-Task 5: Updated fmtVal — percentile format: "[value] - [N] %-ile"
-  const fmtVal = (val: number | undefined, unit: string, pct?: number | string) => {
+  // Sub-Task A: fmtVal returns measurement value only (no percentile)
+  const fmtVal = (val: number | undefined, unit: string) => {
     if (val === undefined) return '—';
-    const base = `${fmtBiometry(val)} ${unit}`;
-    return pct !== undefined ? `${base} - ${pct} %-ile` : base;
+    return `${fmtBiometry(val)} ${unit}`;
   };
 
-  // Sub-Task 5: 3-column biometry grid: label | value | GA from Bio/CRL column
+  // Sub-Task A: fmtPct returns percentile string or "—"
+  const fmtPct = (pct?: number | string): string =>
+    pct !== undefined ? `${pct} %-ile` : '—';
+
+  // Sub-Task B: 4-column biometry grid: label | value (right) | percentile | GA from Bio
+  const bioGridStyle4col: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'max-content minmax(6rem, auto) max-content max-content',
+    gap: '0.3rem 1.25rem',
+    alignItems: 'baseline',
+  };
+
+  // Sub-Task B: right-aligned value style for col 2
+  const bioValueRightStyle: React.CSSProperties = { ...bioValueStyle, textAlign: 'right' };
+
+  // FT biometry grid stays 3-column (no percentile column for FT)
   const bioGridStyle3col: React.CSSProperties = {
     display: 'grid',
     gridTemplateColumns: 'max-content minmax(8rem, 1fr) max-content',
@@ -222,61 +236,77 @@ export default function ExaminationSections({
           </>
         )}
 
-        {/* TILE A2 — BIOMETRY MEASUREMENTS — 3-column grid */}
+        {/* TILE A2 — BIOMETRY MEASUREMENTS — 4-column grid */}
         {visibility.biometry && (
           <>
             <div style={{ ...tileTitleStyle }}>Biometry Measurements</div>
-            <div style={bioGridStyle3col}>
-              {/* Header row */}
+            <div style={bioGridStyle4col}>
+              {/* Header row: Measurement | Value | Percentile | GA from Bio */}
               <div style={bioLabelStyle}>Measurement</div>
-              <div style={bioLabelStyle}>Value</div>
+              <div style={{ ...bioLabelStyle, textAlign: 'right' }}>Value</div>
+              <div style={bioLabelStyle}>Percentile</div>
               <div style={bioLabelStyle}>GA from Bio</div>
-              {/* Row 1: BPD — GA from Bio in col 3 */}
+              {/* Row 1: BPD — GA from Bio in col 4 */}
               <div style={bioLabelStyle}>BPD (mm)</div>
-              <div style={bioValueStyle}>{fmtVal(bio?.bpd, 'mm', bpct?.bpd)}</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.bpd, 'mm')}</div>
+              <div style={bioValueStyle}>{fmtPct(bpct?.bpd)}</div>
               <div style={bioValueStyle}>{gaFromBio || '—'}</div>
-              {/* Remaining rows — col 3 empty */}
+              {/* Remaining rows — col 4 empty */}
               <div style={bioLabelStyle}>OFD (mm)</div>
-              <div style={bioValueStyle}>{fmtVal(bio?.ofd, 'mm')}</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.ofd, 'mm')}</div>
+              <div style={bioValueStyle}>{fmtPct(undefined)}</div>
               <div />
               <div style={bioLabelStyle}>HC (mm)</div>
-              <div style={bioValueStyle}>{fmtVal(bio?.hc, 'mm', bpct?.hc)}</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.hc, 'mm')}</div>
+              <div style={bioValueStyle}>{fmtPct(bpct?.hc)}</div>
               <div />
               <div style={bioLabelStyle}>TAD (mm)</div>
-              <div style={bioValueStyle}>{fmtVal(bio?.tad, 'mm')}</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.tad, 'mm')}</div>
+              <div style={bioValueStyle}>{fmtPct(undefined)}</div>
               <div />
               <div style={bioLabelStyle}>APAD (mm)</div>
-              <div style={bioValueStyle}>{fmtVal(bio?.apad, 'mm')}</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.apad, 'mm')}</div>
+              <div style={bioValueStyle}>{fmtPct(undefined)}</div>
               <div />
               <div style={bioLabelStyle}>AC (mm)</div>
-              <div style={bioValueStyle}>{fmtVal(bio?.ac, 'mm', bpct?.ac)}</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.ac, 'mm')}</div>
+              <div style={bioValueStyle}>{fmtPct(bpct?.ac)}</div>
               <div />
               <div style={bioLabelStyle}>FL (mm)</div>
-              <div style={bioValueStyle}>{fmtVal(bio?.fl, 'mm', bpct?.fl)}</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.fl, 'mm')}</div>
+              <div style={bioValueStyle}>{fmtPct(bpct?.fl)}</div>
               <div />
               <div style={bioLabelStyle}>TCD (mm)</div>
-              <div style={bioValueStyle}>{fmtVal(bio?.tcd, 'mm')}</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.tcd, 'mm')}</div>
+              <div style={bioValueStyle}>{fmtPct(undefined)}</div>
               <div />
               <div style={bioLabelStyle}>Vp (mm)</div>
-              <div style={bioValueStyle}>{fmtVal(bio?.vp, 'mm')}</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.vp, 'mm')}</div>
+              <div style={bioValueStyle}>{fmtPct(undefined)}</div>
               <div />
               <div style={bioLabelStyle}>CM (mm)</div>
-              <div style={bioValueStyle}>{fmtVal(bio?.cm, 'mm')}</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.cm, 'mm')}</div>
+              <div style={bioValueStyle}>{fmtPct(undefined)}</div>
               <div />
               <div style={bioLabelStyle}>NF (mm)</div>
-              <div style={bioValueStyle}>{fmtVal(bio?.nuchalFold, 'mm')}</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.nuchalFold, 'mm')}</div>
+              <div style={bioValueStyle}>{fmtPct(undefined)}</div>
               <div />
               <div style={bioLabelStyle}>NB (mm)</div>
-              <div style={bioValueStyle}>{fmtVal(bio?.nb, 'mm')}</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.nb, 'mm')}</div>
+              <div style={bioValueStyle}>{fmtPct(undefined)}</div>
               <div />
               <div style={bioLabelStyle}>EFW (grams)</div>
-              <div style={bioValueStyle}>{fmtVal(bio?.efw, 'g', efwPct)}</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.efw, 'g')}</div>
+              <div style={bioValueStyle}>{fmtPct(efwPct)}</div>
               <div />
               <div style={bioLabelStyle}>LA (mm)</div>
-              <div style={bioValueStyle}>{fmtVal(bio?.la, 'mm')}</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.la, 'mm')}</div>
+              <div style={bioValueStyle}>{fmtPct(undefined)}</div>
               <div />
               <div style={bioLabelStyle}>LC (mm)</div>
-              <div style={bioValueStyle}>{fmtVal(bio?.lc, 'mm')}</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.lc, 'mm')}</div>
+              <div style={bioValueStyle}>{fmtPct(undefined)}</div>
               <div />
             </div>
             {isTwins && (
@@ -358,8 +388,8 @@ export default function ExaminationSections({
                 fontSize: '0.875rem',
                 fontWeight: 600,
                 color: '#161616',
-                borderTop: '3px solid #0f62fe',
-                paddingTop: '0.5rem',
+                borderBottom: '3px solid #0f62fe',
+                paddingBottom: '0.5rem',
                 marginBottom: '0.5rem',
               }}>
                 Single Fetus / Twin 1
@@ -377,8 +407,8 @@ export default function ExaminationSections({
                   fontSize: '0.875rem',
                   fontWeight: 600,
                   color: '#161616',
-                  borderTop: '3px solid #6929c4',
-                  paddingTop: '0.5rem',
+                  borderBottom: '3px solid #6929c4',
+                  paddingBottom: '0.5rem',
                   marginBottom: '0.5rem',
                 }}>
                   Twin 2
@@ -405,8 +435,8 @@ export default function ExaminationSections({
                 fontSize: '0.875rem',
                 fontWeight: 600,
                 color: '#161616',
-                borderTop: '3px solid #0f62fe',
-                paddingTop: '0.5rem',
+                borderBottom: '3px solid #0f62fe',
+                paddingBottom: '0.5rem',
                 marginBottom: '0.5rem',
               }}>
                 Single Fetus / Twin 1
@@ -420,8 +450,8 @@ export default function ExaminationSections({
                   fontSize: '0.875rem',
                   fontWeight: 600,
                   color: '#161616',
-                  borderTop: '3px solid #6929c4',
-                  paddingTop: '0.5rem',
+                  borderBottom: '3px solid #6929c4',
+                  paddingBottom: '0.5rem',
                   marginBottom: '0.5rem',
                 }}>
                   Twin 2
