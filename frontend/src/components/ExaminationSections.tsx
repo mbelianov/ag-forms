@@ -18,6 +18,15 @@ interface ExaminationSectionsProps {
   efwPercentile2: number | undefined;
 }
 
+// Sub-Task 1: Tile section title style — ALL CAPS, 0.875rem, weight 600, #161616
+const tileTitleStyle: React.CSSProperties = {
+  fontSize: '0.875rem',
+  fontWeight: 600,
+  color: '#161616',
+  textTransform: 'uppercase',
+  marginBottom: '1rem',
+};
+
 const fieldBlock = (label: string, value: React.ReactNode) => (
   <div>
     <div style={{ fontSize: '0.75rem', color: '#525252', marginBottom: '0.25rem' }}>{label}</div>
@@ -41,17 +50,17 @@ export default function ExaminationSections({
   const bioLabelStyle: React.CSSProperties = { fontSize: '0.75rem', color: '#525252', whiteSpace: 'nowrap', textAlign: 'left' };
   const bioValueStyle: React.CSSProperties = { fontSize: '0.875rem', color: '#161616', fontWeight: 600, textAlign: 'left' };
 
-  /** Format a biometry value with optional percentile: "32.4 mm · 45th" */
+  // Sub-Task 5: Updated fmtVal — percentile format: "[value] - [N] %-ile"
   const fmtVal = (val: number | undefined, unit: string, pct?: number | string) => {
     if (val === undefined) return '—';
     const base = `${fmtBiometry(val)} ${unit}`;
-    return pct !== undefined ? `${base} · ${pct}th` : base;
+    return pct !== undefined ? `${base} - ${pct} %-ile` : base;
   };
 
-  /** 2-column biometry grid: pairs flow as [label, value] rows, no width cap */
-  const bioGridStyle: React.CSSProperties = {
+  // Sub-Task 5: 3-column biometry grid: label | value | GA from Bio/CRL column
+  const bioGridStyle3col: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: 'max-content minmax(6rem, 1fr)',
+    gridTemplateColumns: 'max-content minmax(8rem, 1fr) max-content',
     gap: '0.3rem 1.25rem',
     alignItems: 'baseline',
   };
@@ -95,40 +104,62 @@ export default function ExaminationSections({
     </div>
   );
 
-  /** Render Ultrasound + Biometry sub-sections for one fetus column. */
-  const renderFtTop = (prefix: 'ft' | 'twin2_ft', label: string, color: string) => {
+  /**
+   * Sub-Task 6: Render Ultrasound + Biometry sub-sections for one FT fetus column.
+   * Biometry is now a 3-column grid with "GA from CRL" in col 3 (first data row only).
+   */
+  const renderFtTop = (prefix: 'ft' | 'twin2_ft') => {
     const d = examination.data;
     const ftB = prefix === 'ft' ? d?.ft_biometry : d?.twin2_ft_biometry;
     const ftU = prefix === 'ft' ? d?.ft_ultrasound : d?.twin2_ft_ultrasound;
     return (
       <div key={prefix}>
-        {isFtTwinsExam && <h3 style={{ marginBottom: '1rem', borderBottom: `2px solid ${color}`, paddingBottom: '0.5rem' }}>{label}</h3>}
-        <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Ultrasound</h4>
+        {/* Sub-Task 6: ULTRASOUND FINDINGS sub-heading uses tileTitleStyle */}
+        <div style={{ ...tileTitleStyle, marginTop: '1rem' }}>Ultrasound Findings</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
           {fieldBlock('Placenta', ftU?.placenta || '—')}
-          {fieldBlock('FHR', ftU?.heartRate !== undefined ? `${ftU.heartRate} bpm` : '—')}
+          {fieldBlock('FHR (bpm)', ftU?.heartRate !== undefined ? `${ftU.heartRate} bpm` : '—')}
           {fieldBlock('Umbilical Cord', ftU?.umbilicalCord || '—')}
         </div>
-        <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Biometry</h4>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
-          {fieldBlock('CRL (mm)', ftB?.crl !== undefined ? `${ftB.crl} mm` : '—')}
-          {fieldBlock('GA from CRL', ftB?.gaFromCrl || '—')}
-          {fieldBlock('NT (mm)', ftB?.nt !== undefined ? `${ftB.nt} mm` : '—')}
-          {fieldBlock('NB (mm)', ftB?.nb !== undefined ? `${ftB.nb} mm` : '—')}
-          {fieldBlock('Heart Rate', ftB?.puls !== undefined ? `${ftB.puls} bpm` : '—')}
+        {/* Sub-Task 6: BIOMETRY MEASUREMENTS sub-heading */}
+        <div style={{ ...tileTitleStyle, marginTop: '1rem' }}>Biometry Measurements</div>
+        {/* Sub-Task 6: 3-column grid: Measurement | Value | GA from CRL (first row only) */}
+        <div style={bioGridStyle3col}>
+          {/* Header row */}
+          <div style={bioLabelStyle}>Measurement</div>
+          <div style={bioLabelStyle}>Value</div>
+          <div style={bioLabelStyle}>GA from CRL</div>
+          {/* Row 1: CRL — GA from CRL value in col 3 */}
+          <div style={bioLabelStyle}>CRL (mm)</div>
+          <div style={bioValueStyle}>{ftB?.crl !== undefined ? `${ftB.crl} mm` : '—'}</div>
+          <div style={bioValueStyle}>{ftB?.gaFromCrl || '—'}</div>
+          {/* Remaining rows — col 3 empty */}
+          <div style={bioLabelStyle}>NT (mm)</div>
+          <div style={bioValueStyle}>{ftB?.nt !== undefined ? `${ftB.nt} mm` : '—'}</div>
+          <div />
+          <div style={bioLabelStyle}>NB (mm)</div>
+          <div style={bioValueStyle}>{ftB?.nb !== undefined ? `${ftB.nb} mm` : '—'}</div>
+          <div />
+          <div style={bioLabelStyle}>Heart Rate (bpm)</div>
+          <div style={bioValueStyle}>{ftB?.puls !== undefined ? `${ftB.puls} bpm` : '—'}</div>
+          <div />
         </div>
       </div>
     );
   };
 
-  /** Render Anatomy + Doppler sub-sections for one fetus column. */
+  /**
+   * Sub-Task 6: Render Anatomy + Doppler sub-sections for one FT fetus column.
+   * Sub-headings use tileTitleStyle.
+   */
   const renderFtBottom = (prefix: 'ft' | 'twin2_ft') => {
     const d = examination.data;
     const ftA = prefix === 'ft' ? d?.ft_anatomy : d?.twin2_ft_anatomy;
     const ftD = prefix === 'ft' ? d?.ft_doppler : d?.twin2_ft_doppler;
     return (
       <div key={`${prefix}_bottom`}>
-        <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Anatomy</h4>
+        {/* Sub-Task 6: ANATOMY sub-heading */}
+        <div style={{ ...tileTitleStyle, marginTop: '1rem' }}>Anatomy</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem' }}>
           {fieldBlock('Head', ftA?.head || '—')}
           {fieldBlock('Brain', ftA?.brain || '—')}
@@ -142,8 +173,9 @@ export default function ExaminationSections({
           {fieldBlock('Spine', ftA?.spine || '—')}
           {fieldBlock('Thorax', ftA?.thorax || '—')}
         </div>
-        <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Doppler</h4>
-        <div style={{ display: 'grid', gridTemplateColumns: '8rem 1fr 1fr', gap: '0.4rem 1rem', alignItems: 'end', width: '50%' }}>
+        {/* Sub-Task 6: DOPPLER MEASUREMENTS sub-heading */}
+        <div style={{ ...tileTitleStyle, marginTop: '1rem' }}>Doppler Measurements</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '8rem 1fr 1fr', gap: '0.4rem 1rem', alignItems: 'end' }}>
           <div />
           <div style={{ fontSize: '0.75rem', color: '#525252' }}>PI</div>
           <div style={{ fontSize: '0.75rem', color: '#525252' }}>RI</div>
@@ -158,320 +190,245 @@ export default function ExaminationSections({
     );
   };
 
-  return (
-    <>
-      {/* UZPT — First Trimester layout (single fetus): Ultrasound → Biometry → Markers → Anatomy → Doppler */}
-      {isFt && !isFtTwinsExam && (
-        <Tile>
-          <h3 style={{ marginBottom: '1.5rem' }}>First Trimester Ultrasound</h3>
-          {renderFtTop('ft', '', '')}
-          <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Markers</h4>
-          {renderMarkers(examination.data?.ft_markers)}
-          {renderFtBottom('ft')}
-        </Tile>
-      )}
-      {/* UZPT — First Trimester layout (twins): Ultrasound → Biometry → Markers (split) → Anatomy → Doppler */}
-      {isFtTwinsExam && (
-        <Tile>
-          <h3 style={{ marginBottom: '1.5rem' }}>First Trimester Ultrasound (Twins)</h3>
-          {/* Ultrasound + Biometry — two columns */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '2rem' }}>
-            {renderFtTop('ft', 'Twin 1', '#0f62fe')}
-            {renderFtTop('twin2_ft', 'Twin 2', '#6929c4')}
-          </div>
-          {/* Markers — full-width row split 50/50: T1 left, T2 right */}
-          <h4 style={{ marginBottom: '0.75rem', marginTop: '1.5rem' }}>Markers</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '2rem' }}>
-            <div>{renderMarkers(examination.data?.ft_markers)}</div>
-            <div>{renderMarkers(examination.data?.twin2_ft_markers)}</div>
-          </div>
-          {/* Anatomy + Doppler — two columns */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '2rem' }}>
-            {renderFtBottom('ft')}
-            {renderFtBottom('twin2_ft')}
-          </div>
-        </Tile>
-      )}
+  /**
+   * Sub-Task 5: Render one prenatal column's content (A1–A4) for a given fetus.
+   * biometry/doppler/anatomy data source is selected by the T1/T2 flag.
+   */
+  const renderPrenatalColumn = (
+    twin2: boolean,
+    bpct: BiometryPercentiles | undefined,
+    efwPct: number | undefined,
+  ) => {
+    const bio = twin2 ? examination.biometry2 : examination.biometry;
+    const gaFromBio = twin2 ? examination.gestationalAgeFromBiometry2 : examination.gestationalAgeFromBiometry;
+    const uf = twin2 ? examination.data?.twin2_ultrasound_findings : examination.data?.ultrasound_findings;
+    const anat = twin2 ? examination.data?.twin2_anatomy : examination.data?.anatomy;
+    const dop = twin2 ? examination.doppler2 : examination.doppler;
 
-      {/* Ultrasound Findings, Biometry, Anatomy, Doppler — single-fetus path (HF-1 order) */}
-      {!isTwins && !isFt && (
-        <>
-          {visibility.ultrasoundFindings && (
-            <Tile>
-              <h3 style={{ marginBottom: '1.5rem' }}>Ultrasound Findings</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-                {fieldBlock('Presentation', examination.data?.ultrasound_findings?.presentation ? <span style={{ textTransform: 'capitalize' }}>{examination.data.ultrasound_findings.presentation}</span> : '—')}
-                {fieldBlock('Gender', examination.data?.ultrasound_findings?.gender ? <span style={{ textTransform: 'capitalize' }}>{examination.data.ultrasound_findings.gender}</span> : '—')}
-                {fieldBlock('Fetal Heart Rate', examination.data?.ultrasound_findings?.heart_rate !== undefined ? `${examination.data.ultrasound_findings.heart_rate} bpm` : '—')}
-                {fieldBlock('Fetal Movement', examination.data?.ultrasound_findings?.fetal_movement ? <span style={{ textTransform: 'capitalize' }}>{examination.data.ultrasound_findings.fetal_movement}</span> : '—')}
-                {fieldBlock('Placenta', examination.data?.ultrasound_findings?.placenta || '—')}
-                {fieldBlock('Umbilical Cord', examination.data?.ultrasound_findings?.umbilical_cord || '—')}
-              </div>
-            </Tile>
-          )}
-
-          {visibility.biometry && (
-          <Tile>
-            <h3 style={{ marginBottom: '1rem' }}>Biometry Measurements</h3>
-            <div style={bioGridStyle}>
-              {bioRow('BPD',  fmtVal(examination.biometry?.bpd,       'mm', biometryPercentiles?.bpd))}
-              {bioRow('OFD',  fmtVal(examination.biometry?.ofd,       'mm'))}
-              {bioRow('HC',   fmtVal(examination.biometry?.hc,        'mm', biometryPercentiles?.hc))}
-              {bioRow('TAD',  fmtVal(examination.biometry?.tad,       'mm'))}
-              {bioRow('APAD', fmtVal(examination.biometry?.apad,      'mm'))}
-              {bioRow('AC',   fmtVal(examination.biometry?.ac,        'mm', biometryPercentiles?.ac))}
-              {bioRow('FL',   fmtVal(examination.biometry?.fl,        'mm', biometryPercentiles?.fl))}
-              {bioRow('TCD',  fmtVal(examination.biometry?.tcd,       'mm'))}
-              {bioRow('Vp',   fmtVal(examination.biometry?.vp,        'mm'))}
-              {bioRow('CM',   fmtVal(examination.biometry?.cm,        'mm'))}
-              {bioRow('NF',   fmtVal(examination.biometry?.nuchalFold,'mm'))}
-              {bioRow('NB',   fmtVal(examination.biometry?.nb,        'mm'))}
-              {bioRow('EFW',  fmtVal(examination.biometry?.efw,       'g',  efwPercentile))}
-              {bioRow('LA',   fmtVal(examination.biometry?.la,        'mm'))}
-              {bioRow('LC',   fmtVal(examination.biometry?.lc,        'mm'))}
-              {bioRow('GA from Bio', examination.gestationalAgeFromBiometry || '—')}
+    return (
+      <div>
+        {/* TILE A1 — ULTRASOUND FINDINGS */}
+        {visibility.ultrasoundFindings && (
+          <>
+            <div style={{ ...tileTitleStyle, marginTop: '0.5rem' }}>Ultrasound Findings</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {fieldBlock('Presentation', uf?.presentation ? <span style={{ textTransform: 'capitalize' }}>{uf.presentation}</span> : '—')}
+              {fieldBlock('Gender', uf?.gender ? <span style={{ textTransform: 'capitalize' }}>{uf.gender}</span> : '—')}
+              {fieldBlock('FHR (bpm)', uf?.heart_rate !== undefined ? `${uf.heart_rate} bpm` : '—')}
+              {fieldBlock('Fetal Movement', uf?.fetal_movement ? <span style={{ textTransform: 'capitalize' }}>{uf.fetal_movement}</span> : '—')}
+              {fieldBlock('Placenta', uf?.placenta || '—')}
+              {fieldBlock('Umbilical Cord', uf?.umbilical_cord || '—')}
             </div>
-          </Tile>
-          )}
+          </>
+        )}
 
-          {visibility.anatomy && (
-            <Tile>
-              <h3 style={{ marginBottom: '1.5rem' }}>Anatomy</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.5rem' }}>
-                {fieldBlock('Head', examination.data?.anatomy?.head || '—')}
-                {fieldBlock('Brain', examination.data?.anatomy?.brain || '—')}
-                {fieldBlock('Heart', examination.data?.anatomy?.heart || '—')}
-                {fieldBlock('Abdomen', examination.data?.anatomy?.abdomen || '—')}
-                {fieldBlock('Kidneys', examination.data?.anatomy?.kidneys || '—')}
-                {fieldBlock('Limbs', examination.data?.anatomy?.limbs || '—')}
-                {fieldBlock('Skeleton', examination.data?.anatomy?.skeleton || '—')}
-                {fieldBlock('Face', examination.data?.anatomy?.face || '—')}
-                {fieldBlock('Neck / Skin', examination.data?.anatomy?.neckSkin || '—')}
-                {fieldBlock('Spine', examination.data?.anatomy?.spine || '—')}
-                {fieldBlock('Thorax', examination.data?.anatomy?.thorax || '—')}
-              </div>
-            </Tile>
-          )}
-
-          {visibility.doppler && (
-          <Tile>
-            <h3 style={{ marginBottom: '1.5rem' }}>Doppler Measurements</h3>
-            {/* Sub-grid A: vessel label | PI | RI  (matches DopplerSection.tsx) */}
-            <div style={{ display: 'grid', gridTemplateColumns: '8rem 1fr 1fr', gap: '0.5rem', alignItems: 'end', marginBottom: '0.5rem' }}>
+        {/* TILE A2 — BIOMETRY MEASUREMENTS — 3-column grid */}
+        {visibility.biometry && (
+          <>
+            <div style={{ ...tileTitleStyle }}>Biometry Measurements</div>
+            <div style={bioGridStyle3col}>
+              {/* Header row */}
+              <div style={bioLabelStyle}>Measurement</div>
+              <div style={bioLabelStyle}>Value</div>
+              <div style={bioLabelStyle}>GA from Bio</div>
+              {/* Row 1: BPD — GA from Bio in col 3 */}
+              <div style={bioLabelStyle}>BPD (mm)</div>
+              <div style={bioValueStyle}>{fmtVal(bio?.bpd, 'mm', bpct?.bpd)}</div>
+              <div style={bioValueStyle}>{gaFromBio || '—'}</div>
+              {/* Remaining rows — col 3 empty */}
+              <div style={bioLabelStyle}>OFD (mm)</div>
+              <div style={bioValueStyle}>{fmtVal(bio?.ofd, 'mm')}</div>
               <div />
+              <div style={bioLabelStyle}>HC (mm)</div>
+              <div style={bioValueStyle}>{fmtVal(bio?.hc, 'mm', bpct?.hc)}</div>
+              <div />
+              <div style={bioLabelStyle}>TAD (mm)</div>
+              <div style={bioValueStyle}>{fmtVal(bio?.tad, 'mm')}</div>
+              <div />
+              <div style={bioLabelStyle}>APAD (mm)</div>
+              <div style={bioValueStyle}>{fmtVal(bio?.apad, 'mm')}</div>
+              <div />
+              <div style={bioLabelStyle}>AC (mm)</div>
+              <div style={bioValueStyle}>{fmtVal(bio?.ac, 'mm', bpct?.ac)}</div>
+              <div />
+              <div style={bioLabelStyle}>FL (mm)</div>
+              <div style={bioValueStyle}>{fmtVal(bio?.fl, 'mm', bpct?.fl)}</div>
+              <div />
+              <div style={bioLabelStyle}>TCD (mm)</div>
+              <div style={bioValueStyle}>{fmtVal(bio?.tcd, 'mm')}</div>
+              <div />
+              <div style={bioLabelStyle}>Vp (mm)</div>
+              <div style={bioValueStyle}>{fmtVal(bio?.vp, 'mm')}</div>
+              <div />
+              <div style={bioLabelStyle}>CM (mm)</div>
+              <div style={bioValueStyle}>{fmtVal(bio?.cm, 'mm')}</div>
+              <div />
+              <div style={bioLabelStyle}>NF (mm)</div>
+              <div style={bioValueStyle}>{fmtVal(bio?.nuchalFold, 'mm')}</div>
+              <div />
+              <div style={bioLabelStyle}>NB (mm)</div>
+              <div style={bioValueStyle}>{fmtVal(bio?.nb, 'mm')}</div>
+              <div />
+              <div style={bioLabelStyle}>EFW (grams)</div>
+              <div style={bioValueStyle}>{fmtVal(bio?.efw, 'g', efwPct)}</div>
+              <div />
+              <div style={bioLabelStyle}>LA (mm)</div>
+              <div style={bioValueStyle}>{fmtVal(bio?.la, 'mm')}</div>
+              <div />
+              <div style={bioLabelStyle}>LC (mm)</div>
+              <div style={bioValueStyle}>{fmtVal(bio?.lc, 'mm')}</div>
+              <div />
+            </div>
+            {isTwins && (
+              <div style={{ fontSize: '0.75rem', color: '#525252', marginTop: '0.25rem', marginBottom: '1rem', fontStyle: 'italic' }}>
+                Percentiles based on singleton Hadlock reference values
+              </div>
+            )}
+          </>
+        )}
+
+        {/* TILE A3 — ANATOMY */}
+        {visibility.anatomy && (
+          <>
+            <div style={{ ...tileTitleStyle, marginTop: '1rem' }}>Anatomy</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {fieldBlock('Head', anat?.head || '—')}
+              {fieldBlock('Brain', anat?.brain || '—')}
+              {fieldBlock('Heart', anat?.heart || '—')}
+              {fieldBlock('Abdomen', anat?.abdomen || '—')}
+              {fieldBlock('Kidneys', anat?.kidneys || '—')}
+              {fieldBlock('Limbs', anat?.limbs || '—')}
+              {fieldBlock('Skeleton', anat?.skeleton || '—')}
+              {fieldBlock('Face', anat?.face || '—')}
+              {fieldBlock('Neck / Skin', anat?.neckSkin || '—')}
+              {fieldBlock('Spine', anat?.spine || '—')}
+              {fieldBlock('Thorax', anat?.thorax || '—')}
+            </div>
+          </>
+        )}
+
+        {/* TILE A4 — DOPPLER MEASUREMENTS */}
+        {visibility.doppler && (
+          <>
+            <div style={{ ...tileTitleStyle, marginTop: '1rem' }}>Doppler Measurements</div>
+            {/* Sub-grid A: Vessel | PI | RI */}
+            <div style={{ display: 'grid', gridTemplateColumns: '8rem 1fr 1fr', gap: '0.5rem', alignItems: 'end', marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.875rem', color: '#525252' }}>Vessel</div>
               <div style={{ fontSize: '0.875rem', color: '#525252', paddingBottom: '0.5rem' }}>PI</div>
               <div style={{ fontSize: '0.875rem', color: '#525252', paddingBottom: '0.5rem' }}>RI</div>
               <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>A. ut. Dex.</div>
-              <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.utADexPI !== undefined ? examination.doppler.utADexPI : '—'}</div>
-              <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.utADexRI !== undefined ? examination.doppler.utADexRI : '—'}</div>
+              {/* Sub-Task 5: value cells use color #161616 + fontWeight 600 */}
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.utADexPI !== undefined ? String(dop.utADexPI) : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.utADexRI !== undefined ? String(dop.utADexRI) : '—'}</div>
               <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>A. ut. Sin.</div>
-              <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.utASinPI !== undefined ? examination.doppler.utASinPI : '—'}</div>
-              <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.utASinRI !== undefined ? examination.doppler.utASinRI : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.utASinPI !== undefined ? String(dop.utASinPI) : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.utASinRI !== undefined ? String(dop.utASinRI) : '—'}</div>
               <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>A. Umb.</div>
-              <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.pi !== undefined ? examination.doppler.pi : '—'}</div>
-              <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.ri !== undefined ? examination.doppler.ri : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.pi !== undefined ? String(dop.pi) : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.ri !== undefined ? String(dop.ri) : '—'}</div>
             </div>
-            {/* Sub-grid B: label | single value */}
+            {/* Sub-grid B: Measurement | Value */}
             <div style={{ display: 'grid', gridTemplateColumns: '8rem 1fr', gap: '0.5rem', alignItems: 'end' }}>
               <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>CMA PI</div>
-              <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.cma !== undefined ? examination.doppler.cma : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.cma !== undefined ? String(dop.cma) : '—'}</div>
               <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>PSV</div>
-              <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.psv !== undefined ? examination.doppler.psv : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.psv !== undefined ? String(dop.psv) : '—'}</div>
               <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>CPR</div>
-              <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.cpr !== undefined ? examination.doppler.cpr : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.cpr !== undefined ? String(dop.cpr) : '—'}</div>
               <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>Duc. Ven.</div>
-              <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.ducVen || '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.ducVen || '—'}</div>
             </div>
-          </Tile>
-          )}
-        </>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      {/* Sub-Task 6: First Trimester layout — single wrapper Tile, 50%/50% outer grid */}
+      {isFt && (
+        <Tile>
+          {/* Sub-Task 6: heading uses tileTitleStyle */}
+          <div style={tileTitleStyle}>First Trimester Ultrasound</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+            {/* Left column: always rendered — Single Fetus / Twin 1 */}
+            <div>
+              <div style={{
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: '#161616',
+                borderTop: '3px solid #0f62fe',
+                paddingTop: '0.5rem',
+                marginBottom: '0.5rem',
+              }}>
+                Single Fetus / Twin 1
+              </div>
+              {renderFtTop('ft')}
+              {/* Sub-Task 6: Markers sub-heading — always rendered for FT */}
+              <div style={{ ...tileTitleStyle, marginTop: '1rem' }}>Markers</div>
+              {renderMarkers(examination.data?.ft_markers)}
+              {renderFtBottom('ft')}
+            </div>
+            {/* Right column: only rendered for twins */}
+            {isFtTwinsExam && (
+              <div>
+                <div style={{
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#161616',
+                  borderTop: '3px solid #6929c4',
+                  paddingTop: '0.5rem',
+                  marginBottom: '0.5rem',
+                }}>
+                  Twin 2
+                </div>
+                {renderFtTop('twin2_ft')}
+                <div style={{ ...tileTitleStyle, marginTop: '1rem' }}>Markers</div>
+                {renderMarkers(examination.data?.twin2_ft_markers)}
+                {renderFtBottom('twin2_ft')}
+              </div>
+            )}
+          </div>
+        </Tile>
       )}
 
-      {/* uzd-twins: Two-column layout for twins exam (HF-1 order: UF → Bio → Anatomy → Doppler) */}
-      {isTwins && !isFt && (
+      {/* Sub-Task 5: Prenatal layout — single wrapper Tile, 50%/50% outer grid */}
+      {!isFt && (
         <Tile>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '2rem' }}>
-            {/* Twin 1 column */}
+          {/* Sub-Task 5: heading uses tileTitleStyle */}
+          <div style={tileTitleStyle}>Ultrasound Prenatal Exam</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+            {/* Left column: always rendered — Single Fetus / Twin 1 */}
             <div>
-              <h3 style={{ marginBottom: '1rem', borderBottom: '2px solid #0f62fe', paddingBottom: '0.5rem' }}>Twin 1</h3>
-              {visibility.ultrasoundFindings && (
-                <>
-                  <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Ultrasound Findings</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
-                    {fieldBlock('Presentation', examination.data?.ultrasound_findings?.presentation || '—')}
-                    {fieldBlock('Gender', examination.data?.ultrasound_findings?.gender || '—')}
-                    {fieldBlock('Heart Rate', examination.data?.ultrasound_findings?.heart_rate !== undefined ? `${examination.data.ultrasound_findings.heart_rate} bpm` : '—')}
-                    {fieldBlock('Fetal Movement', examination.data?.ultrasound_findings?.fetal_movement || '—')}
-                    {fieldBlock('Placenta', examination.data?.ultrasound_findings?.placenta || '—')}
-                    {fieldBlock('Umbilical Cord', examination.data?.ultrasound_findings?.umbilical_cord || '—')}
-                  </div>
-                </>
-              )}
-              {visibility.biometry && (
-                <>
-                  <h4 style={{ marginBottom: '0.5rem', marginTop: '1rem' }}>Biometry</h4>
-                  <div style={bioGridStyle}>
-                    {bioRow('BPD',  fmtVal(examination.biometry?.bpd,       'mm', biometryPercentiles?.bpd))}
-                    {bioRow('OFD',  fmtVal(examination.biometry?.ofd,       'mm'))}
-                    {bioRow('HC',   fmtVal(examination.biometry?.hc,        'mm', biometryPercentiles?.hc))}
-                    {bioRow('TAD',  fmtVal(examination.biometry?.tad,       'mm'))}
-                    {bioRow('APAD', fmtVal(examination.biometry?.apad,      'mm'))}
-                    {bioRow('AC',   fmtVal(examination.biometry?.ac,        'mm', biometryPercentiles?.ac))}
-                    {bioRow('FL',   fmtVal(examination.biometry?.fl,        'mm', biometryPercentiles?.fl))}
-                    {bioRow('TCD',  fmtVal(examination.biometry?.tcd,       'mm'))}
-                    {bioRow('Vp',   fmtVal(examination.biometry?.vp,        'mm'))}
-                    {bioRow('CM',   fmtVal(examination.biometry?.cm,        'mm'))}
-                    {bioRow('NF',   fmtVal(examination.biometry?.nuchalFold,'mm'))}
-                    {bioRow('NB',   fmtVal(examination.biometry?.nb,        'mm'))}
-                    {bioRow('EFW',  fmtVal(examination.biometry?.efw,       'g',  efwPercentile))}
-                    {bioRow('LA',   fmtVal(examination.biometry?.la,        'mm'))}
-                    {bioRow('LC',   fmtVal(examination.biometry?.lc,        'mm'))}
-                    {bioRow('GA from Bio', examination.gestationalAgeFromBiometry || '—')}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#525252', marginTop: '0.25rem', fontStyle: 'italic' }}>Percentiles based on singleton Hadlock reference values</div>
-                </>
-              )}
-              {visibility.anatomy && (
-                <>
-                  <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Anatomy</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem' }}>
-                    {fieldBlock('Head', examination.data?.anatomy?.head || '—')}
-                    {fieldBlock('Brain', examination.data?.anatomy?.brain || '—')}
-                    {fieldBlock('Heart', examination.data?.anatomy?.heart || '—')}
-                    {fieldBlock('Abdomen', examination.data?.anatomy?.abdomen || '—')}
-                    {fieldBlock('Kidneys', examination.data?.anatomy?.kidneys || '—')}
-                    {fieldBlock('Limbs', examination.data?.anatomy?.limbs || '—')}
-                    {fieldBlock('Skeleton', examination.data?.anatomy?.skeleton || '—')}
-                    {fieldBlock('Face', examination.data?.anatomy?.face || '—')}
-                    {fieldBlock('Neck / Skin', examination.data?.anatomy?.neckSkin || '—')}
-                    {fieldBlock('Spine', examination.data?.anatomy?.spine || '—')}
-                    {fieldBlock('Thorax', examination.data?.anatomy?.thorax || '—')}
-                  </div>
-                </>
-              )}
-              {visibility.doppler && (
-                <>
-                  <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Doppler</h4>
-                  {/* Sub-grid A */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '8rem 1fr 1fr', gap: '0.5rem', alignItems: 'end', marginBottom: '0.5rem' }}>
-                    <div />
-                    <div style={{ fontSize: '0.875rem', color: '#525252', paddingBottom: '0.5rem' }}>PI</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', paddingBottom: '0.5rem' }}>RI</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>A. ut. Dex.</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.utADexPI !== undefined ? String(examination.doppler.utADexPI) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.utADexRI !== undefined ? String(examination.doppler.utADexRI) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>A. ut. Sin.</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.utASinPI !== undefined ? String(examination.doppler.utASinPI) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.utASinRI !== undefined ? String(examination.doppler.utASinRI) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>A. Umb.</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.pi !== undefined ? String(examination.doppler.pi) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.ri !== undefined ? String(examination.doppler.ri) : '—'}</div>
-                  </div>
-                  {/* Sub-grid B */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '8rem 1fr', gap: '0.5rem', alignItems: 'end' }}>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>CMA PI</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.cma !== undefined ? String(examination.doppler.cma) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>PSV</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.psv !== undefined ? String(examination.doppler.psv) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>CPR</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.cpr !== undefined ? String(examination.doppler.cpr) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>Duc. Ven.</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler?.ducVen || '—'}</div>
-                  </div>
-                </>
-              )}
+              <div style={{
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: '#161616',
+                borderTop: '3px solid #0f62fe',
+                paddingTop: '0.5rem',
+                marginBottom: '0.5rem',
+              }}>
+                Single Fetus / Twin 1
+              </div>
+              {renderPrenatalColumn(false, biometryPercentiles, efwPercentile)}
             </div>
-
-            {/* Twin 2 column */}
-            <div>
-              <h3 style={{ marginBottom: '1rem', borderBottom: '2px solid #6929c4', paddingBottom: '0.5rem' }}>Twin 2</h3>
-              {visibility.ultrasoundFindings && (
-                <>
-                  <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Ultrasound Findings</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
-                    {fieldBlock('Presentation', examination.data?.twin2_ultrasound_findings?.presentation || '—')}
-                    {fieldBlock('Gender', examination.data?.twin2_ultrasound_findings?.gender || '—')}
-                    {fieldBlock('Heart Rate', examination.data?.twin2_ultrasound_findings?.heart_rate !== undefined ? `${examination.data.twin2_ultrasound_findings.heart_rate} bpm` : '—')}
-                    {fieldBlock('Fetal Movement', examination.data?.twin2_ultrasound_findings?.fetal_movement || '—')}
-                    {fieldBlock('Placenta', examination.data?.twin2_ultrasound_findings?.placenta || '—')}
-                    {fieldBlock('Umbilical Cord', examination.data?.twin2_ultrasound_findings?.umbilical_cord || '—')}
-                  </div>
-                </>
-              )}
-              {visibility.biometry && (
-                <>
-                  <h4 style={{ marginBottom: '0.5rem', marginTop: '1rem' }}>Biometry</h4>
-                  <div style={bioGridStyle}>
-                    {bioRow('BPD',  fmtVal(examination.biometry2?.bpd,       'mm', biometryPercentiles2?.bpd))}
-                    {bioRow('OFD',  fmtVal(examination.biometry2?.ofd,       'mm'))}
-                    {bioRow('HC',   fmtVal(examination.biometry2?.hc,        'mm', biometryPercentiles2?.hc))}
-                    {bioRow('TAD',  fmtVal(examination.biometry2?.tad,       'mm'))}
-                    {bioRow('APAD', fmtVal(examination.biometry2?.apad,      'mm'))}
-                    {bioRow('AC',   fmtVal(examination.biometry2?.ac,        'mm', biometryPercentiles2?.ac))}
-                    {bioRow('FL',   fmtVal(examination.biometry2?.fl,        'mm', biometryPercentiles2?.fl))}
-                    {bioRow('TCD',  fmtVal(examination.biometry2?.tcd,       'mm'))}
-                    {bioRow('Vp',   fmtVal(examination.biometry2?.vp,        'mm'))}
-                    {bioRow('CM',   fmtVal(examination.biometry2?.cm,        'mm'))}
-                    {bioRow('NF',   fmtVal(examination.biometry2?.nuchalFold,'mm'))}
-                    {bioRow('NB',   fmtVal(examination.biometry2?.nb,        'mm'))}
-                    {bioRow('EFW',  fmtVal(examination.biometry2?.efw,       'g',  efwPercentile2))}
-                    {bioRow('LA',   fmtVal(examination.biometry2?.la,        'mm'))}
-                    {bioRow('LC',   fmtVal(examination.biometry2?.lc,        'mm'))}
-                    {bioRow('GA from Bio', examination.gestationalAgeFromBiometry2 || '—')}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#525252', marginTop: '0.25rem', fontStyle: 'italic' }}>Percentiles based on singleton Hadlock reference values</div>
-                </>
-              )}
-              {visibility.anatomy && (
-                <>
-                  <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Anatomy</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem' }}>
-                    {fieldBlock('Head', examination.data?.twin2_anatomy?.head || '—')}
-                    {fieldBlock('Brain', examination.data?.twin2_anatomy?.brain || '—')}
-                    {fieldBlock('Heart', examination.data?.twin2_anatomy?.heart || '—')}
-                    {fieldBlock('Abdomen', examination.data?.twin2_anatomy?.abdomen || '—')}
-                    {fieldBlock('Kidneys', examination.data?.twin2_anatomy?.kidneys || '—')}
-                    {fieldBlock('Limbs', examination.data?.twin2_anatomy?.limbs || '—')}
-                    {fieldBlock('Skeleton', examination.data?.twin2_anatomy?.skeleton || '—')}
-                    {fieldBlock('Face', examination.data?.twin2_anatomy?.face || '—')}
-                    {fieldBlock('Neck / Skin', examination.data?.twin2_anatomy?.neckSkin || '—')}
-                    {fieldBlock('Spine', examination.data?.twin2_anatomy?.spine || '—')}
-                    {fieldBlock('Thorax', examination.data?.twin2_anatomy?.thorax || '—')}
-                  </div>
-                </>
-              )}
-              {visibility.doppler && (
-                <>
-                  <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Doppler</h4>
-                  {/* Sub-grid A */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '8rem 1fr 1fr', gap: '0.5rem', alignItems: 'end', marginBottom: '0.5rem' }}>
-                    <div />
-                    <div style={{ fontSize: '0.875rem', color: '#525252', paddingBottom: '0.5rem' }}>PI</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', paddingBottom: '0.5rem' }}>RI</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>A. ut. Dex.</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler2?.utADexPI !== undefined ? String(examination.doppler2.utADexPI) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler2?.utADexRI !== undefined ? String(examination.doppler2.utADexRI) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>A. ut. Sin.</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler2?.utASinPI !== undefined ? String(examination.doppler2.utASinPI) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler2?.utASinRI !== undefined ? String(examination.doppler2.utASinRI) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>A. Umb.</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler2?.pi !== undefined ? String(examination.doppler2.pi) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler2?.ri !== undefined ? String(examination.doppler2.ri) : '—'}</div>
-                  </div>
-                  {/* Sub-grid B */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '8rem 1fr', gap: '0.5rem', alignItems: 'end' }}>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>CMA PI</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler2?.cma !== undefined ? String(examination.doppler2.cma) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>PSV</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler2?.psv !== undefined ? String(examination.doppler2.psv) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>CPR</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler2?.cpr !== undefined ? String(examination.doppler2.cpr) : '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>Duc. Ven.</div>
-                    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{examination.doppler2?.ducVen || '—'}</div>
-                  </div>
-                </>
-              )}
-            </div>
+            {/* Right column: only rendered for twins */}
+            {isTwins && (
+              <div>
+                <div style={{
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#161616',
+                  borderTop: '3px solid #6929c4',
+                  paddingTop: '0.5rem',
+                  marginBottom: '0.5rem',
+                }}>
+                  Twin 2
+                </div>
+                {renderPrenatalColumn(true, biometryPercentiles2, efwPercentile2)}
+              </div>
+            )}
           </div>
         </Tile>
       )}

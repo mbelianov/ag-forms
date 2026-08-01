@@ -25,6 +25,15 @@ import { getExamTypeLabel, getSectionVisibility, isFirstTrimester, isFtTwins } f
 import type { Examination } from '../types';
 import ExaminationSections from '../components/ExaminationSections';
 
+// Sub-Task 1: Tile section title style — ALL CAPS, 0.875rem, weight 600, #161616
+const tileTitleStyle: React.CSSProperties = {
+  fontSize: '0.875rem',
+  fontWeight: 600,
+  color: '#161616',
+  textTransform: 'uppercase',
+  marginBottom: '1rem',
+};
+
 export default function ExaminationDetailPage() {
 // DR1 audit: verified detail-page field parity and unconditional field rendering for patient, biometry,
 // doppler, anatomy, ultrasound findings, comments, findings, and notes sections.
@@ -262,9 +271,10 @@ export default function ExaminationDetailPage() {
           </Stack>
         </div>
 
-        {/* Status, Date and MRN — ST-04: three-column layout */}
+        {/* Sub-Task 2: Status Bar — three-column grid: Date | MRN | Status */}
         <Tile style={{ backgroundColor: '#f4f4f4', padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', alignItems: 'start' }}>
+            {/* Cell 1: Examination Date + Type */}
             <div>
               <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.5rem' }}>
                 Examination Date
@@ -272,29 +282,30 @@ export default function ExaminationDetailPage() {
               <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#161616' }}>
                 {formatPlainDate(examination.examDate)}
               </div>
-              {/* TASK-033: Examination type */}
               {examination.examinationType && (
                 <div style={{ fontSize: '0.875rem', color: '#525252', marginTop: '0.25rem' }}>
-                  Type: {examination.examinationType.replace(/_/g, ' ')}
+                  Type: {getExamTypeLabel(examination.examinationType)}
                 </div>
               )}
             </div>
+            {/* Cell 2: MRN */}
             <div>
               <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.5rem' }}>MRN</div>
               <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#161616' }}>
                 {examination.mrn || '—'}
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-              <div style={{ fontSize: '0.875rem', color: '#525252' }}>Status</div>
+            {/* Cell 3: Status */}
+            <div>
+              <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.5rem' }}>Status</div>
               {getStatusTag(examination.status)}
             </div>
           </div>
         </Tile>
 
-        {/* Patient Information */}
+        {/* Sub-Task 4: Tile 2 — Patient Information */}
         <Tile>
-          <h3 style={{ marginBottom: '1.5rem' }}>Patient Information</h3>
+          <div style={tileTitleStyle}>Patient Information</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             {fieldBlock(
               'Patient Name',
@@ -306,30 +317,34 @@ export default function ExaminationDetailPage() {
                 {examination.patientName}
               </Link>
             )}
-            {fieldBlock('Patient Age at Exam', examination.patientAgeAtExam !== undefined ? `${examination.patientAgeAtExam} years` : '—')}
+            {/* Sub-Task 4: Label changed from "Patient Age at Exam" to "Age at Examination" */}
+            {fieldBlock('Age at Examination', examination.patientAgeAtExam !== undefined ? `${examination.patientAgeAtExam} years` : '—')}
           </div>
         </Tile>
 
-        {/* Pregnancy Data */}
+        {/* Sub-Task 3: Tile 3 — Pregnancy Data restructured */}
         {visibility.pregnancyData && (
           <Tile>
-            <h3 style={{ marginBottom: '1.5rem' }}>Pregnancy Data</h3>
+            <div style={tileTitleStyle}>Pregnancy Data</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-              {fieldBlock('Gestational Age (from LMP)', examination.gestationalAge || '—')}
+              {/* Row 1: LMP Date | GA from LMP */}
+              {fieldBlock('LMP Date', lmp ? formatPlainDate(lmp) : '—')}
+              {fieldBlock('GA from LMP', examination.gestationalAge || '—')}
+              {/* Row 2: Expected Delivery Date (highlighted) | GA from Bio or GA from CRL */}
+              <div style={{ backgroundColor: '#e8f1ff', padding: '0.5rem', borderRadius: '2px' }}>
+                <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
+                  Expected Delivery Date
+                </div>
+                <div style={{ fontSize: '1rem', fontWeight: 600, color: '#0f62fe' }}>
+                  {edd || '—'}
+                </div>
+              </div>
               {isFt
                 ? fieldBlock('GA from CRL', isFtTwinsExam
                     ? `${examination.data?.ft_biometry?.gaFromCrl || '—'} / ${examination.data?.twin2_ft_biometry?.gaFromCrl || '—'}`
                     : examination.data?.ft_biometry?.gaFromCrl || '—')
-                : fieldBlock('Gestational Age (from Biometry)', examination.gestationalAgeFromBiometry || '—')}
-              <div>
-                <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
-                  Expected Delivery Date (EDD)
-                </div>
-                <div style={{ fontSize: '1rem', fontWeight: 500, color: '#0f62fe' }}>
-                  {edd || '—'}
-                </div>
-              </div>
-              {fieldBlock('Last Menstrual Period (LMP)', lmp ? formatPlainDate(lmp) : '—')}
+                : fieldBlock('GA from Bio', examination.gestationalAgeFromBiometry || '—')}
+              {/* Row 3: Obstetric History | Family History */}
               {fieldBlock('Obstetric History', examination.data?.pregnancy_data?.obstetric_history || '—')}
               {fieldBlock('Family History', examination.data?.pregnancy_data?.family_history || '—')}
             </div>
@@ -345,39 +360,35 @@ export default function ExaminationDetailPage() {
           efwPercentile2={efwPercentile2}
         />
 
-        {/* Clinical Information */}
+        {/* Sub-Task 4: Tile 4 — Findings (renamed from "Clinical Information") */}
         <Tile>
-          <h3 style={{ marginBottom: '1.5rem' }}>Clinical Information</h3>
-          <Stack gap={5}>
-            <div>
-              <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.5rem', fontWeight: 600 }}>Findings</div>
-              {examination.findings ? (
-                <div style={{ fontSize: '1rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{examination.findings}</div>
-              ) : (
-                <div style={{ color: '#525252', fontStyle: 'italic' }}>No findings recorded.</div>
-              )}
-            </div>
-          </Stack>
+          <div style={tileTitleStyle}>Findings</div>
+          {examination.findings ? (
+            <div style={{ fontSize: '1rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{examination.findings}</div>
+          ) : (
+            <div style={{ color: '#525252', fontStyle: 'italic' }}>No findings recorded.</div>
+          )}
         </Tile>
 
-        {/* Comments */}
+        {/* Sub-Task 4: Tile 5 — Comments */}
         <Tile>
-          <h3 style={{ marginBottom: '1.5rem' }}>Comments</h3>
+          <div style={tileTitleStyle}>Comments</div>
           <div style={{ fontSize: '1rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
             {examination.data?.comments || '—'}
           </div>
         </Tile>
 
+        {/* Sub-Task 4: Tile 6 — Notes */}
         <Tile>
-          <h3 style={{ marginBottom: '1.5rem' }}>Notes</h3>
+          <div style={tileTitleStyle}>Notes</div>
           <div style={{ fontSize: '1rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
             {examination.notes || '—'}
           </div>
         </Tile>
 
-        {/* Metadata — TASK-016: show updatedAt */}
+        {/* Sub-Task 4: Tile 7 — Metadata */}
         <Tile>
-          <h3 style={{ marginBottom: '1.5rem' }}>Metadata</h3>
+          <div style={tileTitleStyle}>Metadata</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             {fieldBlock('Created By', examination.createdByName || examination.createdBy)}
             {fieldBlock('Created At', formatDateTime(examination.createdAt))}
