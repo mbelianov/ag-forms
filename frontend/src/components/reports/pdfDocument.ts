@@ -1,4 +1,4 @@
-import { jsPDF } from 'jspdf';
+﻿import { jsPDF } from 'jspdf';
 import type { ExamPdfViewModel } from '../../services/print.service';
 import { getSectionVisibility, isFirstTrimester, isFtTwins } from '../../constants/examinationTypes';
 import { renderClinicalSections } from './pdfSections';
@@ -278,9 +278,6 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   doc.setFontSize(8);
   setTextColor(doc, C_MID);
 
-  doc.text(`Type: ${(vm.examinationType || '—').replace(/_/g, ' ')}`, MARGIN_L, y);
-  y += 4;
-
   doc.text(`Patient age at exam: ${vm.patientAgeAtExam !== undefined ? `${vm.patientAgeAtExam} years` : '—'}`, MARGIN_L, y);
   y += 4;
 
@@ -319,15 +316,61 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   // ── Pregnancy Data ───────────────────────────────────────────────────────────
   if (visibility.pregnancyData) {
     y = sectionHeading(doc, 'Pregnancy Data', y);
-    const pregnancyPairs: Array<[string, string | undefined]> = [
-      ['LMP',              vm.pregnancy.lmp],
-      ['EDD',              vm.expectedDeliveryDate],
-      ['GA from LMP',      vm.gestationalAge],
-      [isFt ? 'GA from CRL' : 'GA from Biometry', isFt ? gaFromCrlDisplay : gaBioDisplay],
-      ['Obstetric History',vm.pregnancy.obstetricHistory],
-      ['Family History',   vm.pregnancy.familyHistory],
-    ];
-    y = kvGrid(doc, pregnancyPairs, y, 2);
+
+    // 3-row x 2-column manual layout per template spec
+    const COL_HALF = COL_W / 2; // 91 mm per column
+    const LABEL_SIZE = 7.5;
+    const VALUE_SIZE = 8;
+    const xL = MARGIN_L;           // left column x
+    const xR = MARGIN_L + COL_HALF; // right column x
+
+    // Helper: draw inline label+value on a single line
+    const drawInlineCell = (x: number, rowY: number, label: string, value: string | undefined, isAccent = false) => {
+      doc.setFont(FONT_ID, 'normal');
+      doc.setFontSize(LABEL_SIZE);
+      setTextColor(doc, C_MID);
+      doc.text(label, x, rowY);
+      doc.setFont(FONT_ID, 'bold');
+      doc.setFontSize(VALUE_SIZE);
+      if (isAccent) {
+        setTextColor(doc, C_ACCENT);
+      } else {
+        setTextColor(doc, C_DARK);
+      }
+      doc.text(value || '\u2014', x + doc.getTextWidth(label), rowY);
+    };
+
+    // Helper: draw stacked label+value (label on rowY, value on rowY+3.5)
+    const drawCell = (x: number, rowY: number, label: string, value: string | undefined, isAccent = false) => {
+      doc.setFont(FONT_ID, 'normal');
+      doc.setFontSize(LABEL_SIZE);
+      setTextColor(doc, C_MID);
+      doc.text(label, x, rowY);
+      doc.setFont(FONT_ID, 'bold');
+      doc.setFontSize(VALUE_SIZE);
+      if (isAccent) {
+        setTextColor(doc, C_ACCENT);
+      } else {
+        setTextColor(doc, C_DARK);
+      }
+      doc.text(value || '\u2014', x, rowY + 3.5);
+    };
+
+    // Row 1: LMP Date | GA from LMP (inline, 5 mm pitch)
+    drawInlineCell(xL, y, 'LMP Date: ',    vm.pregnancy.lmp);
+    drawInlineCell(xR, y, 'GA from LMP: ', vm.gestationalAge);
+    y += 5;
+
+    // Row 2: Expected Delivery Date | GA from CRL / GA from Bio (inline, 5 mm pitch, no bg)
+    drawInlineCell(xL, y, 'Expected Delivery Date: ', vm.expectedDeliveryDate, true);
+    drawInlineCell(xR, y, (isFt ? 'GA from CRL: ' : 'GA from Bio: '), isFt ? gaFromCrlDisplay : gaBioDisplay);
+    y += 5;
+
+    // Row 3: Obstetric History | Family History (stacked, 8 mm pitch)
+    drawCell(xL, y, 'Obstetric History', vm.pregnancy.obstetricHistory);
+    drawCell(xR, y, 'Family History',    vm.pregnancy.familyHistory);
+    y += 8;
+
     y += 1;
   }
 

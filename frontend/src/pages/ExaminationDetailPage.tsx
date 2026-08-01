@@ -343,7 +343,9 @@ export default function ExaminationDetailPage() {
                 ? fieldBlock('GA from CRL', isFtTwinsExam
                     ? `${examination.data?.ft_biometry?.gaFromCrl || '—'} / ${examination.data?.twin2_ft_biometry?.gaFromCrl || '—'}`
                     : examination.data?.ft_biometry?.gaFromCrl || '—')
-                : fieldBlock('GA from Bio', examination.gestationalAgeFromBiometry || '—')}
+                : fieldBlock('GA from Bio', isTwins
+                    ? `${examination.gestationalAgeFromBiometry || '—'} / ${examination.gestationalAgeFromBiometry2 || '—'}`
+                    : examination.gestationalAgeFromBiometry || '—')}
               {/* Row 3: Obstetric History | Family History */}
               {fieldBlock('Obstetric History', examination.data?.pregnancy_data?.obstetric_history || '—')}
               {fieldBlock('Family History', examination.data?.pregnancy_data?.family_history || '—')}

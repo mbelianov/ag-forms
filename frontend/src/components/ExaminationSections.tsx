@@ -141,21 +141,21 @@ export default function ExaminationSections({
         <div style={bioGridStyle3col}>
           {/* Header row */}
           <div style={bioLabelStyle}>Measurement</div>
-          <div style={bioLabelStyle}>Value</div>
+          <div style={{ ...bioLabelStyle, textAlign: 'right' }}>Value</div>
           <div style={bioLabelStyle}>GA from CRL</div>
           {/* Row 1: CRL — GA from CRL value in col 3 */}
           <div style={bioLabelStyle}>CRL (mm)</div>
-          <div style={bioValueStyle}>{ftB?.crl !== undefined ? `${ftB.crl} mm` : '—'}</div>
+          <div style={bioValueRightStyle}>{ftB?.crl !== undefined ? `${ftB.crl} mm` : '—'}</div>
           <div style={bioValueStyle}>{ftB?.gaFromCrl || '—'}</div>
           {/* Remaining rows — col 3 empty */}
           <div style={bioLabelStyle}>NT (mm)</div>
-          <div style={bioValueStyle}>{ftB?.nt !== undefined ? `${ftB.nt} mm` : '—'}</div>
+          <div style={bioValueRightStyle}>{ftB?.nt !== undefined ? `${ftB.nt} mm` : '—'}</div>
           <div />
           <div style={bioLabelStyle}>NB (mm)</div>
-          <div style={bioValueStyle}>{ftB?.nb !== undefined ? `${ftB.nb} mm` : '—'}</div>
+          <div style={bioValueRightStyle}>{ftB?.nb !== undefined ? `${ftB.nb} mm` : '—'}</div>
           <div />
           <div style={bioLabelStyle}>Heart Rate (bpm)</div>
-          <div style={bioValueStyle}>{ftB?.puls !== undefined ? `${ftB.puls} bpm` : '—'}</div>
+          <div style={bioValueRightStyle}>{ftB?.puls !== undefined ? `${ftB.puls} bpm` : '—'}</div>
           <div />
         </div>
       </div>

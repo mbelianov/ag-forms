@@ -1,6 +1,6 @@
 /**
  * viewModelBuilders.ts — extracted from print.service.ts (Sub-Task 0d).
- * Contains buildViewModel and its helpers (fmtDate, ordinal, withPct).
+ * Contains buildViewModel and its helpers (fmtDate, withPct, pctStr).
  * print.service.ts imports buildViewModel from here.
  */
 import {
@@ -26,21 +26,15 @@ function fmtDate(iso: string): string {
   });
 }
 
-function ordinal(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd'];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
-}
-
 function withPct(value: number): string {
   // withPct now returns just the value (no inline percentile) —
   // the row-by-row biometry renderer places percentile in its own column.
   return `${fmtBiometry(value)} mm`;
 }
 
-/** Returns an ordinal percentile string ("15th") or undefined when pct is absent. */
+/** Returns a "N %-ile" percentile string (e.g. "45 %-ile") or undefined when pct is absent. */
 function pctStr(pct: number | undefined): string | undefined {
-  return pct !== undefined ? ordinal(pct) : undefined;
+  return pct !== undefined ? `${pct} %-ile` : undefined;
 }
 
 // ─── Build view model ─────────────────────────────────────────────────────────
