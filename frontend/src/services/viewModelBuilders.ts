@@ -71,16 +71,16 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
   const buildFtBiometry = (b: typeof exam.data.ft_biometry): FtBiometryViewModel | undefined => {
     if (!b) return undefined;
     return {
-      crl:      b.crl  != null ? `${b.crl} мм` : undefined,
+      crl:      b.crl  != null ? `${b.crl} mm` : undefined,
       gaFromCrl: b.gaFromCrl ?? undefined,
-      nt:       b.nt   != null ? `${b.nt} мм` : undefined,
-      nb:       b.nb   != null ? `${b.nb} мм` : undefined,
-      puls:     b.puls != null ? `${b.puls} уд/мин` : undefined,
+      nt:       b.nt   != null ? `${b.nt} mm` : undefined,
+      nb:       b.nb   != null ? `${b.nb} mm` : undefined,
+      puls:     b.puls != null ? `${b.puls} bpm` : undefined,
     };
   };
   const buildFtMarkers = (m: typeof exam.data.ft_markers): FtMarkersViewModel | undefined => {
     if (!m) return undefined;
-    const yn = (v: string | undefined) => v === 'yes' ? 'Да' : v === 'no' ? 'Не' : undefined;
+    const yn = (v: string | undefined) => v === 'yes' ? 'Yes' : v === 'no' ? 'No' : undefined;
     return {
       arrhythmia:             yn(m.arrhythmia),
       tricuspidRegurgitation: yn(m.tricuspidRegurgitation),
@@ -98,7 +98,7 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
     if (!u) return undefined;
     return {
       placenta:     u.placenta ?? undefined,
-      heartRate:    u.heartRate != null ? `${u.heartRate} уд/мин` : undefined,
+      heartRate:    u.heartRate != null ? `${u.heartRate} bpm` : undefined,
       umbilicalCord: u.umbilicalCord ?? undefined,
     };
   };

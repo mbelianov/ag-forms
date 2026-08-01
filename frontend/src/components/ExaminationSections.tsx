@@ -3,6 +3,7 @@
  * Renders the clinical-data sections for an examination: Ultrasound Findings,
  * Biometry, Anatomy, and Doppler — for both single-fetus and twins layouts.
  */
+import { Fragment } from 'react';
 import { Tile } from '@carbon/react';
 import { fmtBiometry } from '../utils/calculations';
 import { getSectionVisibility, isFirstTrimester, isFtTwins } from '../constants/examinationTypes';
@@ -19,8 +20,8 @@ interface ExaminationSectionsProps {
 
 const fieldBlock = (label: string, value: React.ReactNode) => (
   <div>
-    <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>{label}</div>
-    <div style={{ fontSize: '0.875rem', color: '#525252' }}>{value}</div>
+    <div style={{ fontSize: '0.75rem', color: '#525252', marginBottom: '0.25rem' }}>{label}</div>
+    <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{value}</div>
   </div>
 );
 
@@ -36,51 +37,98 @@ export default function ExaminationSections({
   const isFt = isFirstTrimester(examination.examinationType);
   const isFtTwinsExam = isFtTwins(examination.examinationType);
 
-  // Shared cell styles for the biometry 4-column table
-  const labelStyle: React.CSSProperties = { fontSize: '0.875rem', color: '#525252', textAlign: 'left' };
-  const valueStyle: React.CSSProperties = { fontSize: '0.875rem', color: '#525252', textAlign: 'left' };
-  const pctStyle: React.CSSProperties = { fontSize: '0.875rem', color: '#525252', textAlign: 'left' };
+  // Shared cell styles for the biometry / markers grids (Option C alignment)
+  const bioLabelStyle: React.CSSProperties = { fontSize: '0.75rem', color: '#525252', whiteSpace: 'nowrap', textAlign: 'left' };
+  const bioValueStyle: React.CSSProperties = { fontSize: '0.875rem', color: '#161616', fontWeight: 600, textAlign: 'left' };
 
-  // Helper: render a single FT block (used for both T1 and T2 in twins layout)
-  const renderFtBlock = (prefix: 'ft' | 'twin2_ft', label: string, color: string) => {
+  /** Format a biometry value with optional percentile: "32.4 mm · 45th" */
+  const fmtVal = (val: number | undefined, unit: string, pct?: number | string) => {
+    if (val === undefined) return '—';
+    const base = `${fmtBiometry(val)} ${unit}`;
+    return pct !== undefined ? `${base} · ${pct}th` : base;
+  };
+
+  /** 2-column biometry grid: pairs flow as [label, value] rows, no width cap */
+  const bioGridStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'max-content minmax(6rem, 1fr)',
+    gap: '0.3rem 1.25rem',
+    alignItems: 'baseline',
+  };
+
+  /** Render a single biometry row as two cells */
+  const bioRow = (label: string, value: string) => (
+    <>
+      <div style={bioLabelStyle}>{label}</div>
+      <div style={bioValueStyle}>{value}</div>
+    </>
+  );
+
+  /** Markers grid: label col auto-fits to content, value col left-aligned */
+  const markerGridStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'max-content minmax(4rem, auto)',
+    gap: '0.3rem 1.25rem',
+    alignItems: 'baseline',
+    justifyItems: 'start',
+  };
+
+  const yesNo = (v: string | undefined) => v === 'yes' ? 'Yes' : v === 'no' ? 'No' : '—';
+
+  /** Render the Markers sub-section for one fetus. */
+  const renderMarkers = (ftM: typeof examination.data.ft_markers) => (
+    <div style={markerGridStyle}>
+      {([
+        ['Arrhythmia',              yesNo(ftM?.arrhythmia)],
+        ['Tricuspid Regurgitation', yesNo(ftM?.tricuspidRegurgitation)],
+        ['Abnormal D.Venosus Flow', yesNo(ftM?.abnormalDvFlow)],
+        ['Echogenic Cardiac Focus', yesNo(ftM?.echogenicCardiacFocus)],
+        ['Single Umbilical Artery', yesNo(ftM?.singleUmbilicalArtery)],
+        ['Choroid Plexus Cysts',    yesNo(ftM?.choroidPlexusCysts)],
+        ['Exomphalos',              yesNo(ftM?.exomphalos)],
+        ['Megacystis',              yesNo(ftM?.megacystis)],
+        ['Placenta',                ftM?.placenta || '—'],
+        ['Cord Insertion',          ftM?.cordInsertion || '—'],
+      ] as [string, string][]).map(([lbl, val]) => (
+        <Fragment key={lbl}>{bioRow(lbl, val)}</Fragment>
+      ))}
+    </div>
+  );
+
+  /** Render Ultrasound + Biometry sub-sections for one fetus column. */
+  const renderFtTop = (prefix: 'ft' | 'twin2_ft', label: string, color: string) => {
     const d = examination.data;
     const ftB = prefix === 'ft' ? d?.ft_biometry : d?.twin2_ft_biometry;
-    const ftM = prefix === 'ft' ? d?.ft_markers : d?.twin2_ft_markers;
     const ftU = prefix === 'ft' ? d?.ft_ultrasound : d?.twin2_ft_ultrasound;
-    const ftA = prefix === 'ft' ? d?.ft_anatomy : d?.twin2_ft_anatomy;
-    const ftD = prefix === 'ft' ? d?.ft_doppler : d?.twin2_ft_doppler;
-    const yesNo = (v: string | undefined) => v === 'yes' ? 'Да' : v === 'no' ? 'Не' : '—';
     return (
       <div key={prefix}>
         {isFtTwinsExam && <h3 style={{ marginBottom: '1rem', borderBottom: `2px solid ${color}`, paddingBottom: '0.5rem' }}>{label}</h3>}
-        <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>УЗД</h4>
+        <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Ultrasound</h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
-          {fieldBlock('Плацента', ftU?.placenta || '—')}
-          {fieldBlock('СЧП', ftU?.heartRate !== undefined ? `${ftU.heartRate} уд/мин` : '—')}
-          {fieldBlock('Пъпна връв', ftU?.umbilicalCord || '—')}
+          {fieldBlock('Placenta', ftU?.placenta || '—')}
+          {fieldBlock('FHR', ftU?.heartRate !== undefined ? `${ftU.heartRate} bpm` : '—')}
+          {fieldBlock('Umbilical Cord', ftU?.umbilicalCord || '—')}
         </div>
-        <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Биометрия</h4>
+        <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Biometry</h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
-          {fieldBlock('КТР (мм)', ftB?.crl !== undefined ? `${ftB.crl} мм` : '—')}
-          {fieldBlock('ГВ от КТР', ftB?.gaFromCrl || '—')}
-          {fieldBlock('НТ (мм)', ftB?.nt !== undefined ? `${ftB.nt} мм` : '—')}
-          {fieldBlock('НК (мм)', ftB?.nb !== undefined ? `${ftB.nb} мм` : '—')}
-          {fieldBlock('Пулс', ftB?.puls !== undefined ? `${ftB.puls} уд/мин` : '—')}
+          {fieldBlock('CRL (mm)', ftB?.crl !== undefined ? `${ftB.crl} mm` : '—')}
+          {fieldBlock('GA from CRL', ftB?.gaFromCrl || '—')}
+          {fieldBlock('NT (mm)', ftB?.nt !== undefined ? `${ftB.nt} mm` : '—')}
+          {fieldBlock('NB (mm)', ftB?.nb !== undefined ? `${ftB.nb} mm` : '—')}
+          {fieldBlock('Heart Rate', ftB?.puls !== undefined ? `${ftB.puls} bpm` : '—')}
         </div>
-        <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Маркери</h4>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem 0.75rem' }}>
-          {fieldBlock('Аритмия', yesNo(ftM?.arrhythmia))}
-          {fieldBlock('Трикуспидална регуритация', yesNo(ftM?.tricuspidRegurgitation))}
-          {fieldBlock('Абнормен кръвоток D.Venosus', yesNo(ftM?.abnormalDvFlow))}
-          {fieldBlock('Ехогенен сърдечен фикус', yesNo(ftM?.echogenicCardiacFocus))}
-          {fieldBlock('Една пъпна артерия', yesNo(ftM?.singleUmbilicalArtery))}
-          {fieldBlock('Кисти на PL Chorioideus', yesNo(ftM?.choroidPlexusCysts))}
-          {fieldBlock('Exomphalos', yesNo(ftM?.exomphalos))}
-          {fieldBlock('Мегацистис', yesNo(ftM?.megacystis))}
-          {fieldBlock('Плацента', ftM?.placenta || '—')}
-          {fieldBlock('Пъпна връв инсерция', ftM?.cordInsertion || '—')}
-        </div>
-        <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Анатомия</h4>
+      </div>
+    );
+  };
+
+  /** Render Anatomy + Doppler sub-sections for one fetus column. */
+  const renderFtBottom = (prefix: 'ft' | 'twin2_ft') => {
+    const d = examination.data;
+    const ftA = prefix === 'ft' ? d?.ft_anatomy : d?.twin2_ft_anatomy;
+    const ftD = prefix === 'ft' ? d?.ft_doppler : d?.twin2_ft_doppler;
+    return (
+      <div key={`${prefix}_bottom`}>
+        <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Anatomy</h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem' }}>
           {fieldBlock('Head', ftA?.head || '—')}
           {fieldBlock('Brain', ftA?.brain || '—')}
@@ -94,12 +142,17 @@ export default function ExaminationSections({
           {fieldBlock('Spine', ftA?.spine || '—')}
           {fieldBlock('Thorax', ftA?.thorax || '—')}
         </div>
-        <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Доплер</h4>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
-          {fieldBlock('A. ut. Dex. PI', ftD?.utADexPI !== undefined ? String(ftD.utADexPI) : '—')}
-          {fieldBlock('A. ut. Dex. RI', ftD?.utADexRI !== undefined ? String(ftD.utADexRI) : '—')}
-          {fieldBlock('A. ut. Sin. PI', ftD?.utASinPI !== undefined ? String(ftD.utASinPI) : '—')}
-          {fieldBlock('A. ut. Sin. RI', ftD?.utASinRI !== undefined ? String(ftD.utASinRI) : '—')}
+        <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Doppler</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: '8rem 1fr 1fr', gap: '0.4rem 1rem', alignItems: 'end', width: '50%' }}>
+          <div />
+          <div style={{ fontSize: '0.75rem', color: '#525252' }}>PI</div>
+          <div style={{ fontSize: '0.75rem', color: '#525252' }}>RI</div>
+          <div style={{ fontSize: '0.75rem', color: '#525252' }}>A. ut. Dex.</div>
+          <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{ftD?.utADexPI !== undefined ? String(ftD.utADexPI) : '—'}</div>
+          <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{ftD?.utADexRI !== undefined ? String(ftD.utADexRI) : '—'}</div>
+          <div style={{ fontSize: '0.75rem', color: '#525252' }}>A. ut. Sin.</div>
+          <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{ftD?.utASinPI !== undefined ? String(ftD.utASinPI) : '—'}</div>
+          <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{ftD?.utASinRI !== undefined ? String(ftD.utASinRI) : '—'}</div>
         </div>
       </div>
     );
@@ -107,19 +160,35 @@ export default function ExaminationSections({
 
   return (
     <>
-      {/* UZPT — First Trimester layout */}
+      {/* UZPT — First Trimester layout (single fetus): Ultrasound → Biometry → Markers → Anatomy → Doppler */}
       {isFt && !isFtTwinsExam && (
         <Tile>
-          <h3 style={{ marginBottom: '1.5rem' }}>Ултразвук Първи Триместър</h3>
-          {renderFtBlock('ft', 'Twin 1', '#0f62fe')}
+          <h3 style={{ marginBottom: '1.5rem' }}>First Trimester Ultrasound</h3>
+          {renderFtTop('ft', '', '')}
+          <h4 style={{ marginBottom: '0.75rem', marginTop: '1rem' }}>Markers</h4>
+          {renderMarkers(examination.data?.ft_markers)}
+          {renderFtBottom('ft')}
         </Tile>
       )}
+      {/* UZPT — First Trimester layout (twins): Ultrasound → Biometry → Markers (split) → Anatomy → Doppler */}
       {isFtTwinsExam && (
         <Tile>
-          <h3 style={{ marginBottom: '1.5rem' }}>Ултразвук Първи Триместър (Близнаци)</h3>
+          <h3 style={{ marginBottom: '1.5rem' }}>First Trimester Ultrasound (Twins)</h3>
+          {/* Ultrasound + Biometry — two columns */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '2rem' }}>
-            {renderFtBlock('ft', 'Twin 1', '#0f62fe')}
-            {renderFtBlock('twin2_ft', 'Twin 2', '#6929c4')}
+            {renderFtTop('ft', 'Twin 1', '#0f62fe')}
+            {renderFtTop('twin2_ft', 'Twin 2', '#6929c4')}
+          </div>
+          {/* Markers — full-width row split 50/50: T1 left, T2 right */}
+          <h4 style={{ marginBottom: '0.75rem', marginTop: '1.5rem' }}>Markers</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '2rem' }}>
+            <div>{renderMarkers(examination.data?.ft_markers)}</div>
+            <div>{renderMarkers(examination.data?.twin2_ft_markers)}</div>
+          </div>
+          {/* Anatomy + Doppler — two columns */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '2rem' }}>
+            {renderFtBottom('ft')}
+            {renderFtBottom('twin2_ft')}
           </div>
         </Tile>
       )}
@@ -144,58 +213,23 @@ export default function ExaminationSections({
           {visibility.biometry && (
           <Tile>
             <h3 style={{ marginBottom: '1rem' }}>Biometry Measurements</h3>
-            {/* 4 columns: label | value | percentile | GA from Bio (BPD row only) */}
-            <div style={{ display: 'grid', gridTemplateColumns: '6rem 1fr 4rem 6rem', gap: '0.4rem 1.25rem', alignItems: 'end', width: '50%' }}>
-              <div style={labelStyle}>BPD</div>
-              <div style={valueStyle}>{examination.biometry?.bpd !== undefined ? `${fmtBiometry(examination.biometry.bpd)} mm` : '—'}</div>
-              <div style={pctStyle}>{biometryPercentiles?.bpd !== undefined ? `${biometryPercentiles.bpd}th` : ''}</div>
-              <div><div style={labelStyle}>GA from Bio</div><div style={valueStyle}>{examination.gestationalAgeFromBiometry || '—'}</div></div>
-              <div style={labelStyle}>OFD</div>
-              <div style={valueStyle}>{examination.biometry?.ofd !== undefined ? `${fmtBiometry(examination.biometry.ofd)} mm` : '—'}</div>
-              <div /><div />
-              <div style={labelStyle}>HC</div>
-              <div style={valueStyle}>{examination.biometry?.hc !== undefined ? `${fmtBiometry(examination.biometry.hc)} mm` : '—'}</div>
-              <div style={pctStyle}>{biometryPercentiles?.hc !== undefined ? `${biometryPercentiles.hc}th` : ''}</div>
-              <div />
-              <div style={labelStyle}>TAD</div>
-              <div style={valueStyle}>{examination.biometry?.tad !== undefined ? `${fmtBiometry(examination.biometry.tad)} mm` : '—'}</div>
-              <div /><div />
-              <div style={labelStyle}>APAD</div>
-              <div style={valueStyle}>{examination.biometry?.apad !== undefined ? `${fmtBiometry(examination.biometry.apad)} mm` : '—'}</div>
-              <div /><div />
-              <div style={labelStyle}>AC</div>
-              <div style={valueStyle}>{examination.biometry?.ac !== undefined ? `${fmtBiometry(examination.biometry.ac)} mm` : '—'}</div>
-              <div style={pctStyle}>{biometryPercentiles?.ac !== undefined ? `${biometryPercentiles.ac}th` : ''}</div>
-              <div />
-              <div style={labelStyle}>FL</div>
-              <div style={valueStyle}>{examination.biometry?.fl !== undefined ? `${fmtBiometry(examination.biometry.fl)} mm` : '—'}</div>
-              <div style={pctStyle}>{biometryPercentiles?.fl !== undefined ? `${biometryPercentiles.fl}th` : ''}</div>
-              <div />
-              <div style={labelStyle}>TCD</div>
-              <div style={valueStyle}>{examination.biometry?.tcd !== undefined ? `${fmtBiometry(examination.biometry.tcd)} mm` : '—'}</div>
-              <div /><div />
-              <div style={labelStyle}>Vp</div>
-              <div style={valueStyle}>{examination.biometry?.vp !== undefined ? `${fmtBiometry(examination.biometry.vp)} mm` : '—'}</div>
-              <div /><div />
-              <div style={labelStyle}>CM</div>
-              <div style={valueStyle}>{examination.biometry?.cm !== undefined ? `${fmtBiometry(examination.biometry.cm)} mm` : '—'}</div>
-              <div /><div />
-              <div style={labelStyle}>NF</div>
-              <div style={valueStyle}>{examination.biometry?.nuchalFold !== undefined ? `${fmtBiometry(examination.biometry.nuchalFold)} mm` : '—'}</div>
-              <div /><div />
-              <div style={labelStyle}>NB</div>
-              <div style={valueStyle}>{examination.biometry?.nb !== undefined ? `${fmtBiometry(examination.biometry.nb)} mm` : '—'}</div>
-              <div /><div />
-              <div style={labelStyle}>EFW</div>
-              <div style={valueStyle}>{examination.biometry?.efw !== undefined ? `${fmtBiometry(examination.biometry.efw)} g` : '—'}</div>
-              <div style={pctStyle}>{efwPercentile !== undefined ? `${efwPercentile}th` : ''}</div>
-              <div />
-              <div style={labelStyle}>LA</div>
-              <div style={valueStyle}>{examination.biometry?.la !== undefined ? `${fmtBiometry(examination.biometry.la)} mm` : '—'}</div>
-              <div /><div />
-              <div style={labelStyle}>LC</div>
-              <div style={valueStyle}>{examination.biometry?.lc !== undefined ? `${fmtBiometry(examination.biometry.lc)} mm` : '—'}</div>
-              <div /><div />
+            <div style={bioGridStyle}>
+              {bioRow('BPD',  fmtVal(examination.biometry?.bpd,       'mm', biometryPercentiles?.bpd))}
+              {bioRow('OFD',  fmtVal(examination.biometry?.ofd,       'mm'))}
+              {bioRow('HC',   fmtVal(examination.biometry?.hc,        'mm', biometryPercentiles?.hc))}
+              {bioRow('TAD',  fmtVal(examination.biometry?.tad,       'mm'))}
+              {bioRow('APAD', fmtVal(examination.biometry?.apad,      'mm'))}
+              {bioRow('AC',   fmtVal(examination.biometry?.ac,        'mm', biometryPercentiles?.ac))}
+              {bioRow('FL',   fmtVal(examination.biometry?.fl,        'mm', biometryPercentiles?.fl))}
+              {bioRow('TCD',  fmtVal(examination.biometry?.tcd,       'mm'))}
+              {bioRow('Vp',   fmtVal(examination.biometry?.vp,        'mm'))}
+              {bioRow('CM',   fmtVal(examination.biometry?.cm,        'mm'))}
+              {bioRow('NF',   fmtVal(examination.biometry?.nuchalFold,'mm'))}
+              {bioRow('NB',   fmtVal(examination.biometry?.nb,        'mm'))}
+              {bioRow('EFW',  fmtVal(examination.biometry?.efw,       'g',  efwPercentile))}
+              {bioRow('LA',   fmtVal(examination.biometry?.la,        'mm'))}
+              {bioRow('LC',   fmtVal(examination.biometry?.lc,        'mm'))}
+              {bioRow('GA from Bio', examination.gestationalAgeFromBiometry || '—')}
             </div>
           </Tile>
           )}
@@ -276,58 +310,23 @@ export default function ExaminationSections({
               {visibility.biometry && (
                 <>
                   <h4 style={{ marginBottom: '0.5rem', marginTop: '1rem' }}>Biometry</h4>
-                  {/* 4 columns: label | value | percentile | GA from Bio (BPD row only) */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '6rem 1fr 4rem 6rem', gap: '0.4rem 1.25rem', alignItems: 'end', width: '100%' }}>
-                    <div style={labelStyle}>BPD</div>
-                    <div style={valueStyle}>{examination.biometry?.bpd !== undefined ? `${fmtBiometry(examination.biometry.bpd)} mm` : '—'}</div>
-                    <div style={pctStyle}>{biometryPercentiles?.bpd !== undefined ? `${biometryPercentiles.bpd}th` : ''}</div>
-                    <div><div style={labelStyle}>GA from Bio</div><div style={valueStyle}>{examination.gestationalAgeFromBiometry || '—'}</div></div>
-                    <div style={labelStyle}>OFD</div>
-                    <div style={valueStyle}>{examination.biometry?.ofd !== undefined ? `${fmtBiometry(examination.biometry.ofd)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>HC</div>
-                    <div style={valueStyle}>{examination.biometry?.hc !== undefined ? `${fmtBiometry(examination.biometry.hc)} mm` : '—'}</div>
-                    <div style={pctStyle}>{biometryPercentiles?.hc !== undefined ? `${biometryPercentiles.hc}th` : ''}</div>
-                    <div />
-                    <div style={labelStyle}>TAD</div>
-                    <div style={valueStyle}>{examination.biometry?.tad !== undefined ? `${fmtBiometry(examination.biometry.tad)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>APAD</div>
-                    <div style={valueStyle}>{examination.biometry?.apad !== undefined ? `${fmtBiometry(examination.biometry.apad)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>AC</div>
-                    <div style={valueStyle}>{examination.biometry?.ac !== undefined ? `${fmtBiometry(examination.biometry.ac)} mm` : '—'}</div>
-                    <div style={pctStyle}>{biometryPercentiles?.ac !== undefined ? `${biometryPercentiles.ac}th` : ''}</div>
-                    <div />
-                    <div style={labelStyle}>FL</div>
-                    <div style={valueStyle}>{examination.biometry?.fl !== undefined ? `${fmtBiometry(examination.biometry.fl)} mm` : '—'}</div>
-                    <div style={pctStyle}>{biometryPercentiles?.fl !== undefined ? `${biometryPercentiles.fl}th` : ''}</div>
-                    <div />
-                    <div style={labelStyle}>TCD</div>
-                    <div style={valueStyle}>{examination.biometry?.tcd !== undefined ? `${fmtBiometry(examination.biometry.tcd)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>Vp</div>
-                    <div style={valueStyle}>{examination.biometry?.vp !== undefined ? `${fmtBiometry(examination.biometry.vp)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>CM</div>
-                    <div style={valueStyle}>{examination.biometry?.cm !== undefined ? `${fmtBiometry(examination.biometry.cm)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>NF</div>
-                    <div style={valueStyle}>{examination.biometry?.nuchalFold !== undefined ? `${fmtBiometry(examination.biometry.nuchalFold)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>NB</div>
-                    <div style={valueStyle}>{examination.biometry?.nb !== undefined ? `${fmtBiometry(examination.biometry.nb)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>EFW</div>
-                    <div style={valueStyle}>{examination.biometry?.efw !== undefined ? `${fmtBiometry(examination.biometry.efw)} g` : '—'}</div>
-                    <div style={pctStyle}>{efwPercentile !== undefined ? `${efwPercentile}th` : ''}</div>
-                    <div />
-                    <div style={labelStyle}>LA</div>
-                    <div style={valueStyle}>{examination.biometry?.la !== undefined ? `${fmtBiometry(examination.biometry.la)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>LC</div>
-                    <div style={valueStyle}>{examination.biometry?.lc !== undefined ? `${fmtBiometry(examination.biometry.lc)} mm` : '—'}</div>
-                    <div /><div />
+                  <div style={bioGridStyle}>
+                    {bioRow('BPD',  fmtVal(examination.biometry?.bpd,       'mm', biometryPercentiles?.bpd))}
+                    {bioRow('OFD',  fmtVal(examination.biometry?.ofd,       'mm'))}
+                    {bioRow('HC',   fmtVal(examination.biometry?.hc,        'mm', biometryPercentiles?.hc))}
+                    {bioRow('TAD',  fmtVal(examination.biometry?.tad,       'mm'))}
+                    {bioRow('APAD', fmtVal(examination.biometry?.apad,      'mm'))}
+                    {bioRow('AC',   fmtVal(examination.biometry?.ac,        'mm', biometryPercentiles?.ac))}
+                    {bioRow('FL',   fmtVal(examination.biometry?.fl,        'mm', biometryPercentiles?.fl))}
+                    {bioRow('TCD',  fmtVal(examination.biometry?.tcd,       'mm'))}
+                    {bioRow('Vp',   fmtVal(examination.biometry?.vp,        'mm'))}
+                    {bioRow('CM',   fmtVal(examination.biometry?.cm,        'mm'))}
+                    {bioRow('NF',   fmtVal(examination.biometry?.nuchalFold,'mm'))}
+                    {bioRow('NB',   fmtVal(examination.biometry?.nb,        'mm'))}
+                    {bioRow('EFW',  fmtVal(examination.biometry?.efw,       'g',  efwPercentile))}
+                    {bioRow('LA',   fmtVal(examination.biometry?.la,        'mm'))}
+                    {bioRow('LC',   fmtVal(examination.biometry?.lc,        'mm'))}
+                    {bioRow('GA from Bio', examination.gestationalAgeFromBiometry || '—')}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: '#525252', marginTop: '0.25rem', fontStyle: 'italic' }}>Percentiles based on singleton Hadlock reference values</div>
                 </>
@@ -402,58 +401,23 @@ export default function ExaminationSections({
               {visibility.biometry && (
                 <>
                   <h4 style={{ marginBottom: '0.5rem', marginTop: '1rem' }}>Biometry</h4>
-                  {/* 4 columns: label | value | percentile | GA from Bio (BPD row only) */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '6rem 1fr 4rem 6rem', gap: '0.4rem 1.25rem', alignItems: 'end', width: '100%' }}>
-                    <div style={labelStyle}>BPD</div>
-                    <div style={valueStyle}>{examination.biometry2?.bpd !== undefined ? `${fmtBiometry(examination.biometry2.bpd)} mm` : '—'}</div>
-                    <div style={pctStyle}>{biometryPercentiles2?.bpd !== undefined ? `${biometryPercentiles2.bpd}th` : ''}</div>
-                    <div><div style={labelStyle}>GA from Bio</div><div style={valueStyle}>{examination.gestationalAgeFromBiometry2 || '—'}</div></div>
-                    <div style={labelStyle}>OFD</div>
-                    <div style={valueStyle}>{examination.biometry2?.ofd !== undefined ? `${fmtBiometry(examination.biometry2.ofd)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>HC</div>
-                    <div style={valueStyle}>{examination.biometry2?.hc !== undefined ? `${fmtBiometry(examination.biometry2.hc)} mm` : '—'}</div>
-                    <div style={pctStyle}>{biometryPercentiles2?.hc !== undefined ? `${biometryPercentiles2.hc}th` : ''}</div>
-                    <div />
-                    <div style={labelStyle}>TAD</div>
-                    <div style={valueStyle}>{examination.biometry2?.tad !== undefined ? `${fmtBiometry(examination.biometry2.tad)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>APAD</div>
-                    <div style={valueStyle}>{examination.biometry2?.apad !== undefined ? `${fmtBiometry(examination.biometry2.apad)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>AC</div>
-                    <div style={valueStyle}>{examination.biometry2?.ac !== undefined ? `${fmtBiometry(examination.biometry2.ac)} mm` : '—'}</div>
-                    <div style={pctStyle}>{biometryPercentiles2?.ac !== undefined ? `${biometryPercentiles2.ac}th` : ''}</div>
-                    <div />
-                    <div style={labelStyle}>FL</div>
-                    <div style={valueStyle}>{examination.biometry2?.fl !== undefined ? `${fmtBiometry(examination.biometry2.fl)} mm` : '—'}</div>
-                    <div style={pctStyle}>{biometryPercentiles2?.fl !== undefined ? `${biometryPercentiles2.fl}th` : ''}</div>
-                    <div />
-                    <div style={labelStyle}>TCD</div>
-                    <div style={valueStyle}>{examination.biometry2?.tcd !== undefined ? `${fmtBiometry(examination.biometry2.tcd)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>Vp</div>
-                    <div style={valueStyle}>{examination.biometry2?.vp !== undefined ? `${fmtBiometry(examination.biometry2.vp)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>CM</div>
-                    <div style={valueStyle}>{examination.biometry2?.cm !== undefined ? `${fmtBiometry(examination.biometry2.cm)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>NF</div>
-                    <div style={valueStyle}>{examination.biometry2?.nuchalFold !== undefined ? `${fmtBiometry(examination.biometry2.nuchalFold)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>NB</div>
-                    <div style={valueStyle}>{examination.biometry2?.nb !== undefined ? `${fmtBiometry(examination.biometry2.nb)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>EFW</div>
-                    <div style={valueStyle}>{examination.biometry2?.efw !== undefined ? `${fmtBiometry(examination.biometry2.efw)} g` : '—'}</div>
-                    <div style={pctStyle}>{efwPercentile2 !== undefined ? `${efwPercentile2}th` : ''}</div>
-                    <div />
-                    <div style={labelStyle}>LA</div>
-                    <div style={valueStyle}>{examination.biometry2?.la !== undefined ? `${fmtBiometry(examination.biometry2.la)} mm` : '—'}</div>
-                    <div /><div />
-                    <div style={labelStyle}>LC</div>
-                    <div style={valueStyle}>{examination.biometry2?.lc !== undefined ? `${fmtBiometry(examination.biometry2.lc)} mm` : '—'}</div>
-                    <div /><div />
+                  <div style={bioGridStyle}>
+                    {bioRow('BPD',  fmtVal(examination.biometry2?.bpd,       'mm', biometryPercentiles2?.bpd))}
+                    {bioRow('OFD',  fmtVal(examination.biometry2?.ofd,       'mm'))}
+                    {bioRow('HC',   fmtVal(examination.biometry2?.hc,        'mm', biometryPercentiles2?.hc))}
+                    {bioRow('TAD',  fmtVal(examination.biometry2?.tad,       'mm'))}
+                    {bioRow('APAD', fmtVal(examination.biometry2?.apad,      'mm'))}
+                    {bioRow('AC',   fmtVal(examination.biometry2?.ac,        'mm', biometryPercentiles2?.ac))}
+                    {bioRow('FL',   fmtVal(examination.biometry2?.fl,        'mm', biometryPercentiles2?.fl))}
+                    {bioRow('TCD',  fmtVal(examination.biometry2?.tcd,       'mm'))}
+                    {bioRow('Vp',   fmtVal(examination.biometry2?.vp,        'mm'))}
+                    {bioRow('CM',   fmtVal(examination.biometry2?.cm,        'mm'))}
+                    {bioRow('NF',   fmtVal(examination.biometry2?.nuchalFold,'mm'))}
+                    {bioRow('NB',   fmtVal(examination.biometry2?.nb,        'mm'))}
+                    {bioRow('EFW',  fmtVal(examination.biometry2?.efw,       'g',  efwPercentile2))}
+                    {bioRow('LA',   fmtVal(examination.biometry2?.la,        'mm'))}
+                    {bioRow('LC',   fmtVal(examination.biometry2?.lc,        'mm'))}
+                    {bioRow('GA from Bio', examination.gestationalAgeFromBiometry2 || '—')}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: '#525252', marginTop: '0.25rem', fontStyle: 'italic' }}>Percentiles based on singleton Hadlock reference values</div>
                 </>

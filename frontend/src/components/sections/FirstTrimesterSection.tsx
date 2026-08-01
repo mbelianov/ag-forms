@@ -8,7 +8,7 @@
  * DOI 10.1136/bmj.4.5986.28. Valid CRL range: 10–65 mm (7+0 to 13+6 weeks).
  * calcGAFromCRL is defined in frontend/src/utils/calculations.ts.
  */
-import { TextInput, Button, FormGroup, Select, SelectItem } from '@carbon/react';
+import { TextInput, Button, FormGroup, RadioButtonGroup, RadioButton } from '@carbon/react';
 import AnatomySection from './AnatomySection';
 import type { AnatomySectionFormData } from './AnatomySection';
 import { calcGAFromCRL } from '../../utils/calculations';
@@ -56,7 +56,7 @@ interface FirstTrimesterSectionProps {
 }
 
 const calcButtonWrap: React.CSSProperties = { display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' };
-const labelStyle: React.CSSProperties = { fontSize: '0.875rem', color: '#525252', alignSelf: 'center' };
+const labelStyle: React.CSSProperties = { fontSize: '0.875rem', color: '#525252', alignSelf: 'center', textAlign: 'left' };
 
 export default function FirstTrimesterSection({ prefix, data, errors, onChange, isSubmitting }: FirstTrimesterSectionProps) {
   const p = (field: string) => `${prefix}_${field}`;
@@ -90,12 +90,12 @@ export default function FirstTrimesterSection({ prefix, data, errors, onChange, 
   return (
     <div>
       {/* ── FT Ultrasound ───────────────────────────────────────────────────── */}
-      <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>УЗД (Ултразвук)</h5>
+      <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Ultrasound</h5>
       <FormGroup legendText="">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
           <TextInput
             id={p('ft_placenta')}
-            labelText="Плацента"
+            labelText="Placenta"
             placeholder=""
             value={data[p('ft_placenta') as keyof FirstTrimesterSectionFormData]}
             onChange={(e) => onChange(p('ft_placenta'), e.target.value)}
@@ -103,7 +103,7 @@ export default function FirstTrimesterSection({ prefix, data, errors, onChange, 
           />
           <TextInput
             id={p('ft_heartRate')}
-            labelText="СЧП (уд/мин)"
+            labelText="FHR (bpm)"
             placeholder=""
             value={data[p('ft_heartRate') as keyof FirstTrimesterSectionFormData]}
             invalid={!!errors[p('ft_heartRate')]}
@@ -113,7 +113,7 @@ export default function FirstTrimesterSection({ prefix, data, errors, onChange, 
           />
           <TextInput
             id={p('ft_umbilicalCord')}
-            labelText="Пъпна връв"
+            labelText="Umbilical Cord"
             placeholder=""
             value={data[p('ft_umbilicalCord') as keyof FirstTrimesterSectionFormData]}
             onChange={(e) => onChange(p('ft_umbilicalCord'), e.target.value)}
@@ -123,13 +123,13 @@ export default function FirstTrimesterSection({ prefix, data, errors, onChange, 
       </FormGroup>
 
       {/* ── FT Biometry ─────────────────────────────────────────────────────── */}
-      <h5 style={{ marginTop: '0.75rem', marginBottom: '0.25rem', fontWeight: 600 }}>Биометрия</h5>
+      <h5 style={{ marginTop: '0.75rem', marginBottom: '0.25rem', fontWeight: 600 }}>Biometry</h5>
       <FormGroup legendText="">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 9rem', gap: '0.75rem', alignItems: 'end' }}>
           {/* Row 1: CRL */}
           <TextInput
             id={p('ft_crl')}
-            labelText="КТР (мм)"
+            labelText="CRL (mm)"
             placeholder=""
             value={data[p('ft_crl') as keyof FirstTrimesterSectionFormData]}
             invalid={!!errors[p('ft_crl')]}
@@ -139,8 +139,8 @@ export default function FirstTrimesterSection({ prefix, data, errors, onChange, 
           />
           <TextInput
             id={p('ft_gaFromCrl')}
-            labelText="ГВ от КТР"
-            placeholder="напр. 12w 3d"
+            labelText="GA from CRL"
+            placeholder="e.g. 12w 3d"
             value={data[p('ft_gaFromCrl') as keyof FirstTrimesterSectionFormData]}
             invalid={!!errors[p('ft_gaFromCrl')]}
             invalidText={errors[p('ft_gaFromCrl')]}
@@ -157,13 +157,13 @@ export default function FirstTrimesterSection({ prefix, data, errors, onChange, 
                 ? 'Calculate GA from CRL (Robinson 1975, valid range 10–65 mm)'
                 : 'Enter CRL in the valid range 10–65 mm to enable calculation'}
             >
-              AutoCalc GA from CRL
+              GA from CRL
             </Button>
           </div>
           {/* Row 2: NT */}
           <TextInput
             id={p('ft_nt')}
-            labelText="НТ (мм)"
+            labelText="NT (mm)"
             placeholder=""
             value={data[p('ft_nt') as keyof FirstTrimesterSectionFormData]}
             invalid={!!errors[p('ft_nt')]}
@@ -175,7 +175,7 @@ export default function FirstTrimesterSection({ prefix, data, errors, onChange, 
           {/* Row 3: NB */}
           <TextInput
             id={p('ft_nb')}
-            labelText="НК (мм)"
+            labelText="NB (mm)"
             placeholder=""
             value={data[p('ft_nb') as keyof FirstTrimesterSectionFormData]}
             invalid={!!errors[p('ft_nb')]}
@@ -187,7 +187,7 @@ export default function FirstTrimesterSection({ prefix, data, errors, onChange, 
           {/* Row 4: Puls */}
           <TextInput
             id={p('ft_puls')}
-            labelText="Пулс (уд/мин)"
+            labelText="Heart Rate (bpm)"
             placeholder=""
             value={data[p('ft_puls') as keyof FirstTrimesterSectionFormData]}
             invalid={!!errors[p('ft_puls')]}
@@ -200,48 +200,73 @@ export default function FirstTrimesterSection({ prefix, data, errors, onChange, 
       </FormGroup>
 
       {/* ── Markers ─────────────────────────────────────────────────────────── */}
-      <h5 style={{ marginTop: '0.75rem', marginBottom: '0.25rem', fontWeight: 600 }}>Маркери</h5>
+      <h5 style={{ marginTop: '0.75rem', marginBottom: '0.25rem', fontWeight: 600 }}>Markers</h5>
       <FormGroup legendText="">
-        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.5rem 1rem', alignItems: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', gap: '0.5rem 1rem', alignItems: 'center', justifyContent: 'start' }}>
           {([
-            ['ft_arrhythmia',             'Аритмия'],
-            ['ft_tricuspidRegurgitation', 'Трикуспидална регуритация'],
-            ['ft_abnormalDvFlow',         'Абнормен кръвоток D.Venosus'],
-            ['ft_echogenicCardiacFocus',  'Ехогенен сърдечен фикус'],
-            ['ft_singleUmbilicalArtery',  'Една пъпна артерия'],
-            ['ft_choroidPlexusCysts',     'Кисти на PL Chorioideus'],
+            ['ft_arrhythmia',             'Arrhythmia'],
+            ['ft_tricuspidRegurgitation', 'Tricuspid Regurgitation'],
+            ['ft_abnormalDvFlow',         'Abnormal D.Venosus Flow'],
+            ['ft_echogenicCardiacFocus',  'Echogenic Cardiac Focus'],
+            ['ft_singleUmbilicalArtery',  'Single Umbilical Artery'],
+            ['ft_choroidPlexusCysts',     'Choroid Plexus Cysts'],
             ['ft_exomphalos',             'Exomphalos'],
-            ['ft_megacystis',             'Мегацистис'],
-          ] as [string, string][]).map(([field, label]) => (
-            <>
-              <div key={`lbl_${field}`} style={labelStyle}>{label}</div>
-              <Select
-                key={`sel_${field}`}
-                id={p(field)}
-                labelText=""
-                value={data[p(field) as keyof FirstTrimesterSectionFormData]}
-                onChange={(e) => onChange(p(field), e.target.value)}
-                disabled={isSubmitting}
-              >
-                <SelectItem value="" text="—" />
-                <SelectItem value="yes" text="Да" />
-                <SelectItem value="no" text="Не" />
-              </Select>
-            </>
-          ))}
-          <div style={labelStyle}>Плацента</div>
+            ['ft_megacystis',             'Megacystis'],
+          ] as [string, string][]).map(([field, label]) => {
+            const val = (data as unknown as Record<string, string>)[p(field)];
+            return (
+              <>
+                <div key={`lbl_${field}`} style={labelStyle}>{label}</div>
+                <div key={`ctrl_${field}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <RadioButtonGroup
+                    name={p(field)}
+                    valueSelected={val || ''}
+                    onChange={(v: string) => onChange(p(field), v)}
+                    disabled={isSubmitting}
+                    legendText=""
+                    orientation="horizontal"
+                  >
+                    <RadioButton id={`${p(field)}_yes`} labelText="Yes" value="yes" />
+                    <RadioButton id={`${p(field)}_no`}  labelText="No"  value="no"  />
+                  </RadioButtonGroup>
+                  {val && (
+                    <button
+                      type="button"
+                      onClick={() => onChange(p(field), '')}
+                      disabled={isSubmitting}
+                      style={{
+                        background: '#da1e28',
+                        border: 'none',
+                        borderRadius: '999px',
+                        cursor: 'pointer',
+                        padding: '0.1rem 0.6rem',
+                        color: '#ffffff',
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        lineHeight: 1.4,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </>
+            );
+          })}
+          <div style={labelStyle}>Placenta</div>
           <TextInput id={p('ft_markerPlacenta')} labelText="" placeholder="" value={data[p('ft_markerPlacenta') as keyof FirstTrimesterSectionFormData]} onChange={(e) => onChange(p('ft_markerPlacenta'), e.target.value)} disabled={isSubmitting} />
-          <div style={labelStyle}>Пъпна връв инсерция</div>
+          <div style={labelStyle}>Cord Insertion</div>
           <TextInput id={p('ft_cordInsertion')} labelText="" placeholder="" value={data[p('ft_cordInsertion') as keyof FirstTrimesterSectionFormData]} onChange={(e) => onChange(p('ft_cordInsertion'), e.target.value)} disabled={isSubmitting} />
         </div>
       </FormGroup>
 
       {/* ── Anatomy ─────────────────────────────────────────────────────────── */}
-      <h5 style={{ marginTop: '0.75rem', marginBottom: '0.25rem', fontWeight: 600 }}>Анатомия</h5>
+      <h5 style={{ marginTop: '0.75rem', marginBottom: '0.25rem', fontWeight: 600 }}>Anatomy</h5>
       <AnatomySection prefix={prefix} data={anatomyData} errors={errors} onChange={onChange} isSubmitting={isSubmitting} columns={6} />
 
       {/* ── FT Doppler ──────────────────────────────────────────────────────── */}
-      <h5 style={{ marginTop: '0.75rem', marginBottom: '0.25rem', fontWeight: 600 }}>Доплер</h5>
+      <h5 style={{ marginTop: '0.75rem', marginBottom: '0.25rem', fontWeight: 600 }}>Doppler</h5>
       <FormGroup legendText="">
         <div style={{ display: 'grid', gridTemplateColumns: '8rem 1fr 1fr', gap: '0.5rem', alignItems: 'end' }}>
           <div />

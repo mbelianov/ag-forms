@@ -227,6 +227,9 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   const gaBioDisplay = isTwins
     ? `${vm.gestationalAgeFromBiometry || '—'} / ${vm.gestationalAgeFromBiometry2 || '—'}`
     : vm.gestationalAgeFromBiometry;
+  const gaFromCrlDisplay = isFtTwinsExam
+    ? `${vm.ftBiometry?.gaFromCrl || '—'} / ${vm.twin2FtBiometry?.gaFromCrl || '—'}`
+    : vm.ftBiometry?.gaFromCrl;
   // uzd-twins: layout constants for twin two-column layout
   // A4 usable width: 182 mm; twin column: 88 mm each with 6 mm gutter
   const TWIN_COL_W = 88;
@@ -241,9 +244,9 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   doc.setFontSize(13);
   setTextColor(doc, C_DARK);
   const headerTitle = isFtTwinsExam
-    ? 'УЛТРАЗВУК ПЪРВИ ТРИМЕСТЪР (БЛИЗНАЦИ)'
+    ? 'First Trimester Ultrasound (Twins)'
     : isFt
-    ? 'УЛТРАЗВУК ПЪРВИ ТРИМЕСТЪР'
+    ? 'First Trimester Ultrasound'
     : 'Prenatal Ultrasound Report';
   doc.text(headerTitle, MARGIN_L, 10);
 
@@ -290,11 +293,12 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
     doc.setFont(FONT_ID, 'normal');
     setTextColor(doc, C_MID);
 
-    const bioLabel = '  GA (Bio): ';
-    doc.text(bioLabel, MARGIN_L + 42, y);
+    const secondGaLabel = isFt ? '  GA (CRL): ' : '  GA (Bio): ';
+    const secondGaValue = isFt ? (gaFromCrlDisplay || '—') : (gaBioDisplay || '—');
+    doc.text(secondGaLabel, MARGIN_L + 42, y);
     doc.setFont(FONT_ID, 'bold');
     setTextColor(doc, C_DARK);
-    doc.text(gaBioDisplay || '—', MARGIN_L + 42 + doc.getTextWidth(bioLabel), y);
+    doc.text(secondGaValue, MARGIN_L + 42 + doc.getTextWidth(secondGaLabel), y);
     doc.setFont(FONT_ID, 'normal');
     setTextColor(doc, C_MID);
 
@@ -319,7 +323,7 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
       ['LMP',              vm.pregnancy.lmp],
       ['EDD',              vm.expectedDeliveryDate],
       ['GA from LMP',      vm.gestationalAge],
-      ['GA from Biometry', gaBioDisplay],
+      [isFt ? 'GA from CRL' : 'GA from Biometry', isFt ? gaFromCrlDisplay : gaBioDisplay],
       ['Obstetric History',vm.pregnancy.obstetricHistory],
       ['Family History',   vm.pregnancy.familyHistory],
     ];

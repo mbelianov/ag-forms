@@ -295,7 +295,7 @@ export default function ExaminationForm(props: ExaminationFormProps) {
                   <SelectItem value="female" text="Female" />
                   <SelectItem value="unknown" text="Unknown" />
                 </Select>
-                <TextInput id="heart_rate" labelText="Fetal Heart Rate (bpm)" placeholder="e.g., 145" value={formData.heart_rate} invalid={!!errors.heart_rate} invalidText={errors.heart_rate} disabled={isSubmitting} onChange={(e) => handleChange('heart_rate', e.target.value)} />
+                <TextInput id="heart_rate" labelText="FHR (bpm)" placeholder="e.g., 145" value={formData.heart_rate} invalid={!!errors.heart_rate} invalidText={errors.heart_rate} disabled={isSubmitting} onChange={(e) => handleChange('heart_rate', e.target.value)} />
                 <Select id="fetal_movement" labelText="Fetal Movement" value={formData.fetal_movement} onChange={(e) => handleChange('fetal_movement', e.target.value)} disabled={isSubmitting}>
                   <SelectItem value="" text="Select fetal movement" />
                   <SelectItem value="active" text="Active" />
@@ -380,7 +380,7 @@ export default function ExaminationForm(props: ExaminationFormProps) {
               prefix="t1"
               data={formData as unknown as FirstTrimesterSectionFormData}
               errors={errors}
-              onChange={handleChangeT1}
+              onChange={handleChange}
               isSubmitting={isSubmitting}
             />
           </div>
@@ -399,7 +399,7 @@ export default function ExaminationForm(props: ExaminationFormProps) {
                   prefix="t1"
                   data={formData as unknown as FirstTrimesterSectionFormData}
                   errors={errors}
-                  onChange={handleChangeT1}
+                  onChange={handleChange}
                   isSubmitting={isSubmitting}
                 />
               </div>
@@ -615,7 +615,7 @@ export default function ExaminationForm(props: ExaminationFormProps) {
           <Button kind="secondary" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting || (!isEdit && !formData.patientId)}>
             {isSubmitting ? 'Saving...' : isEdit ? `Update ${getExamTypeLabel(formData.examinationType)}` : `Create ${getExamTypeLabel(formData.examinationType)}`}
           </Button>
         </ButtonSet>

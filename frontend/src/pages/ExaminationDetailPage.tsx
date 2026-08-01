@@ -21,7 +21,7 @@ import EmailReportButton from '../components/reports/EmailReportButton';
 import { useAuth } from '../contexts/AuthContext';
 import { useAutoNotification } from '../utils/useAutoNotification';
 import { formatDateTime, formatPlainDate } from '../utils/formatters';
-import { getExamTypeLabel, getSectionVisibility } from '../constants/examinationTypes';
+import { getExamTypeLabel, getSectionVisibility, isFirstTrimester, isFtTwins } from '../constants/examinationTypes';
 import type { Examination } from '../types';
 import ExaminationSections from '../components/ExaminationSections';
 
@@ -157,6 +157,8 @@ export default function ExaminationDetailPage() {
     : undefined;
 
   // Type-driven section visibility
+  const isFt = isFirstTrimester(examination.examinationType);
+  const isFtTwinsExam = isFtTwins(examination.examinationType);
   const visibility = getSectionVisibility(examination.examinationType);
 
   // uzd-twins: detect twins exam type
@@ -314,7 +316,11 @@ export default function ExaminationDetailPage() {
             <h3 style={{ marginBottom: '1.5rem' }}>Pregnancy Data</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
               {fieldBlock('Gestational Age (from LMP)', examination.gestationalAge || '—')}
-              {fieldBlock('Gestational Age (from Biometry)', examination.gestationalAgeFromBiometry || '—')}
+              {isFt
+                ? fieldBlock('GA from CRL', isFtTwinsExam
+                    ? `${examination.data?.ft_biometry?.gaFromCrl || '—'} / ${examination.data?.twin2_ft_biometry?.gaFromCrl || '—'}`
+                    : examination.data?.ft_biometry?.gaFromCrl || '—')
+                : fieldBlock('Gestational Age (from Biometry)', examination.gestationalAgeFromBiometry || '—')}
               <div>
                 <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
                   Expected Delivery Date (EDD)

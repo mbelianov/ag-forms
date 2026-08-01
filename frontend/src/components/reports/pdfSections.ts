@@ -59,36 +59,96 @@ function mkAnatomyPairs(a: ExamPdfViewModel['anatomy'] | AnatomyViewModel): Arra
 
 function mkFtBiometryPairs(b: FtBiometryViewModel): Array<[string, string | undefined]> {
   return [
-    ['КТР', b.crl], ['ГВ от КТР', b.gaFromCrl], ['НТ', b.nt], ['НК', b.nb], ['Пулс', b.puls],
+    ['CRL', b.crl], ['GA from CRL', b.gaFromCrl], ['NT', b.nt], ['NB', b.nb], ['Heart Rate', b.puls],
   ];
 }
 
-function mkFtMarkerPairs(m: FtMarkersViewModel): Array<[string, string | undefined]> {
-  return [
-    ['Аритмия',                    m.arrhythmia],
-    ['Трикусп. регург.',            m.tricuspidRegurgitation],
-    ['Абн. кр. D.Venosus',         m.abnormalDvFlow],
-    ['Ехог. срд. фикус',           m.echogenicCardiacFocus],
-    ['Една пъпна артерия',         m.singleUmbilicalArtery],
-    ['Кисти PL Chorioideus',       m.choroidPlexusCysts],
-    ['Exomphalos',                  m.exomphalos],
-    ['Мегацистис',                  m.megacystis],
-    ['Плацента',                    m.placenta],
-    ['Пъпна връв инсерция',        m.cordInsertion],
+/** Render FT markers one per line: label on the left, value to its right. Returns new Y. */
+function renderFtMarkersBlock(
+  doc: jsPDF,
+  m: FtMarkersViewModel,
+  y: number,
+  xStart: number,
+  fontId: string,
+): number {
+  const PITCH = 3.85;
+  const labelW = 52;
+  const xValue = xStart + labelW;
+
+  const rows: Array<[string, string | undefined]> = [
+    ['Arrhythmia',              m.arrhythmia],
+    ['Tricusp. Regurg.',        m.tricuspidRegurgitation],
+    ['Abnorm. D.Venosus Flow',  m.abnormalDvFlow],
+    ['Echogenic Cardiac Focus', m.echogenicCardiacFocus],
+    ['Single Umbilical Artery', m.singleUmbilicalArtery],
+    ['Choroid Plexus Cysts',    m.choroidPlexusCysts],
+    ['Exomphalos',              m.exomphalos],
+    ['Megacystis',              m.megacystis],
+    ['Placenta',                m.placenta],
+    ['Cord Insertion',          m.cordInsertion],
   ];
+
+  for (const [label, value] of rows) {
+    doc.setFont(fontId, 'normal');
+    doc.setFontSize(7.5);
+    setTextColor(doc, C_MID);
+    doc.text(label, xStart, y);
+    doc.setFont(fontId, 'bold');
+    doc.setFontSize(8);
+    setTextColor(doc, C_DARK);
+    doc.text(value || '—', xValue, y);
+    y += PITCH;
+  }
+  return y;
 }
 
 function mkFtUltrasoundPairs(u: FtUltrasoundViewModel): Array<[string, string | undefined]> {
   return [
-    ['Плацента', u.placenta], ['СЧП', u.heartRate], ['Пъпна връв', u.umbilicalCord],
+    ['Placenta', u.placenta], ['FHR', u.heartRate], ['Umbilical Cord', u.umbilicalCord],
   ];
 }
 
-function mkFtDopplerPairs(d: FtDopplerViewModel): Array<[string, string | undefined]> {
-  return [
-    ['A.ut.Dex PI', d.utADexPI], ['A.ut.Dex RI', d.utADexRI],
-    ['A.ut.Sin PI', d.utASinPI], ['A.ut.Sin RI', d.utASinRI],
+/** Render FT doppler as a PI | RI table matching the form layout. Returns new Y. */
+function renderFtDopplerBlock(
+  doc: jsPDF,
+  d: FtDopplerViewModel,
+  y: number,
+  xStart: number,
+  colW: number,
+  fontId: string,
+): number {
+  const PITCH = 3.85;
+  const labelW = colW * 0.40;
+  const halfW  = (colW - labelW) / 2;
+  const xPI = xStart + labelW;
+  const xRI = xStart + labelW + halfW;
+
+  // Header row
+  doc.setFont(fontId, 'normal');
+  doc.setFontSize(7.5);
+  setTextColor(doc, C_MID);
+  doc.text('PI', xPI, y);
+  doc.text('RI', xRI, y);
+  y += PITCH;
+
+  const rows: Array<{ label: string; pi: string | undefined; ri: string | undefined }> = [
+    { label: 'A.ut.Dex.', pi: d.utADexPI, ri: d.utADexRI },
+    { label: 'A.ut.Sin.', pi: d.utASinPI, ri: d.utASinRI },
   ];
+
+  for (const row of rows) {
+    doc.setFont(fontId, 'normal');
+    doc.setFontSize(7.5);
+    setTextColor(doc, C_MID);
+    doc.text(row.label, xStart, y);
+    doc.setFont(fontId, 'bold');
+    doc.setFontSize(8);
+    setTextColor(doc, C_DARK);
+    doc.text(row.pi || '—', xPI, y);
+    doc.text(row.ri || '—', xRI, y);
+    y += PITCH;
+  }
+  return y;
 }
 
 // ─── Biometry: row-by-row renderer ───────────────────────────────────────────
@@ -283,36 +343,37 @@ export function renderClinicalSections(
 
   // ── UZPT single-fetus FT layout ──────────────────────────────────────────────
   if (isFt && !isFtTwins) {
-    if (vm.ftUltrasound) {
-      rule(doc, y); y += 4;
-      y = sectionHeading(doc, 'УЗД', y);
-      y = kvGrid(doc, mkFtUltrasoundPairs(vm.ftUltrasound), y, 3);
-      y += 1;
-    }
-    if (vm.ftBiometry) {
-      rule(doc, y); y += 4;
-      y = sectionHeading(doc, 'Биометрия', y);
-      y = kvGrid(doc, mkFtBiometryPairs(vm.ftBiometry), y, 3);
-      y += 1;
-    }
-    if (vm.ftMarkers) {
-      rule(doc, y); y += 4;
-      y = sectionHeading(doc, 'Маркери', y);
-      y = kvGrid(doc, mkFtMarkerPairs(vm.ftMarkers), y, 2);
-      y += 1;
-    }
-    if (vm.ftAnatomy) {
-      rule(doc, y); y += 4;
-      y = sectionHeading(doc, 'Анатомия', y);
-      y = kvGrid(doc, mkAnatomyPairs(vm.ftAnatomy), y, 3);
-      y += 1;
-    }
-    if (vm.ftDoppler) {
-      rule(doc, y); y += 4;
-      y = sectionHeading(doc, 'Доплер', y);
-      y = kvGrid(doc, mkFtDopplerPairs(vm.ftDoppler), y, 2);
-      y += 1;
-    }
+    const emptyU: FtUltrasoundViewModel = {};
+    const emptyB: FtBiometryViewModel   = {};
+    const emptyM: FtMarkersViewModel    = {};
+    const emptyA: AnatomyViewModel      = {};
+    const emptyD: FtDopplerViewModel    = {};
+
+    rule(doc, y); y += 4;
+    y = sectionHeading(doc, 'Ultrasound', y);
+    y = kvGrid(doc, mkFtUltrasoundPairs(vm.ftUltrasound ?? emptyU), y, 3);
+    y += 1;
+
+    rule(doc, y); y += 4;
+    y = sectionHeading(doc, 'Biometry', y);
+    y = kvGrid(doc, mkFtBiometryPairs(vm.ftBiometry ?? emptyB), y, 3);
+    y += 1;
+
+    rule(doc, y); y += 4;
+    y = sectionHeading(doc, 'Markers', y);
+    y = renderFtMarkersBlock(doc, vm.ftMarkers ?? emptyM, y, 14, FONT_ID);
+    y += 1;
+
+    rule(doc, y); y += 4;
+    y = sectionHeading(doc, 'Anatomy', y);
+    y = kvGrid(doc, mkAnatomyPairs(vm.ftAnatomy ?? emptyA), y, 3);
+    y += 1;
+
+    rule(doc, y); y += 4;
+    y = sectionHeading(doc, 'Doppler', y);
+    y = renderFtDopplerBlock(doc, vm.ftDoppler ?? emptyD, y, 14, 182, FONT_ID);
+    y += 1;
+
     return y;
   }
 
@@ -329,6 +390,12 @@ export function renderClinicalSections(
     doc.text('TWIN 2', T2_X, y);
     y += 5;
 
+    const emptyU: FtUltrasoundViewModel = {};
+    const emptyB: FtBiometryViewModel   = {};
+    const emptyM: FtMarkersViewModel    = {};
+    const emptyA: AnatomyViewModel      = {};
+    const emptyD: FtDopplerViewModel    = {};
+
     const renderFtTwinSection = (
       label: string,
       pairs1: Array<[string, string | undefined]>,
@@ -343,11 +410,34 @@ export function renderClinicalSections(
       y = Math.max(y1after, y2after) + 1;
     };
 
-    if (vm.ftUltrasound && vm.twin2FtUltrasound) renderFtTwinSection('УЗД', mkFtUltrasoundPairs(vm.ftUltrasound), mkFtUltrasoundPairs(vm.twin2FtUltrasound));
-    if (vm.ftBiometry && vm.twin2FtBiometry) renderFtTwinSection('Биометрия', mkFtBiometryPairs(vm.ftBiometry), mkFtBiometryPairs(vm.twin2FtBiometry));
-    if (vm.ftMarkers && vm.twin2FtMarkers) renderFtTwinSection('Маркери', mkFtMarkerPairs(vm.ftMarkers), mkFtMarkerPairs(vm.twin2FtMarkers));
-    if (vm.ftAnatomy && vm.twin2FtAnatomy) renderFtTwinSection('Анатомия', mkAnatomyPairs(vm.ftAnatomy), mkAnatomyPairs(vm.twin2FtAnatomy));
-    if (vm.ftDoppler && vm.twin2FtDoppler) renderFtTwinSection('Доплер', mkFtDopplerPairs(vm.ftDoppler), mkFtDopplerPairs(vm.twin2FtDoppler));
+    rule(doc, y); y += 4;
+    renderFtTwinSection('Ultrasound', mkFtUltrasoundPairs(vm.ftUltrasound ?? emptyU), mkFtUltrasoundPairs(vm.twin2FtUltrasound ?? emptyU));
+
+    rule(doc, y); y += 4;
+    renderFtTwinSection('Biometry', mkFtBiometryPairs(vm.ftBiometry ?? emptyB), mkFtBiometryPairs(vm.twin2FtBiometry ?? emptyB));
+
+    rule(doc, y); y += 4;
+    {
+      const yStart = y;
+      y = sectionHeadingAt(doc, 'Markers', y, T1_X, T1_XEND);
+      const y1after = renderFtMarkersBlock(doc, vm.ftMarkers ?? emptyM, y, T1_X, FONT_ID);
+      const yH2 = sectionHeadingAt(doc, 'Markers', yStart, T2_X, T2_XEND);
+      const y2after = renderFtMarkersBlock(doc, vm.twin2FtMarkers ?? emptyM, yH2, T2_X, FONT_ID);
+      y = Math.max(y1after, y2after) + 1;
+    }
+
+    rule(doc, y); y += 4;
+    renderFtTwinSection('Anatomy', mkAnatomyPairs(vm.ftAnatomy ?? emptyA), mkAnatomyPairs(vm.twin2FtAnatomy ?? emptyA));
+
+    rule(doc, y); y += 4;
+    {
+      const yStart = y;
+      y = sectionHeadingAt(doc, 'Doppler', y, T1_X, T1_XEND);
+      const y1after = renderFtDopplerBlock(doc, vm.ftDoppler ?? emptyD, y, T1_X, TWIN_COL_W, FONT_ID);
+      const yH2 = sectionHeadingAt(doc, 'Doppler', yStart, T2_X, T2_XEND);
+      const y2after = renderFtDopplerBlock(doc, vm.twin2FtDoppler ?? emptyD, yH2, T2_X, TWIN_COL_W, FONT_ID);
+      y = Math.max(y1after, y2after) + 1;
+    }
     return y;
   }
 
