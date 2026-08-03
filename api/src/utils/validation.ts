@@ -7,6 +7,8 @@ import * as Joi from 'joi';
 import { ValidationResult } from '../types';
 import { EXAM_TYPE_KEYS } from '../constants/examinationTypes';
 
+const GA_REGEX = /^(\d{1,2}w\s?\d{1}d|\d{1,2}с\s?\d{1}д)$/;
+
 /**
  * User validation schema
  */
@@ -176,15 +178,15 @@ const biometrySchema = Joi.object({
     }),
     // TASK-034: Extended biometry
     ofd: Joi.number().min(0).max(200).optional().messages({ 'number.base': 'OFD must be a valid number' }),
-    vp:  Joi.number().min(0).max(100).optional().messages({ 'number.base': 'Vp must be a valid number' }),
+    vp:  Joi.string().max(500).optional().allow(''),
     tcd: Joi.number().min(0).max(100).optional().messages({ 'number.base': 'TCD must be a valid number' }),
     cm:  Joi.number().min(0).max(50).optional().messages({ 'number.base': 'CM must be a valid number' }),
     nuchalFold: Joi.number().min(0).max(30).optional().messages({ 'number.base': 'Nuchal Fold must be a valid number' }),
     nb:  Joi.number().min(0).max(30).optional().messages({ 'number.base': 'NB must be a valid number' }),
     apad: Joi.number().min(0).max(200).optional().messages({ 'number.base': 'APAD must be a valid number' }),
     tad:  Joi.number().min(0).max(200).optional().messages({ 'number.base': 'TAD must be a valid number' }),
-    // TASK-035: LA and LC
-    la: Joi.number().min(0).max(100).optional().messages({ 'number.base': 'LA must be a valid number' }),
+    // TASK-035: LA (migrated to string) and LC
+    la: Joi.string().max(500).optional().allow(''),
     lc: Joi.number().min(0).max(100).optional().messages({ 'number.base': 'LC must be a valid number' })
 }).optional();
 
@@ -201,10 +203,7 @@ const dopplerSchema = Joi.object({
         'number.min': 'RI must be a positive value',
         'number.max': 'RI must be between 0 and 1'
     }),
-    vessel: Joi.string().max(100).optional().allow('').messages({
-        'string.max': 'Vessel name must not exceed 100 characters'
-    }),
-    // TASK-036: Extended vascular parameters
+    // TASK-036: Extended vascular parameters (HF-3: vessel removed)
     utADexPI: Joi.number().min(0).max(10).optional(),
     utADexRI: Joi.number().min(0).max(1).optional(),
     utASinPI: Joi.number().min(0).max(10).optional(),
@@ -263,6 +262,43 @@ const anatomySchema = Joi.object({
 }).optional();
 
 /**
+ * UZPT — First Trimester sub-schemas
+ */
+const ftBiometrySchema = Joi.object({
+    crl:       Joi.number().min(0).max(200).optional(),
+    gaFromCrl: Joi.string().pattern(GA_REGEX).optional().allow(''),
+    nt:        Joi.number().min(0).max(30).optional(),
+    nb:        Joi.number().min(0).max(30).optional(),
+    puls:      Joi.number().integer().min(0).max(300).optional(),
+}).optional();
+
+const ftMarkersSchema = Joi.object({
+    arrhythmia:              Joi.string().valid('yes', 'no', '').optional().allow(''),
+    tricuspidRegurgitation:  Joi.string().valid('yes', 'no', '').optional().allow(''),
+    abnormalDvFlow:          Joi.string().valid('yes', 'no', '').optional().allow(''),
+    echogenicCardiacFocus:   Joi.string().valid('yes', 'no', '').optional().allow(''),
+    singleUmbilicalArtery:   Joi.string().valid('yes', 'no', '').optional().allow(''),
+    choroidPlexusCysts:      Joi.string().valid('yes', 'no', '').optional().allow(''),
+    exomphalos:              Joi.string().valid('yes', 'no', '').optional().allow(''),
+    megacystis:              Joi.string().valid('yes', 'no', '').optional().allow(''),
+    placenta:                Joi.string().max(500).optional().allow(''),
+    cordInsertion:           Joi.string().max(500).optional().allow(''),
+}).optional();
+
+const ftUltrasoundSchema = Joi.object({
+    placenta:      Joi.string().max(500).optional().allow(''),
+    heartRate:     Joi.number().integer().min(1).max(300).optional(),
+    umbilicalCord: Joi.string().max(500).optional().allow(''),
+}).optional();
+
+const ftDopplerSchema = Joi.object({
+    utADexPI: Joi.number().min(0).max(10).optional(),
+    utADexRI: Joi.number().min(0).max(1).optional(),
+    utASinPI: Joi.number().min(0).max(10).optional(),
+    utASinRI: Joi.number().min(0).max(1).optional(),
+}).optional();
+
+/**
  * Examination clinical data sub-schema
  */
 const examinationDataSchema = Joi.object({
@@ -272,6 +308,17 @@ const examinationDataSchema = Joi.object({
     // uzd-twins: Twin 2 fields
     twin2_ultrasound_findings: ultrasoundFindingsSchema,
     twin2_anatomy: anatomySchema,
+    // UZPT — First Trimester fields
+    ft_biometry:           ftBiometrySchema,
+    ft_markers:            ftMarkersSchema,
+    ft_ultrasound:         ftUltrasoundSchema,
+    ft_anatomy:            anatomySchema,
+    ft_doppler:            ftDopplerSchema,
+    twin2_ft_biometry:     ftBiometrySchema,
+    twin2_ft_markers:      ftMarkersSchema,
+    twin2_ft_ultrasound:   ftUltrasoundSchema,
+    twin2_ft_anatomy:      anatomySchema,
+    twin2_ft_doppler:      ftDopplerSchema,
     comments: Joi.string().max(5000).optional().allow('')
 }).optional();
 
@@ -298,18 +345,18 @@ const examinationSchema = Joi.object({
             'any.required': 'Exam date is required'
         }),
     gestationalAge: Joi.string()
-        .pattern(/^\d{1,2}w\s?\d{1}d$/)
+        .pattern(GA_REGEX)
         .optional()
         .allow('')
         .messages({
-            'string.pattern.base': 'Gestational age must be in format "28w 3d"'
+            'string.pattern.base': 'Gestational age must be in format "28w 3d" or "28с 3д"'
         }),
     gestationalAgeFromBiometry: Joi.string()
-        .pattern(/^\d{1,2}w\s?\d{1}d$/)
+        .pattern(GA_REGEX)
         .optional()
         .allow('')
         .messages({
-            'string.pattern.base': 'Gestational age from biometry must be in format "28w 3d"'
+            'string.pattern.base': 'Gestational age from biometry must be in format "28w 3d" or "28с 3д"'
         }),
     status: Joi.string()
         .valid('draft', 'completed', 'reviewed')
@@ -325,11 +372,11 @@ const examinationSchema = Joi.object({
     biometry2: biometrySchema,
     doppler2: dopplerSchema,
     gestationalAgeFromBiometry2: Joi.string()
-        .pattern(/^\d{1,2}w\s?\d{1}d$/)
+        .pattern(GA_REGEX)
         .optional()
         .allow('')
         .messages({
-            'string.pattern.base': 'Gestational age from biometry (Twin 2) must be in format "28w 3d"'
+            'string.pattern.base': 'Gestational age from biometry (Twin 2) must be in format "28w 3d" or "28с 3д"'
         }),
     notes: Joi.string()
         .max(5000)

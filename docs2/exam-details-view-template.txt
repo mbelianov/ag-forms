@@ -1,0 +1,441 @@
+============================================================
+  EXAMINATION DETAIL VIEW — VISUAL LAYOUT TEMPLATE
+  Last updated: 2025-07
+============================================================
+
+This template defines how the Examination details report shall
+look within the Examination details page. The surrounding page
+chrome (breadcrumb, page header, action buttons) is out of scope.
+
+CONVENTIONS USED IN THIS DOCUMENT
+──────────────────────────────────
+  "static text"       — literal string rendered in the UI
+  [field name]        — dynamic value (plain weight unless noted)
+  [field name bold]   — dynamic value, font-weight: 600
+  [field name link]   — dynamic value rendered as a hyperlink
+  [yes/no]            — boolean displayed as "Yes" / "No"
+  [free text]         — multi-line text block, whitespace preserved
+  ← depends on type → — value or visibility depends on exam type
+  (conditional)       — tile/section only rendered when applicable
+
+FIELD TYPE REFERENCE
+────────────────────
+  Date values         — format: MMM D, YYYY (e.g. "Jun 12, 2026")
+                        [implementation uses formatPlainDate / calcEDD as-is]
+  Gestational age     — format: Xw Yd  (e.g. "28w 3d")
+                        twins: T1 Xw Yd / T2 Xw Yd
+  Percentile values   — appended with " %-ile" (e.g. "32.4 - 45 %-ile")
+  Datetime values     — format: "MMMM D, YYYY, hh:mm a" (e.g. "June 12, 2026, 10:30 AM")
+                        [implementation uses formatDateTime as-is]
+
+
+============================================================
+TILE 1 — STATUS BAR
+============================================================
+  Background: #f4f4f4 (Carbon gray-10)
+  Layout: single row, 4 evenly spaced cells
+
+  ┌─────────────────────────────────────────────────────────────┐
+  │ "Examination Date"    "MRN"          "Status"               │
+  │ [exam date bold]      [mrn bold]     [Status Tag]           │
+  │ "Type:" [exam type]                                         │
+  └─────────────────────────────────────────────────────────────┘
+
+  Field notes:
+  • [Status Tag]  — Carbon Tag component; color depends on status value
+  • [exam type]   — human-readable label (e.g. "Prenatal Ultrasound")
+
+
+============================================================
+TILE 2 — PATIENT INFORMATION
+============================================================
+  Layout: 2-column grid, full width, cells left-aligned
+
+                      "PATIENT INFORMATION"
+  ┌──────────────────────────────┬───────────────────────────────┐
+  │ "Patient Name"               │ "Age at Examination"          │
+  │ [patient name link]          │ [age] "years"                 │
+  └──────────────────────────────┴───────────────────────────────┘
+
+  Field notes:
+  • [patient name link] — links to Patient detail page; color: #0f62fe
+
+
+============================================================
+TILE 3 — PREGNANCY DATA
+============================================================
+  Layout: 2-column grid, full width, cells left-aligned
+  Visibility: conditional — rendered for all exam types
+
+                        "PREGNANCY DATA"
+  ┌──────────────────────────────┬───────────────────────────────┐
+  │ "LMP Date"                   │ "GA from LMP"                 │
+  │ [lmp date]                   │ [ga from lmp]                 │
+  ├──────────────────────────────┼───────────────────────────────┤
+  │ "Expected Delivery Date"     │ ← depends on type →           │
+  │ [edd bold]                   │   "GA from CRL"  (trimester)  │
+  │ (highlight: blue background) │   "GA from Bio"  (prenatal)   │
+  │                              │ [ga value]                    │
+  ├──────────────────────────────┼───────────────────────────────┤
+  │ "Obstetric History"          │ "Family History"              │
+  │ [obstetric history]          │ [family history]              │
+  └──────────────────────────────┴───────────────────────────────┘
+
+  Field notes:
+  • "GA from CRL" is shown for exam types: ultrasound_first_trimester,
+    ultrasound_first_trimester_twins
+  • "GA from Bio" is shown for exam types: ultrasound_prenatal,
+    ultrasound_prenatal_twins
+  • For twin exams, gestational age format is: "T1 Xw Yd / T2 Xw Yd"
+
+
+============================================================
+CLINICAL SECTIONS — 2 PATHS (mutually exclusive)
+============================================================
+
+  The clinical section renders one of two layout paths depending
+  on the exam type. Within each path, a single fetus uses only
+  the left column; twin exams populate both columns. The two-column
+  grid is always 50%/50% — the left column does NOT expand to full
+  width when the right column is hidden.
+
+  PATH ROUTING:
+  ┌──────────────────────────────────────┬───────────┐
+  │ Exam Type                            │ Path      │
+  ├──────────────────────────────────────┼───────────┤
+  │ ultrasound_prenatal                  │ A (1 col) │
+  │ ultrasound_prenatal_twins            │ A (2 col) │
+  │ ultrasound_first_trimester           │ B (1 col) │
+  │ ultrasound_first_trimester_twins     │ B (2 col) │
+  └──────────────────────────────────────┴───────────┘
+
+
+------------------------------------------------------------
+PATH A — ultrasound_prenatal  /  ultrasound_prenatal_twins
+------------------------------------------------------------
+                    "ULTRASOUND PRENATAL EXAM"
+
+  Outer 2-column layout (50% / 50%):
+  ┌─────────────────────────────────────────────────────────────┐
+  │   "Single Fetus / Twin 1"        "Twin 2"                   │
+  │  (border-top: #0f62fe)          (border-top: #6929c4)       │
+  │  ┌───────────────────────┐  ┌───────────────────────┐       │
+  │  │  [TILE A1 contents]   │  │  [TILE A1 contents]   │       │
+  │  │  [TILE A2 contents]   │  │  [TILE A2 contents]   │       │
+  │  │  [TILE A3 contents]   │  │  [TILE A3 contents]   │       │
+  │  │  [TILE A4 contents]   │  │  [TILE A4 contents]   │       │
+  │  └───────────────────────┘  └───────────────────────┘       │
+  └─────────────────────────────────────────────────────────────┘
+
+  ⚠ IMPORTANT: For single-fetus exams the right column ("Twin 2") is
+  hidden entirely; only the left column is rendered, but it remains
+  half the width of the report (50%) — it does NOT expand to full width.
+  Note: Percentiles are based on singleton Hadlock reference values.
+
+
+  TILE A1 — ULTRASOUND FINDINGS
+  ─────────────────────────────
+                    "ULTRASOUND FINDINGS"
+  Layout: auto-fit 3-column grid, cells left-aligned
+
+  ┌──────────────────────┬──────────────────────┬───────────────────────┐
+  │ "Presentation"       │ "Gender"             │ "FHR (bpm)"           │
+  │ [value]              │ [value]              │ [value]               │
+  ├──────────────────────┼──────────────────────┼───────────────────────┤
+  │ "Fetal Movement"     │ "Placenta"           │ "Umbilical Cord"      │
+  │ [value]              │ [value]              │ [value]               │
+  └──────────────────────┴──────────────────────┴───────────────────────┘
+
+
+  TILE A2 — BIOMETRY MEASUREMENTS
+  ────────────────────────────────
+                    "BIOMETRY MEASUREMENTS"
+  Layout: 4-column grid (Measurement | Value | Percentile | GA from Bio)
+  • Col 2 (Value): measurement only, right-aligned (e.g. "10.00 mm")
+  • Col 3 (Percentile): percentile when available (e.g. "1 %-ile"), "—" otherwise
+  • Col 4 (GA from Bio): spans only one row (header + single value cell on BPD row);
+    remaining rows in col 4 are empty.
+
+  ┌──────────────────────┬────────────────┬──────────────┬────────────────┐
+  │ "Measurement"        │ "Value"        │ "Percentile" │ "GA from Bio"  │
+  ├──────────────────────┼────────────────┼──────────────┼────────────────┤
+  │ "BPD (mm)"           │ [value]        │ [N] "%-ile"  │ [ga from bio]  │
+  │ "OFD (mm)"           │ [value]        │ "—"          │                │
+  │ "HC (mm)"            │ [value]        │ [N] "%-ile"  │                │
+  │ "TAD (mm)"           │ [value]        │ "—"          │                │
+  │ "APAD (mm)"          │ [value]        │ "—"          │                │
+  │ "AC (mm)"            │ [value]        │ [N] "%-ile"  │                │
+  │ "FL (mm)"            │ [value]        │ [N] "%-ile"  │                │
+  │ "TCD (mm)"           │ [value]        │ "—"          │                │
+  │ "Vp (mm)"            │ [value]        │ "—"          │                │
+  │ "CM (mm)"            │ [value]        │ "—"          │                │
+  │ "NF (mm)"            │ [value]        │ "—"          │                │
+  │ "NB (mm)"            │ [value]        │ "—"          │                │
+  │ "EFW (grams)"        │ [value]        │ [N] "%-ile"  │                │
+  │ "LA (mm)"            │ [value]        │ "—"          │                │
+  │ "LC (mm)"            │ [value]        │ "—"          │                │
+  └──────────────────────┴────────────────┴──────────────┴────────────────┘
+
+  Field notes:
+  • Percentile fields (BPD, HC, AC, FL, EFW) show "[N] %-ile" when a reference
+    value exists; all other rows show "—" in the Percentile column.
+  • Col 2 (Value) is right-aligned; col 3 (Percentile) is left-aligned.
+  • [ga from bio] — gestational age derived from biometry measurements;
+    format: Xw Yd (e.g. "28w 3d")
+
+
+  TILE A3 — ANATOMY
+  ──────────────────
+                         "ANATOMY"
+  Layout: auto-fit 6-column grid (wrap to next row after col 6),
+          cells left-aligned; each cell: label on top, value below
+
+  ┌──────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
+  │ "Head"   │ "Brain"  │ "Heart"  │ "Abdomen"│ "Kidneys"│ "Limbs"  │
+  │ [value]  │ [value]  │ [value]  │ [value]  │ [value]  │ [value]  │
+  ├──────────┼──────────┼──────────┼──────────┼──────────┼──────────┤
+  │"Skeleton"│ "Face"   │"Neck/Skin│ "Spine"  │ "Thorax" │          │
+  │ [value]  │ [value]  │ [value]  │ [value]  │ [value]  │          │
+  └──────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
+
+  Field notes:
+  • Anatomy values are typically: "Normal", "Abnormal", or "Not assessed"
+  • 11 fields total; last cell of row 2 is empty (grid fills left-to-right)
+
+
+  TILE A4 — DOPPLER MEASUREMENTS
+  ────────────────────────────────
+                    "DOPPLER MEASUREMENTS"
+  Layout: two separate sub-grids stacked vertically
+
+  Sub-grid A — Vessel measurements (3-column: Vessel | PI | RI)
+  ┌───────────────────┬──────────────────┬──────────────────┐
+  │ "Vessel"          │ "PI"             │ "RI"             │
+  ├───────────────────┼──────────────────┼──────────────────┤
+  │ "A. ut. Dex."     │ [value]          │ [value]          │
+  │ "A. ut. Sin."     │ [value]          │ [value]          │
+  │ "A. Umb."         │ [value]          │ [value]          │
+  └───────────────────┴──────────────────┴──────────────────┘
+
+  Sub-grid B — Single-value measurements (2-column: Label | Value)
+  ┌───────────────────┬──────────────────────────────────────┐
+  │ "Measurement"     │ "Value"                              │
+  ├───────────────────┼──────────────────────────────────────┤
+  │ "CMA PI"          │ [value]                              │
+  │ "PSV"             │ [value]                              │
+  │ "CPR"             │ [value]                              │
+  │ "Duc. Ven."       │ [value]                              │
+  └───────────────────┴──────────────────────────────────────┘
+
+
+------------------------------------------------------------
+PATH B — ultrasound_first_trimester  /  ultrasound_first_trimester_twins
+------------------------------------------------------------
+                  "FIRST TRIMESTER ULTRASOUND"
+
+  Outer 2-column layout (50% / 50%) — same rules as Path A:
+  ┌─────────────────────────────────────────────────────────────┐
+  │   "Single Fetus / Twin 1"        "Twin 2"                   │
+  │  (border-top: #0f62fe)          (border-top: #6929c4)       │
+  │  ┌───────────────────────┐  ┌───────────────────────┐       │
+  │  │  [TILE B1 contents]   │  │  [TILE B1 contents]   │       │
+  │  │  [TILE B2 contents]   │  │  [TILE B2 contents]   │       │
+  │  │  [TILE B3 contents]   │  │  [TILE B3 contents]   │       │
+  │  │  [TILE B4 contents]   │  │  [TILE B4 contents]   │       │
+  │  │  [TILE B5 contents]   │  │  [TILE B5 contents]   │       │
+  │  └───────────────────────┘  └───────────────────────┘       │
+  └─────────────────────────────────────────────────────────────┘
+
+  ⚠ IMPORTANT: For single-fetus exams the right column ("Twin 2") is
+  hidden entirely; only the left column is rendered, but it remains
+  half the width of the report (50%) — it does NOT expand to full width.
+
+
+  TILE B1 — ULTRASOUND FINDINGS (First Trimester)
+  ─────────────────────────────────────────────────
+                    "ULTRASOUND FINDINGS"
+  Layout: auto-fit 3-column grid, cells left-aligned
+  (same grid rules as TILE A1; different field set)
+
+  ┌──────────────────────┬──────────────────────┬───────────────────────┐
+  │ "Placenta"           │ "FHR (bpm)"          │ "Umbilical Cord"      │
+  │ [value]              │ [value]              │ [value]               │
+  └──────────────────────┴──────────────────────┴───────────────────────┘
+
+
+  TILE B2 — BIOMETRY (First Trimester)
+  ─────────────────────────────────────
+                    "BIOMETRY MEASUREMENTS"
+  Layout: 3-column grid (Measurement | Value | GA from CRL), cells left-aligned
+  The "GA from CRL" column spans only one row (header + single value cell);
+  the remaining rows in col 3 are empty.
+
+  ┌──────────────────────┬──────────────────────────┬────────────────┐
+  │ "Measurement"        │ "Value"                  │ "GA from CRL"  │
+  ├──────────────────────┼──────────────────────────┼────────────────┤
+  │ "CRL (mm)"           │ [value]                  │ [ga from crl]  │
+  │ "NT (mm)"            │ [value]                  │                │
+  │ "NB (mm)"            │ [value]                  │                │
+  │ "Heart Rate (bpm)"   │ [value]                  │                │
+  └──────────────────────┴──────────────────────────┴────────────────┘
+
+  Field notes:
+  • [ga from crl] — gestational age derived from CRL; format: Xw Yd
+
+
+  TILE B3 — MARKERS (First Trimester)
+  ─────────────────────────────────────
+                    "MARKERS"
+  Layout: 2-column grid (Marker label | Value), cells left-aligned
+  Rows 1–8: boolean values displayed as "Yes" / "No"
+  Rows 9–10: free-text values
+
+  ┌──────────────────────────────────┬────────────────────────────┐
+  │ "Marker"                         │ "Value"                    │
+  ├──────────────────────────────────┼────────────────────────────┤
+  │ "Arrhythmia"                     │ [yes/no]                   │
+  │ "Tricuspid Regurgitation"        │ [yes/no]                   │
+  │ "Abnormal D.Venosus Flow"        │ [yes/no]                   │
+  │ "Echogenic Cardiac Focus"        │ [yes/no]                   │
+  │ "Single Umbilical Artery"        │ [yes/no]                   │
+  │ "Choroid Plexus Cysts"           │ [yes/no]                   │
+  │ "Exomphalos"                     │ [yes/no]                   │
+  │ "Megacystis"                     │ [yes/no]                   │
+  │ "Placenta"                       │ [value]                    │
+  │ "Cord Insertion"                 │ [value]                    │
+  └──────────────────────────────────┴────────────────────────────┘
+
+
+  TILE B4 — ANATOMY (First Trimester)
+  ─────────────────────────────────────
+                         "ANATOMY"
+  Layout and fields: identical to TILE A3 (same 11 fields, same grid).
+  See TILE A3 definition above.
+
+
+  TILE B5 — DOPPLER (First Trimester)
+  ─────────────────────────────────────
+                    "DOPPLER MEASUREMENTS"
+  Layout: Sub-grid A only (vessel measurements; no Sub-grid B)
+
+  Sub-grid A — Vessel measurements (3-column: Vessel | PI | RI)
+  ┌───────────────────┬──────────────────┬──────────────────┐
+  │ "Vessel"          │ "PI"             │ "RI"             │
+  ├───────────────────┼──────────────────┼──────────────────┤
+  │ "A. ut. Dex."     │ [value]          │ [value]          │
+  │ "A. ut. Sin."     │ [value]          │ [value]          │
+  └───────────────────┴──────────────────┴──────────────────┘
+
+  Field notes:
+  • "A. Umb." and Sub-grid B fields (CMA PI, PSV, CPR, Duc. Ven.)
+    are NOT shown in first-trimester exams.
+
+
+============================================================
+TILE 4 — CLINICAL INFORMATION
+============================================================
+  Layout: single full-width text block
+
+  ┌─────────────────────────────────────────────────────────────┐
+  │ "FINDINGS"                                                  │
+  │ [free text]                                                 │
+  └─────────────────────────────────────────────────────────────┘
+
+
+============================================================
+TILE 5 — COMMENTS
+============================================================
+  Layout: single full-width text block
+
+  ┌─────────────────────────────────────────────────────────────┐
+  │ "COMMENTS"                                                  │
+  │ [free text]                                                 │
+  └─────────────────────────────────────────────────────────────┘
+
+
+============================================================
+TILE 6 — NOTES
+============================================================
+  Layout: single full-width text block
+
+  ┌─────────────────────────────────────────────────────────────┐
+  │ "NOTES"                                                     │
+  │ [free text]                                                 │
+  └─────────────────────────────────────────────────────────────┘
+
+
+============================================================
+TILE 7 — METADATA
+============================================================
+  Layout: 2-column grid, full width, cells left-aligned
+
+  ┌──────────────────────────────┬───────────────────────────────┐
+  │ "Created By"                 │ "Created At"                  │
+  │ [username]                   │ [created datetime]            │
+  ├──────────────────────────────┼───────────────────────────────┤
+  │ "Last Updated"               │                               │
+  │ [updated datetime]           │                               │
+  └──────────────────────────────┴───────────────────────────────┘
+
+
+============================================================
+STYLING REFERENCE
+============================================================
+
+  Token               Value                   Notes
+  ──────────────────────────────────────────────────────────────
+  Tile section title  ALL CAPS, quoted        font-size: 0.875rem, weight: 600,
+                                              color: #161616; rendered as a heading
+                                              above the tile's content grid
+                                              (e.g. "ULTRASOUND FINDINGS")
+  Label color         #525252 (gray-60)       font-size: 0.75–0.875rem
+  Value color         #161616 (gray-100)      font-size: 0.875–1rem, weight: 600
+  Link color          #0f62fe (blue-60)       patient name hyperlink
+  Status tile bg      #f4f4f4 (gray-10)       Tile 1 only
+  Twin 1 border       #0f62fe (blue-60)       border-top on left column header
+  Twin 2 border       #6929c4 (purple-70)     border-top on right column header
+  Percentile format   [value] - [N] "%-ile"   e.g. "32.4 - 45 %-ile"
+
+  Layout primitives:
+    Carbon Stack (gap 4, 5, 6)
+    Carbon Tile
+    CSS Grid — repeat(auto-fit, minmax(140–200px, 1fr))
+
+  Carbon components used:
+    Breadcrumb / BreadcrumbItem
+    Button
+    Stack
+    Tile
+    InlineNotification
+    Modal (delete confirmation)
+    InlineLoading
+    Tag (status indicator)
+    Icons: Edit, ArrowLeft, TrashCan (@carbon/icons-react)
+
+
+============================================================
+SECTION VISIBILITY MAP  (to be updated as types are added)
+============================================================
+
+  Column key:
+    Preg    — Tile 3 (Pregnancy Data)
+    UF      — Ultrasound Findings (A1 / B1)
+    Bio     — Biometry (A2 / B2)
+    Anat    — Anatomy (A3 / B4)
+    Dop     — Doppler (A4 / B5)
+    Markers — Markers (B3 only)
+    Path    — Clinical section layout path
+
+  ┌──────────────────────────────────────┬──────┬────┬─────┬──────┬─────┬─────────┬──────┐
+  │ Exam Type                            │ Preg │ UF │ Bio │ Anat │ Dop │ Markers │ Path │
+  ├──────────────────────────────────────┼──────┼────┼─────┼──────┼─────┼─────────┼──────┤
+  │ ultrasound_prenatal                  │  ✓   │ ✓  │  ✓  │  ✓   │  ✓  │    —    │  A   │
+  │ ultrasound_prenatal_twins            │  ✓   │ ✓  │  ✓  │  ✓   │  ✓  │    —    │  A   │
+  │ ultrasound_first_trimester           │  ✓   │ ✓  │  ✓  │  ✓   │  ✓  │    ✓    │  B   │
+  │ ultrasound_first_trimester_twins     │  ✓   │ ✓  │  ✓  │  ✓   │  ✓  │    ✓    │  B   │
+  └──────────────────────────────────────┴──────┴────┴─────┴──────┴─────┴─────────┴──────┘
+
+
+============================================================
+END OF TEMPLATE
+============================================================

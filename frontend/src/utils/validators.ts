@@ -8,7 +8,7 @@ export interface ValidationResult {
   errors: Record<string, string>;
 }
 
-const GA_REGEX = /^\d{1,2}w\s?\d{1}d$/;
+export const GA_REGEX = /^(\d{1,2}w\s?\d{1}d|\d{1,2}с\s?\d{1}д)$/;
 const PHONE_REGEX = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -78,40 +78,68 @@ export function validatePatient(data: {
  */
 export function validateGestationalAge(ga: string): string | undefined {
   if (!ga) return undefined;
-  if (!GA_REGEX.test(ga)) return 'Format must be "28w 3d"';
+  if (!GA_REGEX.test(ga)) return 'Format must be "28w 3d" or "28с 3д"';
+  return undefined;
+}
+
+/** Strict numeric regex — rejects "1abc", "1,5", "1e5" */
+const NUMERIC_REGEX = /^\d+(\.\d+)?$/;
+
+/**
+ * Validate a positive float field (biometry).
+ * Rejects "1abc", "1,5". Accepts empty (optional field).
+ * Returns an error string if invalid, undefined if empty or valid.
+ */
+export function validatePositiveFloat(raw: string, label: string): string | undefined {
+  if (!raw || !raw.trim()) return undefined;
+  const trimmed = raw.trim();
+  if (!NUMERIC_REGEX.test(trimmed)) return `${label} must be a positive number`;
+  const v = parseFloat(trimmed);
+  if (v <= 0) return `${label} must be a positive number`;
+  return undefined;
+}
+
+/**
+ * Validate a non-negative float field (doppler).
+ * Same strict regex as validatePositiveFloat; accepts 0.
+ */
+export function validateNonNegativeFloat(raw: string, label: string): string | undefined {
+  if (!raw || !raw.trim()) return undefined;
+  const trimmed = raw.trim();
+  if (!NUMERIC_REGEX.test(trimmed)) return `${label} must be a valid number`;
+  const v = parseFloat(trimmed);
+  if (v < 0) return `${label} must be a valid number`;
+  return undefined;
+}
+
+/**
+ * Validate an integer field (heart rate / pulse).
+ * Accepts "145" or "145.7" (fraction will be truncated at submit). Rejects "145abc".
+ * Value must be > 0.
+ */
+export function validateIntegerField(raw: string, label: string): string | undefined {
+  if (!raw || !raw.trim()) return undefined;
+  const trimmed = raw.trim();
+  if (!NUMERIC_REGEX.test(trimmed)) return `${label} must be a whole number`;
+  const v = parseFloat(trimmed);
+  if (v <= 0) return `${label} must be a positive number`;
   return undefined;
 }
 
 /**
  * Validate a biometry float field.
- * Returns an error message string or undefined if valid.
+ * Delegates to validatePositiveFloat.
  */
 export function validateBiometryField(value: string, fieldName: string): string | undefined {
-  if (!value || !value.trim()) return undefined;
-  const parsed = parseFloat(value);
-  if (isNaN(parsed) || !isFinite(parsed)) {
-    return `${fieldName} must be a positive number`;
-  }
-  if (parsed <= 0) {
-    return `${fieldName} must be a positive number`;
-  }
-  return undefined;
+  return validatePositiveFloat(value, fieldName);
 }
 
 /**
  * Validate a doppler float field.
- * Returns an error message string or undefined if valid.
+ * Delegates to validateNonNegativeFloat.
  */
 export function validateDopplerField(value: string, fieldName: string): string | undefined {
-  if (!value || !value.trim()) return undefined;
-  const parsed = parseFloat(value);
-  if (isNaN(parsed)) {
-    return `${fieldName} must be a valid number`;
-  }
-  if (parsed < 0) {
-    return `${fieldName} must be a positive number`;
-  }
-  return undefined;
+  return validateNonNegativeFloat(value, fieldName);
 }
 
 // Made with Bob

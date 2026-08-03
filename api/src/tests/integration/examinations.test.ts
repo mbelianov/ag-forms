@@ -44,7 +44,6 @@ describe('Examinations Integration', () => {
             doppler: {
                 pi: 1.2,
                 ri: 0.7,
-                vessel: 'Umbilical Artery'
             },
             findings: 'Normal findings',
             notes: 'Test notes'

@@ -104,17 +104,72 @@ export interface AnatomyFindings {
     thorax?: string;
 }
 
+// UZPT — First Trimester examination interfaces
+export interface FtBiometry {
+    crl?: number;        // Crown-Rump Length, mm
+    gaFromCrl?: string;  // "Xw Yd" — GA calculated from CRL (storage key; display label = "GA from Bio")
+    nt?: number;         // Nuchal Translucency, mm
+    nb?: number;         // Nasal Bone, mm
+    puls?: number;       // Fetal heart rate (Puls), bpm
+    // Sub-Task 3: Per-measurement GA fields for first-trimester measurements
+    ntGa?:  string;  // GA derived from NT (placeholder; calculation deferred)
+    nbGa?:  string;  // GA derived from NB (placeholder; calculation deferred)
+    crlGa?: string;  // GA derived from CRL (alias; gaFromCrl is the legacy field, keep both)
+}
+
+export interface FtMarkers {
+    arrhythmia?: string;
+    tricuspidRegurgitation?: string;
+    abnormalDvFlow?: string;
+    echogenicCardiacFocus?: string;
+    singleUmbilicalArtery?: string;
+    choroidPlexusCysts?: string;
+    exomphalos?: string;
+    megacystis?: string;
+    placenta?: string;        // free-text placenta description
+    cordInsertion?: string;   // free-text cord insertion
+}
+
+export interface FtUltrasoundFindings {
+    placenta?: string;
+    heartRate?: number;    // СЧП, bpm
+    umbilicalCord?: string;
+}
+
+export interface FtDoppler {
+    utADexPI?: number;
+    utADexRI?: number;
+    utASinPI?: number;
+    utASinRI?: number;
+}
+
 export interface ExaminationData {
     pregnancy_data?: PregnancyData;
     ultrasound_findings?: UltrasoundFindings;
     anatomy?: AnatomyFindings;
     twin2_ultrasound_findings?: UltrasoundFindings; // uzd-twins: Twin 2
     twin2_anatomy?: AnatomyFindings;                // uzd-twins: Twin 2
+    // UZPT — First Trimester fields
+    ft_biometry?: FtBiometry;
+    ft_markers?: FtMarkers;
+    ft_ultrasound?: FtUltrasoundFindings;
+    ft_anatomy?: AnatomyFindings;       // reuses existing type
+    ft_doppler?: FtDoppler;
+    twin2_ft_biometry?: FtBiometry;
+    twin2_ft_markers?: FtMarkers;
+    twin2_ft_ultrasound?: FtUltrasoundFindings;
+    twin2_ft_anatomy?: AnatomyFindings;
+    twin2_ft_doppler?: FtDoppler;
     comments?: string;
 }
 
 /**
- * Biometry measurements for ultrasound examination
+ * Biometry measurements for ultrasound examination.
+ *
+ * Sub-Task 3 reserved field conventions:
+ *   Per-measurement GA: {measurementKey}Ga  (string "Xw Yd" | undefined)
+ *   Persisted percentile: {measurementKey}Percentile  (number | undefined)
+ *   gestationalAgeFromBiometry is retained for backward compatibility.
  */
 export interface BiometryData {
     bpd?: number; // Biparietal Diameter (float, mm)
@@ -124,7 +179,7 @@ export interface BiometryData {
     efw?: number; // Estimated Fetal Weight (float, grams)
     // TASK-034: Extended biometry parameters
     ofd?: number;         // Occipito-frontal Diameter (float, mm)
-    vp?: number;          // Vermis (float, mm)
+    vp?: string;          // Vermis (free-text string, migrated from float)
     tcd?: number;         // Transcerebellar Diameter (float, mm)
     cm?: number;          // Cisterna Magna (float, mm)
     nuchalFold?: number;  // Nuchal Fold (float, mm)
@@ -132,8 +187,26 @@ export interface BiometryData {
     apad?: number;        // Antero-Posterior Abdominal Diameter (float, mm)
     tad?: number;         // Transverse Abdominal Diameter (float, mm)
     // TASK-035: LA and LC
-    la?: number;          // Left Atrium (float, mm)
+    la?: string;          // Left Atrium (free-text string, migrated from float)
     lc?: number;          // Left Cardiac (float, mm)
+    // Sub-Task 3: Per-measurement GA fields ("Xw Yd" strings)
+    bpdGa?:   string;   // GA derived from BPD
+    ofdGa?:   string;   // GA derived from OFD
+    hcGa?:    string;   // GA derived from HC
+    tadGa?:   string;   // GA derived from TAD
+    apadGa?:  string;   // GA derived from APAD
+    acGa?:    string;   // GA derived from AC
+    flGa?:    string;   // GA derived from FL
+    efwGa?:   string;   // GA derived from EFW
+    // Sub-Task 3: Persisted percentile fields (v2 expanded set)
+    bpdPercentile?:   number;   // BPD percentile
+    ofdPercentile?:   number;   // OFD percentile (NEW — v2)
+    hcPercentile?:    number;   // HC percentile
+    tadPercentile?:   number;   // TAD percentile (NEW — v2)
+    apadPercentile?:  number;   // APAD percentile (NEW — v2)
+    acPercentile?:    number;   // AC percentile
+    flPercentile?:    number;   // FL percentile
+    efwPercentile?:   number;   // EFW percentile
 }
 
 /**
@@ -142,8 +215,7 @@ export interface BiometryData {
 export interface DopplerData {
     pi?: number;     // Pulsatility Index (float)
     ri?: number;     // Resistance Index (float)
-    vessel?: string; // Vessel name (e.g., "Umbilical Artery")
-    // TASK-036: Extended vascular parameters
+    // TASK-036: Extended vascular parameters (HF-3: vessel removed)
     utADexPI?: number;  // A.ut. Dex PI
     utADexRI?: number;  // A.ut. Dex RI
     utASinPI?: number;  // A.ut. Sin PI

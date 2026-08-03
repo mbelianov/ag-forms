@@ -136,7 +136,6 @@ describe('Validation Utilities', () => {
                 doppler: {
                     pi: 1.2,
                     ri: 0.7,
-                    vessel: 'Umbilical Artery'
                 },
                 notes: 'Normal notes',
                 findings: 'Normal findings'
@@ -166,7 +165,7 @@ describe('Validation Utilities', () => {
             });
 
             expect(result.valid).toBe(false);
-            expect(result.errors).toContain('Gestational age must be in format "28w 3d"');
+            expect(result.errors).toContain('Gestational age must be in format "28w 3d" or "28с 3д"');
         });
 
         test('should accept float biometry values', () => {

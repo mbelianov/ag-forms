@@ -1,0 +1,52 @@
+Hotfix changes for Ultrasound Prenatal Test and Ultrasound Prenatal Test for Twins (form, details view an pdf)
+- sectoins order:
+   --pregnancy data, 
+   --ultrasound findings, 
+   --biometry, 
+   --anatomy, 
+   --Doppler, 
+   --finding, 
+   --comments, 
+   --notes
+
+- Biometry fields to be ordered verticall in following order and manner.
+   -- BP    [input]     [percentile]        [GA from Bio]
+   -- OFD   [input] 
+   -- HC    [input]     [percentile]
+   -- TAD   [input]
+   -- APAD  [input]
+   -- AC    [input]     [percentile]
+   -- FL    [input]     [percentile]        [Biometry/EFW button]  <- one single autocalc button instead of existing AutoCalcGA and AutoCalcEFW
+   -- TCD   [input]
+   -- Vp    [input]
+   -- CM    [input]
+   -- NF    [input]
+   -- NB    [input]
+   -- EFW   [input]     [percentile]
+   -- LA    [input]
+   -- LC    [input]
+
+- Doppler section fields rename. rename in UI, code base and db. 
+  no migration necessary (existing records will be deleted)
+   -- PI -> A.Umb. PI
+   -- RI -> A.Umb. RI
+   -- Dex PI -> A. ut. Dex. PI
+   -- Dex RI -> A. ut. Dex. RI
+   -- Sin PI -> A. ut. Sin. PI
+   -- Sin RI -> A. ut. Sin. PI
+   -- CMA -> CMA PI
+
+  fields order  
+                        PI          RI
+    -- A. ut. Dex.      [input]     [input]
+    -- A. ut. SIn.      [input]     [input]
+    -- A. Umb.          [input]     [input]
+    -- CMA              [input]
+    -- PSV              [input]
+    -- CPR              [input]
+    -- Duc. Ven.        [input]
+
+- in the Twins variant, fields keep order and structure but occupay half page. 
+  left half is Twin 1, right half Twin 2. common sectons remain full page width
+
+- keep A4 single pdf page (if possible)

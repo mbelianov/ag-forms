@@ -238,3 +238,98 @@ This goes to the Functions host trace — it is **not** written to the `AuditLog
   Remove the two standalone `<TextInput>` elements for `la` and `lc` at lines 902–903.
 - **Priority:** P4 · Cosmetic — no functional or user-visible impact
 - **Status:** Deferred
+
+---
+
+## KI-009 · Biometry percentile fields in edit form are not populated on load, and percentiles are never persisted
+
+- **Affects:**
+  - `frontend/src/components/sections/BiometrySection.tsx`
+  - `frontend/src/hooks/useExaminationForm.ts`
+  - `frontend/src/pages/ExaminationDetailPage.tsx`
+  - `frontend/src/services/viewModelBuilders.ts` (PDF)
+- **Exam types:** `ultrasound_prenatal` (Single Fetus) and `ultrasound_prenatal_twins` (Twins) — both affected identically. First Trimester exams are not affected (no percentile column exists for FT).
+- **Symptom:** When editing a Prenatal exam that already has biometry measurements saved (BPD, HC, AC, FL), the BPD Percentile, HC Percentile, AC Percentile, FL Percentile, and EFW Percentile input fields in the Biometry section all appear empty. The user must manually click **"Biometry / EFW"** to repopulate them. For twins exams both fetus columns are affected.
+- **Root cause — two compounding problems:**
+
+  1. **Percentile state is purely local and ephemeral.** In `BiometrySection.tsx` the percentile values are held in `useState` (`percentiles`, `efwPercentile`) which initialises to `undefined` on every mount. There is no `useEffect` that seeds these values from the incoming `data` prop on edit load. The only code path that sets them is the `handleCalcBiometryEFW` click handler — so they are always blank until the user clicks the button.
+
+  2. **Percentiles are never saved to the backend.** The `formData` object in `useExaminationForm.ts` has no fields for percentile values, and the submit payload never includes them. Even if the auto-calculate button is clicked, the computed percentiles are discarded on form submit. On the detail view, `ExaminationDetailPage.tsx` re-computes percentiles client-side using `calcBiometryPercentiles()` each time the page loads; there is no stored source of truth.
+
+- **Consequence:** Percentiles cannot be entered manually (inputs are `readOnly`), cannot be saved, and cannot survive a page reload. There is no way for a clinician to record a percentile value obtained from an external tool (e.g. a dedicated fetal growth calculator), which is a required clinical workflow.
+- **Fix:** See implementation plan `docs2/percentiles-persistence-plan.md`. In summary:
+  - Add `BiometryPercentileData` type to both API and frontend type definitions.
+  - Add `biometryPercentiles` / `biometryPercentiles2` JSON-string columns to the Azure Table Storage row, following the same serialization/deserialization pattern as `biometry` / `biometry2`.
+  - Lift percentile state out of `BiometrySection` into `formData`; make the inputs fully editable and controlled.
+  - Seed `formData` percentile fields from `examination.biometryPercentiles` on edit load.
+  - Include percentiles in create/update request payloads.
+  - Replace client-side recomputation in `ExaminationDetailPage` and `viewModelBuilders` with reads from the stored field.
+- **Priority:** P1 · High — blocks manual percentile entry, a required clinical workflow
+- **Status:** Planned — implementation plan written; not yet implemented
+
+---
+
+## KI-010 · First Trimester exam data uses a different storage layout than Prenatal exams — all clinical data is inside the `data` JSON blob
+
+- **Type:** Architectural note — not a bug. Documents a non-obvious storage asymmetry that affects any future work on FT exams.
+- **Affects:**
+  - `api/src/functions/CreateExamination.ts`
+  - `api/src/functions/UpdateExamination.ts`
+  - `api/src/functions/GetExamination.ts`
+  - `api/src/types/index.ts` (`ExaminationData`, `FtBiometry`, `FtMarkers`, `FtUltrasoundFindings`, `FtDoppler`)
+  - `frontend/src/hooks/useExaminationForm.ts` (FT form-state seeding)
+  - `frontend/src/services/viewModelBuilders.ts` (FT PDF rendering)
+
+### Storage layout comparison
+
+Every examination row in the `Examinations` Azure Table Storage table is a flat bag of typed columns. Prenatal exams and First Trimester exams share the same partition/row key scheme and the same scalar columns (`examDate`, `gestationalAge`, `status`, `mrn`, etc.), but differ significantly in how clinical data is stored:
+
+**Prenatal (`ultrasound_prenatal`, `ultrasound_prenatal_twins`):**
+
+| Column | Content |
+|--------|---------|
+| `biometry` | JSON string — `{ bpd, hc, ac, fl, efw, ofd, vp, … }` |
+| `doppler` | JSON string — `{ pi, ri, utADexPI, … }` |
+| `biometry2` | JSON string — Twin 2 biometry (absent on single-fetus rows) |
+| `doppler2` | JSON string — Twin 2 doppler (absent on single-fetus rows) |
+| `data` | JSON string — `{ pregnancy_data, ultrasound_findings, anatomy, twin2_ultrasound_findings, twin2_anatomy, comments }` |
+
+**First Trimester (`ultrasound_first_trimester`, `ultrasound_first_trimester_twins`):**
+
+| Column | Content |
+|--------|---------|
+| `biometry` | **absent** |
+| `doppler` | **absent** |
+| `biometry2` | **absent** |
+| `doppler2` | **absent** |
+| `data` | JSON string — contains **all** clinical sub-data: `pregnancy_data`, `ft_biometry`, `ft_markers`, `ft_ultrasound`, `ft_anatomy`, `ft_doppler`, and for twins `twin2_ft_biometry`, `twin2_ft_markers`, `twin2_ft_ultrasound`, `twin2_ft_anatomy`, `twin2_ft_doppler` |
+
+For a single-fetus FT exam the `data` blob looks like:
+
+```json
+{
+  "pregnancy_data": { "last_menstrual_period": "2024-09-15", "obstetric_history": "G1P0" },
+  "ft_ultrasound":  { "placenta": "anterior", "heartRate": 162, "umbilicalCord": "3 vessels" },
+  "ft_biometry":    { "crl": 58.2, "gaFromCrl": "12w 3d", "nt": 1.4, "nb": 2.1, "puls": 162 },
+  "ft_markers":     { "arrhythmia": "no", "tricuspidRegurgitation": "no", "placenta": "normal", … },
+  "ft_anatomy":     { "head": "normal", "brain": "normal", … },
+  "ft_doppler":     { "utADexPI": 1.12, "utADexRI": 0.58, "utASinPI": 1.08, "utASinRI": 0.55 }
+}
+```
+
+For an FT twins exam, the same blob also carries `twin2_ft_biometry`, `twin2_ft_markers`, `twin2_ft_ultrasound`, `twin2_ft_anatomy`, and `twin2_ft_doppler` alongside the fetus-1 keys.
+
+### Why this matters
+
+1. **No top-level `biometry` column for FT.** Any code that reads `examination.biometry` (e.g. `ExaminationDetailPage`, `viewModelBuilders`) receives `undefined` for FT exams. FT biometry is accessed as `examination.data?.ft_biometry`. This is currently handled correctly, but the asymmetry is a latent trap for new features.
+
+2. **`gestationalAgeFromBiometry` is unused for FT.** Prenatal exams store GA derived from biometry in the top-level `gestationalAgeFromBiometry` column. For FT exams, GA derived from CRL is stored inside `data.ft_biometry.gaFromCrl` — one extra level of nesting, a different field name, and only accessible after parsing the `data` JSON blob.
+
+3. **Percentile persistence (KI-009) does not apply to FT.** The planned `biometryPercentiles` / `biometryPercentiles2` columns will only be relevant for prenatal exam types. FT exams have no corresponding percentile calculations in the current clinical model.
+
+4. **Adding new FT-specific fields requires modifying `ExaminationData`** (`api/src/types/index.ts` and `frontend/src/types/index.ts`) and the `data` JSON blob — not adding a new top-level column. This is in contrast to prenatal extensions (e.g. `biometry2`, `doppler2`) which each got their own top-level column.
+
+5. **`GetExamination.ts` deserializes `data` as one opaque blob.** The `ft_biometry`, `ft_markers` etc. sub-keys are never individually deserialized at the API layer — they travel as nested objects inside the single parsed `data` object. This means the API has no awareness of individual FT field shapes; validation of FT sub-fields is enforced only via the Joi `dataSchema` in `validation.ts`.
+
+- **Priority:** P5 · Informational — no action required; document for developer awareness
+- **Status:** Documented — no fix planned; layout is consistent and intentional

@@ -1,0 +1,14 @@
+- biometry fields in ultrasound prenatal details must follow the structure of the 
+  biometry fiedls in the input form:
+  -- vertically ordered, one measurement per row with following structure - label, value, percentile
+  -- left aligned in the Biometry section
+  Example (3 rows only):
+     BPD:   20      30th percentile
+     OFD:   150     <empty>
+     HC:    130     35th percentile
+     
+- Doppler measurement section in ultrasound prenatal details must reflect structure 
+  of the same section in the input form 
+
+
+ 
