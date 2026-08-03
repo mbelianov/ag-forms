@@ -137,9 +137,11 @@ export default function FirstTrimesterSection({ prefix, data, errors, onChange, 
             onChange={(e) => onChange(p('ft_crl'), e.target.value)}
             disabled={isSubmitting}
           />
+          {/* Sub-Task 5: label renamed from "GA from CRL" to "GA from Bio" */}
+          {/* GA from Bio = GA from CRL for FT exams at current level of development */}
           <TextInput
             id={p('ft_gaFromCrl')}
-            labelText="GA from CRL"
+            labelText="GA from Bio"
             placeholder="e.g. 12w 3d"
             value={data[p('ft_gaFromCrl') as keyof FirstTrimesterSectionFormData]}
             invalid={!!errors[p('ft_gaFromCrl')]}
@@ -154,10 +156,11 @@ export default function FirstTrimesterSection({ prefix, data, errors, onChange, 
               onClick={handleCalcGA}
               disabled={!canCalcGA || isSubmitting}
               title={canCalcGA
-                ? 'Calculate GA from CRL (Robinson 1975, valid range 10–65 mm)'
+                ? 'Calculate GA from Bio (CRL · Robinson 1975, valid range 10–65 mm)'
                 : 'Enter CRL in the valid range 10–65 mm to enable calculation'}
             >
-              GA from CRL
+              {/* Sub-Task 5: button text updated */}
+              GA from Bio
             </Button>
           </div>
           {/* Row 2: NT */}

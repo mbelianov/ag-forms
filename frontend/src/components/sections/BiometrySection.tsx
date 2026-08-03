@@ -1,7 +1,14 @@
 /**
  * BiometrySection — generic per-fetus biometry form section.
- * HF-2: Vertical 3-column table layout. Single "Biometry / EFW" button on FL row.
+ * HF-2: Vertical 3-column grid layout.
+ *   Col 1: measurement input
+ *   Col 2: percentile (read-only) or GA from Bio (BPD row)
+ *   Col 3: empty placeholder
+ * The "Biometry / EFW" calculate button lives in a dedicated row after LC, col 3.
  * Parameterised by `prefix` so DOM ids remain unique when two instances coexist.
+ *
+ * Sub-Task 1: EFW row moved to position 8 (immediately after FL).
+ * Sub-Task 2: Button relocated from FL row col-3 to a dedicated calculate row after LC, col-3.
  */
 import { useState } from 'react';
 import { TextInput, Button, FormGroup } from '@carbon/react';
@@ -36,14 +43,21 @@ interface BiometrySectionProps {
   isSubmitting: boolean;
 }
 
-const calcButtonWrap: React.CSSProperties = { display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' };
-
-// HF-2: 3-column grid — col1: input, col2: percentile or secondary, col3: button or empty
+// HF-2: 3-column grid — col1: input, col2: percentile or secondary, col3: empty or GA from Bio
 const gridStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '1fr 1fr 1fr',
   gap: '0.75rem',
   alignItems: 'end',
+};
+
+// Calculate row — 3 equal columns, button sits in col 3
+const calcRowStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr 1fr',
+  gap: '0.75rem',
+  alignItems: 'end',
+  marginTop: '0.5rem',
 };
 
 export default function BiometrySection({ prefix, data, errors, onChange, isSubmitting }: BiometrySectionProps) {
@@ -82,7 +96,7 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
   return (
     <FormGroup legendText="">
       <div style={gridStyle}>
-        {/* BPD row — col3: GA from Biometry editable field */}
+        {/* BPD row — col2: BPD percentile, col3: GA from Bio editable field */}
         <TextInput id={p('bpd')} labelText="BPD (mm)" placeholder="e.g., 85.5"
           value={data.bpd} onChange={(e) => onChange(p('bpd'), e.target.value)}
           invalid={!!errors[p('bpd')]} invalidText={errors[p('bpd')]} disabled={isSubmitting} autoComplete="off" />
@@ -128,21 +142,21 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
           value={pctText(percentiles?.ac)} readOnly tabIndex={-1} />
         <div />
 
-        {/* FL row — col3: single Biometry / EFW button */}
+        {/* FL row */}
         <TextInput id={p('fl')} labelText="FL (mm)" placeholder="e.g., 55.5"
           value={data.fl} onChange={(e) => onChange(p('fl'), e.target.value)}
           invalid={!!errors[p('fl')]} invalidText={errors[p('fl')]} disabled={isSubmitting} autoComplete="off" />
         <TextInput id={p('flPercentile')} labelText="FL Percentile"
           value={pctText(percentiles?.fl)} readOnly tabIndex={-1} />
-        <div style={calcButtonWrap}>
-          <Button kind="tertiary" size="md" onClick={handleCalcBiometryEFW}
-            disabled={!canCalcGA || isSubmitting}
-            title={canCalcGA
-              ? 'Calculate GA from biometry and EFW (BPD, HC, AC, FL required)'
-              : 'All four measurements (BPD, HC, AC, FL) required'}>
-            Biometry / EFW
-          </Button>
-        </div>
+        <div />
+
+        {/* EFW row — moved to position 8 (immediately after FL) */}
+        <TextInput id={p('efw')} labelText="EFW (grams)" placeholder="e.g., 1500"
+          value={data.efw} onChange={(e) => { onChange(p('efw'), e.target.value); setEfwPercentile(undefined); }}
+          invalid={!!errors[p('efw')]} invalidText={errors[p('efw')]} disabled={isSubmitting} autoComplete="off" />
+        <TextInput id={p('efwPercentile')} labelText="EFW Percentile"
+          value={efwPercentile !== undefined ? `${efwPercentile}th` : ''} placeholder="—" readOnly tabIndex={-1} />
+        <div />
 
         {/* TCD row */}
         <TextInput id={p('tcd')} labelText="TCD (mm)" placeholder="e.g., 0.0"
@@ -174,14 +188,6 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
           invalid={!!errors[p('nb')]} invalidText={errors[p('nb')]} disabled={isSubmitting} autoComplete="off" />
         <div /><div />
 
-        {/* EFW row */}
-        <TextInput id={p('efw')} labelText="EFW (grams)" placeholder="e.g., 1500"
-          value={data.efw} onChange={(e) => { onChange(p('efw'), e.target.value); setEfwPercentile(undefined); }}
-          invalid={!!errors[p('efw')]} invalidText={errors[p('efw')]} disabled={isSubmitting} autoComplete="off" />
-        <TextInput id={p('efwPercentile')} labelText="EFW Percentile"
-          value={efwPercentile !== undefined ? `${efwPercentile}th` : ''} placeholder="—" readOnly tabIndex={-1} />
-        <div />
-
         {/* LA row */}
         <TextInput id={p('la')} labelText="LA" placeholder="e.g., custom value"
           value={data.la} onChange={(e) => onChange(p('la'), e.target.value)}
@@ -193,6 +199,18 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
           value={data.lc} onChange={(e) => onChange(p('lc'), e.target.value)}
           invalid={!!errors[p('lc')]} invalidText={errors[p('lc')]} disabled={isSubmitting} autoComplete="off" />
         <div /><div />
+      </div>
+
+      {/* Dedicated calculate row — 3 columns; button in col 3 */}
+      <div style={calcRowStyle}>
+        <div /><div />
+        <Button kind="tertiary" size="md" onClick={handleCalcBiometryEFW}
+          disabled={!canCalcGA || isSubmitting}
+          title={canCalcGA
+            ? 'Calculate GA from biometry and EFW (BPD, HC, AC, FL required)'
+            : 'All four measurements (BPD, HC, AC, FL) required'}>
+          Biometry / EFW
+        </Button>
       </div>
     </FormGroup>
   );

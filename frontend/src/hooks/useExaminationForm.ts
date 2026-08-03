@@ -95,6 +95,15 @@ export function useExaminationForm({
     // GA fields (both stored separately)
     gestationalAge: examination?.gestationalAge || '',                         // GA from LMP
     gestationalAgeFromBiometry: examination?.gestationalAgeFromBiometry || '', // GA from Biometry
+    // Sub-Task 3: Per-measurement GA fields (T1) — string "Xw Yd", empty until calculated
+    bpdGa:  examination?.biometry?.bpdGa  || '',
+    ofdGa:  examination?.biometry?.ofdGa  || '',
+    hcGa:   examination?.biometry?.hcGa   || '',
+    tadGa:  examination?.biometry?.tadGa  || '',
+    apadGa: examination?.biometry?.apadGa || '',
+    acGa:   examination?.biometry?.acGa   || '',
+    flGa:   examination?.biometry?.flGa   || '',
+    efwGa:  examination?.biometry?.efwGa  || '',
     // Doppler (floats allowed)
     pi: examination?.doppler?.pi?.toString() || '',
     ri: examination?.doppler?.ri?.toString() || '',
@@ -150,6 +159,15 @@ export function useExaminationForm({
     t2_la: examination?.biometry2?.la ?? '',
     t2_lc: examination?.biometry2?.lc != null ? examination.biometry2.lc.toFixed(2) : '',
     t2_gestationalAgeFromBiometry: examination?.gestationalAgeFromBiometry2 || '',
+    // Sub-Task 3: Twin 2 per-measurement GA fields
+    t2_bpdGa:  examination?.biometry2?.bpdGa  || '',
+    t2_ofdGa:  examination?.biometry2?.ofdGa  || '',
+    t2_hcGa:   examination?.biometry2?.hcGa   || '',
+    t2_tadGa:  examination?.biometry2?.tadGa  || '',
+    t2_apadGa: examination?.biometry2?.apadGa || '',
+    t2_acGa:   examination?.biometry2?.acGa   || '',
+    t2_flGa:   examination?.biometry2?.flGa   || '',
+    t2_efwGa:  examination?.biometry2?.efwGa  || '',
     // uzd-twins: Twin 2 doppler fields
     t2_pi: examination?.doppler2?.pi?.toString() || '',
     t2_ri: examination?.doppler2?.ri?.toString() || '',
@@ -269,6 +287,15 @@ export function useExaminationForm({
         lc: examination.biometry?.lc != null ? examination.biometry.lc.toFixed(2) : '',
         gestationalAge: examination.gestationalAge || '',
         gestationalAgeFromBiometry: examination.gestationalAgeFromBiometry || '',
+        // Sub-Task 3: Per-measurement GA fields (T1)
+        bpdGa:  examination.biometry?.bpdGa  || '',
+        ofdGa:  examination.biometry?.ofdGa  || '',
+        hcGa:   examination.biometry?.hcGa   || '',
+        tadGa:  examination.biometry?.tadGa  || '',
+        apadGa: examination.biometry?.apadGa || '',
+        acGa:   examination.biometry?.acGa   || '',
+        flGa:   examination.biometry?.flGa   || '',
+        efwGa:  examination.biometry?.efwGa  || '',
         pi: examination.doppler?.pi?.toString() || '',
         ri: examination.doppler?.ri?.toString() || '',
         utADexPI: examination.doppler?.utADexPI?.toString() || '',
@@ -319,6 +346,15 @@ export function useExaminationForm({
         t2_la: examination.biometry2?.la?.toString() || '',
         t2_lc: examination.biometry2?.lc != null ? examination.biometry2.lc.toFixed(2) : '',
         t2_gestationalAgeFromBiometry: examination.gestationalAgeFromBiometry2 || '',
+        // Sub-Task 3: Twin 2 per-measurement GA fields
+        t2_bpdGa:  examination.biometry2?.bpdGa  || '',
+        t2_ofdGa:  examination.biometry2?.ofdGa  || '',
+        t2_hcGa:   examination.biometry2?.hcGa   || '',
+        t2_tadGa:  examination.biometry2?.tadGa  || '',
+        t2_apadGa: examination.biometry2?.apadGa || '',
+        t2_acGa:   examination.biometry2?.acGa   || '',
+        t2_flGa:   examination.biometry2?.flGa   || '',
+        t2_efwGa:  examination.biometry2?.efwGa  || '',
         // uzd-twins: Twin 2 doppler
         t2_pi: examination.doppler2?.pi?.toString() || '',
         t2_ri: examination.doppler2?.ri?.toString() || '',
@@ -604,6 +640,15 @@ export function useExaminationForm({
     { formKey: 'tad',        payloadPath: 'biometry.tad',        outType: 'float' },
     { formKey: 'la',         payloadPath: 'biometry.la',         outType: 'trim' },  // string field
     { formKey: 'lc',         payloadPath: 'biometry.lc',         outType: 'float' },
+    // Sub-Task 3: T1 per-measurement GA fields (pass-through; no calculation yet)
+    { formKey: 'bpdGa',  payloadPath: 'biometry.bpdGa',  outType: 'trim' },
+    { formKey: 'ofdGa',  payloadPath: 'biometry.ofdGa',  outType: 'trim' },
+    { formKey: 'hcGa',   payloadPath: 'biometry.hcGa',   outType: 'trim' },
+    { formKey: 'tadGa',  payloadPath: 'biometry.tadGa',  outType: 'trim' },
+    { formKey: 'apadGa', payloadPath: 'biometry.apadGa', outType: 'trim' },
+    { formKey: 'acGa',   payloadPath: 'biometry.acGa',   outType: 'trim' },
+    { formKey: 'flGa',   payloadPath: 'biometry.flGa',   outType: 'trim' },
+    { formKey: 'efwGa',  payloadPath: 'biometry.efwGa',  outType: 'trim' },
     // ── T1 doppler ────────────────────────────────────────────────────────────
     { formKey: 'pi',       payloadPath: 'doppler.pi',       outType: 'float' },
     { formKey: 'ri',       payloadPath: 'doppler.ri',       outType: 'float' },
@@ -633,6 +678,15 @@ export function useExaminationForm({
     { formKey: 't2_tad',        payloadPath: 'biometry2.tad',        outType: 'float',   onlyWhen: () => isTwins },
     { formKey: 't2_la',         payloadPath: 'biometry2.la',         outType: 'trim',    onlyWhen: () => isTwins }, // string field
     { formKey: 't2_lc',         payloadPath: 'biometry2.lc',         outType: 'float',   onlyWhen: () => isTwins },
+    // Sub-Task 3: T2 per-measurement GA fields (pass-through; no calculation yet)
+    { formKey: 't2_bpdGa',  payloadPath: 'biometry2.bpdGa',  outType: 'trim', onlyWhen: () => isTwins },
+    { formKey: 't2_ofdGa',  payloadPath: 'biometry2.ofdGa',  outType: 'trim', onlyWhen: () => isTwins },
+    { formKey: 't2_hcGa',   payloadPath: 'biometry2.hcGa',   outType: 'trim', onlyWhen: () => isTwins },
+    { formKey: 't2_tadGa',  payloadPath: 'biometry2.tadGa',  outType: 'trim', onlyWhen: () => isTwins },
+    { formKey: 't2_apadGa', payloadPath: 'biometry2.apadGa', outType: 'trim', onlyWhen: () => isTwins },
+    { formKey: 't2_acGa',   payloadPath: 'biometry2.acGa',   outType: 'trim', onlyWhen: () => isTwins },
+    { formKey: 't2_flGa',   payloadPath: 'biometry2.flGa',   outType: 'trim', onlyWhen: () => isTwins },
+    { formKey: 't2_efwGa',  payloadPath: 'biometry2.efwGa',  outType: 'trim', onlyWhen: () => isTwins },
     // ── T2 doppler ────────────────────────────────────────────────────────────
     { formKey: 't2_pi',       payloadPath: 'doppler2.pi',       outType: 'float',   onlyWhen: () => isTwins },
     { formKey: 't2_ri',       payloadPath: 'doppler2.ri',       outType: 'float',   onlyWhen: () => isTwins },

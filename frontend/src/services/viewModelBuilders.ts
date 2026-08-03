@@ -65,11 +65,14 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
   const buildFtBiometry = (b: typeof exam.data.ft_biometry): FtBiometryViewModel | undefined => {
     if (!b) return undefined;
     return {
-      crl:      b.crl  != null ? `${b.crl.toFixed(2)} mm` : undefined,
+      crl:       b.crl  != null ? `${b.crl.toFixed(2)} mm` : undefined,
       gaFromCrl: b.gaFromCrl ?? undefined,
-      nt:       b.nt   != null ? `${b.nt.toFixed(2)} mm` : undefined,
-      nb:       b.nb   != null ? `${b.nb.toFixed(2)} mm` : undefined,
-      puls:     b.puls != null ? `${b.puls} bpm` : undefined,
+      nt:        b.nt   != null ? `${b.nt.toFixed(2)} mm` : undefined,
+      nb:        b.nb   != null ? `${b.nb.toFixed(2)} mm` : undefined,
+      puls:      b.puls != null ? `${b.puls} bpm` : undefined,
+      // Sub-Task 4: per-measurement GA for NT and NB (placeholder until calculation wired)
+      gaFromNt:  b.ntGa ?? undefined,
+      gaFromNb:  b.nbGa ?? undefined,
     };
   };
   const buildFtMarkers = (m: typeof exam.data.ft_markers): FtMarkersViewModel | undefined => {
@@ -138,6 +141,19 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
       acPct:  pctStr(percentiles2?.ac),
       flPct:  pctStr(percentiles2?.fl),
       efwPct: pctStr(efwPct2),
+      // Sub-Task 4: expanded percentile set for T2
+      ofdPct:  pctStr(exam.biometry2?.ofdPercentile),
+      tadPct:  pctStr(exam.biometry2?.tadPercentile),
+      apadPct: pctStr(exam.biometry2?.apadPercentile),
+      // Sub-Task 4: per-measurement GA for T2
+      bpdGa:  exam.biometry2?.bpdGa  ?? undefined,
+      ofdGa:  exam.biometry2?.ofdGa  ?? undefined,
+      hcGa:   exam.biometry2?.hcGa   ?? undefined,
+      tadGa:  exam.biometry2?.tadGa  ?? undefined,
+      apadGa: exam.biometry2?.apadGa ?? undefined,
+      acGa:   exam.biometry2?.acGa   ?? undefined,
+      flGa:   exam.biometry2?.flGa   ?? undefined,
+      efwGa:  exam.biometry2?.efwGa  ?? undefined,
       ofd:       exam.biometry2?.ofd       != null ? `${fmtBiometry(exam.biometry2.ofd)} mm`       : undefined,
       vp:        exam.biometry2?.vp?.trim() || undefined,
       tcd:       exam.biometry2?.tcd       != null ? `${fmtBiometry(exam.biometry2.tcd)} mm`       : undefined,
@@ -239,6 +255,19 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
       acPct:  pctStr(percentiles?.ac),
       flPct:  pctStr(percentiles?.fl),
       efwPct: pctStr(efwPct),
+      // Sub-Task 4: expanded percentile set for T1
+      ofdPct:  pctStr(exam.biometry?.ofdPercentile),
+      tadPct:  pctStr(exam.biometry?.tadPercentile),
+      apadPct: pctStr(exam.biometry?.apadPercentile),
+      // Sub-Task 4: per-measurement GA for T1
+      bpdGa:  exam.biometry?.bpdGa  ?? undefined,
+      ofdGa:  exam.biometry?.ofdGa  ?? undefined,
+      hcGa:   exam.biometry?.hcGa   ?? undefined,
+      tadGa:  exam.biometry?.tadGa  ?? undefined,
+      apadGa: exam.biometry?.apadGa ?? undefined,
+      acGa:   exam.biometry?.acGa   ?? undefined,
+      flGa:   exam.biometry?.flGa   ?? undefined,
+      efwGa:  exam.biometry?.efwGa  ?? undefined,
       ofd:       exam.biometry?.ofd       != null ? `${fmtBiometry(exam.biometry.ofd)} mm`       : undefined,
       vp:        exam.biometry?.vp?.trim() || undefined,
       tcd:       exam.biometry?.tcd       != null ? `${fmtBiometry(exam.biometry.tcd)} mm`       : undefined,

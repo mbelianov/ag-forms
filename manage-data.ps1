@@ -17,6 +17,22 @@
 #   -SeedData            Create 1 000 patients each with 2 examinations
 #   -CheckCounts         Report counter values vs actual iterated counts
 #   -DeleteAll           Delete every non-deleted patient (and cascade examinations)
+#   -Snapshot            Dump all Azure Table Storage tables to a JSON file in .\.snapshots\
+#                        Requires Azure CLI (az) to be installed and on PATH.
+#   -Restore             Upload all entities from a snapshot file back into Azure Table Storage.
+#                        Use -SnapshotFile to specify the file; omit to pick from .\.snapshots\.
+#                        Requires Azure CLI (az) to be installed and on PATH.
+#
+# Snapshot examples:
+#   .\manage-data.ps1 -Snapshot                             # dev (Azurite)
+#   .\manage-data.ps1 -Snapshot -Environment prod `
+#                     -ConnectionString 'DefaultEndpointsProtocol=https;...'
+#   .\manage-data.ps1 -Snapshot -Environment prod           # reads $env:AZURE_STORAGE_CONNECTION_STRING
+#
+# Restore examples:
+#   .\manage-data.ps1 -Restore                              # picks latest snapshot, dev (Azurite)
+#   .\manage-data.ps1 -Restore -SnapshotFile '.\.snapshots\snapshot_prod_20260803_160012.json' `
+#                     -Environment prod -ConnectionString 'DefaultEndpointsProtocol=https;...'
 #
 # Notes:
 #   - First user  : no -Token required. The server always assigns role='admin' for the
@@ -46,7 +62,19 @@ param(
     [switch]$DeleteAll,
     # Credentials used to log in before seed / check / delete operations
     [string]$LoginUsername = '',
-    [string]$LoginPassword = ''
+    [string]$LoginPassword = '',
+
+    # ---- snapshot / restore mode ----
+    [switch]$Snapshot,
+    [switch]$Restore,
+    # Path to the snapshot JSON file to restore from. When omitted with -Restore the script
+    # lists available files in .\.snapshots\ and prompts the user to pick one.
+    [string]$SnapshotFile = '',
+    # Optional explicit connection string. When omitted the script falls back to
+    # $env:AZURE_STORAGE_CONNECTION_STRING, then the Azurite explicit string (dev only).
+    [string]$ConnectionString = '',
+    [ValidateSet('dev', 'prod')]
+    [string]$Environment = 'dev'
 )
 
 Set-StrictMode -Version Latest
@@ -418,11 +446,497 @@ function Invoke-DeleteAll {
     Write-Host ''
 }
 
+
+# ==========================================================================
+# HELPER: Invoke-TableRestQuery
+#   Reads ALL entities from a single Azure Table Storage table via the REST
+#   API using a pre-generated SAS token. Bypasses az CLI which corrupts
+#   string values containing 'w'/'d' via OData type annotation confusion.
+#   Handles x-ms-continuation pagination via a HttpWebRequest so we can
+#   read response headers (Invoke-RestMethod swallows them in PS 5/6).
+# ==========================================================================
+function Invoke-TableRestQuery {
+    param(
+        [string]$TableEndpoint,   # e.g. http://127.0.0.1:10002/devstoreaccount1
+        [string]$TableName,
+        [string]$SasToken
+    )
+
+    $all    = [System.Collections.Generic.List[object]]::new()
+    $nextPK = $null
+    $nextRK = $null
+
+    do {
+        $url = "${TableEndpoint}/${TableName}()?${SasToken}"
+        if ($nextPK) {
+            $url += '&NextPartitionKey=' + [uri]::EscapeDataString($nextPK) +
+                    '&NextRowKey='       + [uri]::EscapeDataString($nextRK)
+        }
+
+        # Use HttpWebRequest to access response headers for continuation tokens
+        $req = [System.Net.HttpWebRequest]::Create($url)
+        $req.Method  = 'GET'
+        $req.Accept  = 'application/json;odata=nometadata'
+        $req.Headers['x-ms-version'] = '2020-12-06'
+
+        try {
+            $resp    = $req.GetResponse()
+            $reader  = [System.IO.StreamReader]::new($resp.GetResponseStream())
+            $body    = $reader.ReadToEnd()
+            $reader.Close()
+
+            $nextPK = $resp.Headers['x-ms-continuation-NextPartitionKey']
+            $nextRK = $resp.Headers['x-ms-continuation-NextRowKey']
+            $resp.Close()
+        } catch [System.Net.WebException] {
+            $sc      = [int]$_.Exception.Response.StatusCode
+            $errBody = [System.IO.StreamReader]::new($_.Exception.Response.GetResponseStream()).ReadToEnd()
+            throw "REST query failed HTTP $sc (table=$TableName): $errBody"
+        }
+
+        $page = $body | ConvertFrom-Json
+        foreach ($item in $page.value) {
+            $all.Add($item)
+        }
+    } while ($nextPK)
+
+    return $all
+}
+
+# ==========================================================================
+# MODE: Snapshot  --  dump all tables to .\.snapshots\snapshot_{env}_{ts}.json
+#   Uses Azure Table Storage REST API directly (via SAS token) to dump all
+#   entities with exact field values — az CLI is only used once to generate
+#   the SAS token, not for reading data.
+#   Connection string resolution order:
+#     1. -ConnectionString param
+#     2. $env:AZURE_STORAGE_CONNECTION_STRING
+#     3. Azurite explicit string  (dev only; prod throws if neither set)
+# ==========================================================================
+function Invoke-Snapshot {
+    param(
+        [string]$Environment      = 'dev',
+        [string]$ConnectionString = ''
+    )
+
+    Write-Host ''
+    Write-Host '=====================================================' -ForegroundColor Cyan
+    Write-Host '   DB Snapshot -- Azure Table Storage' -ForegroundColor Cyan
+    Write-Host "   Environment : $Environment" -ForegroundColor DarkGray
+    Write-Host '=====================================================' -ForegroundColor Cyan
+    Write-Host ''
+
+    # ---- validate az CLI is available ----
+    if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+        throw 'Azure CLI (az) not found on PATH. Install from https://aka.ms/installazurecliwindows'
+    }
+
+    # ---- resolve connection string ----
+    # NOTE: 'UseDevelopmentStorage=true' is an SDK shorthand that the Azure CLI does NOT
+    # support. For Azurite (dev) we always expand it to the full explicit connection string
+    # that az CLI can parse (AccountName=devstoreaccount1, HTTP, 127.0.0.1 endpoints).
+    $azuriteConnStr = 'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;' +
+                      'AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;' +
+                      'TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;'
+
+    $connStr = ''
+    if ($ConnectionString) {
+        $connStr = $ConnectionString
+        Write-Host '  Using connection string from -ConnectionString param.' -ForegroundColor DarkGray
+    } elseif ($env:AZURE_STORAGE_CONNECTION_STRING -and
+              $env:AZURE_STORAGE_CONNECTION_STRING -ne 'UseDevelopmentStorage=true') {
+        $connStr = $env:AZURE_STORAGE_CONNECTION_STRING
+        Write-Host '  Using connection string from $env:AZURE_STORAGE_CONNECTION_STRING.' -ForegroundColor DarkGray
+    } elseif ($Environment -eq 'dev') {
+        $connStr = $azuriteConnStr
+        Write-Host '  Using local Azurite (127.0.0.1:10002).' -ForegroundColor DarkGray
+    } else {
+        throw "prod snapshot requires -ConnectionString or `$env:AZURE_STORAGE_CONNECTION_STRING to be set."
+    }
+
+    # ---- extract table endpoint and generate SAS token ----
+    $tableEndpoint = ''
+    foreach ($part in $connStr -split ';') {
+        if ($part -match '^TableEndpoint=(.+)$') { $tableEndpoint = $Matches[1].TrimEnd('/'); break }
+    }
+    if (-not $tableEndpoint) {
+        foreach ($part in $connStr -split ';') {
+            if ($part -match '^AccountName=(.+)$') {
+                $proto         = if ($connStr -match 'DefaultEndpointsProtocol=https') { 'https' } else { 'http' }
+                $tableEndpoint = "${proto}://$($Matches[1]).table.core.windows.net"
+                break
+            }
+        }
+    }
+    if (-not $tableEndpoint) { throw "Cannot determine Table endpoint from connection string." }
+
+    Write-Host '  Generating SAS token ...' -ForegroundColor DarkGray
+    $sasToken = Get-TableSasToken -ConnStr $connStr -Permissions 'rl'
+    Write-Host '  SAS token obtained.' -ForegroundColor DarkGray
+    Write-Host ''
+
+    # ---- prepare output file ----
+    $outDir = Join-Path $PSScriptRoot '.snapshots'
+    New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+    $ts      = Get-Date -Format 'yyyyMMdd_HHmmss'
+    $outFile = Join-Path $outDir "snapshot_${Environment}_${ts}.json"
+
+    Write-Host "  Output : $outFile" -ForegroundColor DarkGray
+    Write-Host ''
+
+    # ---- dump each table ----
+    $tables = @('Users', 'Patients', 'Examinations', 'Counters', 'AuditLogs')
+    $counts = @{}
+    $data   = [ordered]@{}
+
+    foreach ($table in $tables) {
+        Write-Host "  Dumping $table ..." -ForegroundColor DarkGray -NoNewline
+        try {
+            $entities       = Invoke-TableRestQuery -TableEndpoint $tableEndpoint -TableName $table -SasToken $sasToken
+            $counts[$table] = $entities.Count
+            $data[$table]   = $entities
+            Write-Host "  $($entities.Count) entities" -ForegroundColor White
+        } catch {
+            Write-Host '' # end the -NoNewline line
+            throw "Failed to dump table '$table': $_"
+        }
+    }
+
+    # ---- build snapshot document ----
+    $snapshot = [ordered]@{
+        snapshotMeta = [ordered]@{
+            createdAt   = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+            environment = $Environment
+            tables      = $tables
+        }
+    }
+    foreach ($table in $tables) {
+        $snapshot[$table] = $data[$table]
+    }
+
+    # ---- serialise and write ----
+    $snapshot | ConvertTo-Json -Depth 20 -Compress | Set-Content -Path $outFile -Encoding UTF8
+
+    # ---- success banner ----
+    Write-Host ''
+    Write-Host '=====================================================' -ForegroundColor Green
+    Write-Host '   Snapshot complete' -ForegroundColor Green
+    Write-Host '=====================================================' -ForegroundColor Green
+    foreach ($table in $tables) {
+        Write-Host ("  {0,-14}: {1} entities" -f $table, $counts[$table]) -ForegroundColor White
+    }
+    Write-Host ''
+    Write-Host "  File: $(Resolve-Path $outFile)" -ForegroundColor Cyan
+    Write-Host ''
+}
+
+
+# ==========================================================================
+# HELPER: Get-TableSasToken
+#   Uses az storage account generate-sas to produce a short-lived account SAS
+#   token scoped to Table service (rwdlau). Returns the raw query-string token
+#   (without leading '?'). Called once per Invoke-Restore run.
+# ==========================================================================
+
+# Fields returned by az storage entity query that must NOT be written back
+$script:AzReadOnlyFields = @('Timestamp', 'etag', 'odata.etag', 'odata.metadata')
+
+function Get-TableSasToken {
+    param(
+        [string]$ConnStr,
+        [string]$Permissions = 'rwdlau',   # rwdlau = read+write+delete+list+add+update
+        [int]   $ExpiryHours = 2
+    )
+
+    $expiry = (Get-Date).AddHours($ExpiryHours).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+
+    $stdoutFile = [System.IO.Path]::GetTempFileName()
+    $stderrFile = [System.IO.Path]::GetTempFileName()
+    try {
+        $proc = Start-Process -FilePath 'az' -ArgumentList @(
+            'storage', 'account', 'generate-sas',
+            '--connection-string', $ConnStr,
+            '--services',          't',
+            '--resource-types',    'sco',
+            '--permissions',       $Permissions,
+            '--expiry',            $expiry,
+            '--output',            'tsv'
+        ) -RedirectStandardOutput $stdoutFile `
+          -RedirectStandardError  $stderrFile `
+          -NoNewWindow -Wait -PassThru
+
+        $sas    = ((Get-Content -Path $stdoutFile -Raw -Encoding UTF8) -join '').Trim()
+        $sasErr = ((Get-Content -Path $stderrFile -Raw -Encoding UTF8) -join '').Trim()
+
+        if ($proc.ExitCode -ne 0) {
+            throw "az storage account generate-sas failed: $sasErr"
+        }
+        if (-not $sas) {
+            throw "az storage account generate-sas returned empty token. stderr: $sasErr"
+        }
+        return $sas
+    } finally {
+        Remove-Item $stdoutFile, $stderrFile -ErrorAction SilentlyContinue
+    }
+}
+
+# ==========================================================================
+# HELPER: Invoke-TableEntityUpsert
+#   INSERT OR REPLACE a single entity via the Azure Table Storage REST API
+#   using a pre-generated SAS token. No per-call subprocess — pure HTTP.
+#   Azure read-only metadata (Timestamp, etag, odata.etag) are stripped.
+#   Upsert strategy: PUT without If-Match (insert); on 409 Conflict retry
+#   with If-Match: * (replace). This is a true insert-or-replace.
+# ==========================================================================
+function Invoke-TableEntityUpsert {
+    param(
+        [string]$TableEndpoint,   # e.g. http://127.0.0.1:10002/devstoreaccount1
+        [string]$TableName,
+        [string]$SasToken,        # raw query-string SAS (no leading '?')
+        [object]$Entity
+    )
+
+    # Build clean payload: strip read-only fields and nulls
+    $clean = [ordered]@{}
+    foreach ($prop in $Entity.PSObject.Properties) {
+        if ($prop.Name -in $script:AzReadOnlyFields) { continue }
+        if ($null -eq $prop.Value)                   { continue }
+        $clean[$prop.Name] = $prop.Value
+    }
+
+    $pk   = $clean['PartitionKey']
+    $rk   = $clean['RowKey']
+    $body = $clean | ConvertTo-Json -Depth 10 -Compress
+
+    # URL: <endpoint>/<table>(PartitionKey='<pk>',RowKey='<rk>')?<sas>
+    $pkEnc = [uri]::EscapeDataString($pk)
+    $rkEnc = [uri]::EscapeDataString($rk)
+    $url   = "${TableEndpoint}/${TableName}(PartitionKey='${pkEnc}',RowKey='${rkEnc}')?${SasToken}"
+
+    $headers = @{
+        'Content-Type' = 'application/json'
+        'Accept'       = 'application/json;odata=nometadata'
+    }
+
+    # Try insert (PUT, no If-Match)
+    try {
+        $null = Invoke-RestMethod -Uri $url -Method PUT -Headers $headers -Body $body -ErrorAction Stop
+        return  # success
+    } catch {
+        $sc = $_.Exception.Response.StatusCode.value__
+        if ($sc -ne 409) {
+            # Unexpected error — surface it
+            try {
+                $stream  = $_.Exception.Response.GetResponseStream()
+                $errBody = [System.IO.StreamReader]::new($stream).ReadToEnd()
+            } catch { $errBody = $_.ToString() }
+            throw "REST PUT insert failed HTTP $sc (table=$TableName PK=$pk RK=$rk): $errBody"
+        }
+        # 409 Conflict = entity already exists — fall through to replace
+    }
+
+    # Replace existing entity (PUT, If-Match: *)
+    $headers2 = $headers + @{ 'If-Match' = '*' }
+    try {
+        $null = Invoke-RestMethod -Uri $url -Method PUT -Headers $headers2 -Body $body -ErrorAction Stop
+    } catch {
+        $sc = $_.Exception.Response.StatusCode.value__
+        try {
+            $stream  = $_.Exception.Response.GetResponseStream()
+            $errBody = [System.IO.StreamReader]::new($stream).ReadToEnd()
+        } catch { $errBody = $_.ToString() }
+        throw "REST PUT replace failed HTTP $sc (table=$TableName PK=$pk RK=$rk): $errBody"
+    }
+}
+
+# ==========================================================================
+# MODE: Restore  --  upload all entities from a snapshot JSON file back into
+#   Azure Table Storage. Upserts every row (insert-or-replace) so it is safe
+#   to run against a non-empty storage — existing rows are overwritten.
+#   Connection string resolution is identical to Invoke-Snapshot.
+# ==========================================================================
+function Invoke-Restore {
+    param(
+        [string]$Environment      = 'dev',
+        [string]$ConnectionString = '',
+        [string]$SnapshotFile     = ''
+    )
+
+    Write-Host ''
+    Write-Host '=====================================================' -ForegroundColor Cyan
+    Write-Host '   DB Restore -- Azure Table Storage' -ForegroundColor Cyan
+    Write-Host "   Environment : $Environment" -ForegroundColor DarkGray
+    Write-Host '=====================================================' -ForegroundColor Cyan
+    Write-Host ''
+
+    # ---- validate az CLI is available ----
+    if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+        throw 'Azure CLI (az) not found on PATH. Install from https://aka.ms/installazurecliwindows'
+    }
+
+    # ---- resolve connection string (same logic as Invoke-Snapshot) ----
+    $azuriteConnStr = 'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;' +
+                      'AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;' +
+                      'TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;'
+
+    $connStr = ''
+    if ($ConnectionString) {
+        $connStr = $ConnectionString
+        Write-Host '  Using connection string from -ConnectionString param.' -ForegroundColor DarkGray
+    } elseif ($env:AZURE_STORAGE_CONNECTION_STRING -and
+              $env:AZURE_STORAGE_CONNECTION_STRING -ne 'UseDevelopmentStorage=true') {
+        $connStr = $env:AZURE_STORAGE_CONNECTION_STRING
+        Write-Host '  Using connection string from $env:AZURE_STORAGE_CONNECTION_STRING.' -ForegroundColor DarkGray
+    } elseif ($Environment -eq 'dev') {
+        $connStr = $azuriteConnStr
+        Write-Host '  Using local Azurite (127.0.0.1:10002).' -ForegroundColor DarkGray
+    } else {
+        throw "prod restore requires -ConnectionString or `$env:AZURE_STORAGE_CONNECTION_STRING to be set."
+    }
+
+    # ---- extract table endpoint from connection string ----
+    # Parses TableEndpoint=... from explicit conn strings, or derives the
+    # default Azure endpoint from AccountName= for prod connection strings.
+    $tableEndpoint = ''
+    foreach ($part in $connStr -split ';') {
+        if ($part -match '^TableEndpoint=(.+)$') {
+            $tableEndpoint = $Matches[1].TrimEnd('/')
+            break
+        }
+    }
+    if (-not $tableEndpoint) {
+        # Derive from AccountName for prod (https://account.table.core.windows.net)
+        foreach ($part in $connStr -split ';') {
+            if ($part -match '^AccountName=(.+)$') {
+                $acctName      = $Matches[1]
+                $proto         = if ($connStr -match 'DefaultEndpointsProtocol=https') { 'https' } else { 'http' }
+                $tableEndpoint = "${proto}://${acctName}.table.core.windows.net"
+                break
+            }
+        }
+    }
+    if (-not $tableEndpoint) {
+        throw "Cannot determine Table endpoint from connection string."
+    }
+
+    # ---- obtain a short-lived SAS token for REST upserts ----
+    Write-Host '  Generating SAS token ...' -ForegroundColor DarkGray
+    $sasToken = Get-TableSasToken -ConnStr $connStr
+    Write-Host '  SAS token obtained.' -ForegroundColor DarkGray
+    Write-Host ''
+
+    # ---- resolve snapshot file ----
+    if (-not $SnapshotFile) {
+        $snapshotDir = Join-Path $PSScriptRoot '.snapshots'
+        if (-not (Test-Path $snapshotDir)) {
+            throw "No .snapshots directory found at '$snapshotDir'. Run -Snapshot first or supply -SnapshotFile."
+        }
+        $files = @(Get-ChildItem -Path $snapshotDir -Filter 'snapshot_*.json' |
+                   Sort-Object LastWriteTime -Descending)
+        if ($files.Count -eq 0) {
+            throw "No snapshot files found in '$snapshotDir'. Run -Snapshot first or supply -SnapshotFile."
+        }
+        if ($files.Count -eq 1) {
+            $SnapshotFile = $files[0].FullName
+            Write-Host "  Auto-selected snapshot: $SnapshotFile" -ForegroundColor DarkGray
+        } else {
+            Write-Host '  Available snapshots (most recent first):' -ForegroundColor Cyan
+            for ($i = 0; $i -lt [Math]::Min($files.Count, 10); $i++) {
+                Write-Host ("    {0}  {1}" -f ($i + 1), $files[$i].Name) -ForegroundColor White
+            }
+            Write-Host ''
+            $pick = Read-Host "  Enter number (1-$([Math]::Min($files.Count, 10)))"
+            $idx  = [int]$pick - 1
+            if ($idx -lt 0 -or $idx -ge $files.Count) {
+                throw "Invalid selection '$pick'."
+            }
+            $SnapshotFile = $files[$idx].FullName
+        }
+    }
+
+    if (-not (Test-Path $SnapshotFile)) {
+        throw "Snapshot file not found: '$SnapshotFile'"
+    }
+
+    Write-Host "  Source : $SnapshotFile" -ForegroundColor DarkGray
+    Write-Host ''
+
+    # ---- load snapshot ----
+    Write-Host '  Loading snapshot ...' -ForegroundColor DarkGray
+    $snapshot = Get-Content -Path $SnapshotFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    $meta     = $snapshot.snapshotMeta
+    Write-Host "  Created : $($meta.createdAt)  (env=$($meta.environment))" -ForegroundColor DarkGray
+    Write-Host ''
+
+    # ---- safety confirmation ----
+    Write-Host '  WARNING: This will INSERT OR REPLACE every entity from the snapshot.' -ForegroundColor Yellow
+    Write-Host '           Existing rows with matching PartitionKey+RowKey will be overwritten.' -ForegroundColor Yellow
+    $confirm = Read-Host '  Type YES to confirm'
+    if ($confirm -ne 'YES') {
+        Write-Host '  Aborted.' -ForegroundColor DarkGray
+        return
+    }
+    Write-Host ''
+
+    # ---- restore each table ----
+    $tables = $meta.tables
+    $counts = @{}
+
+    foreach ($table in $tables) {
+        $entities = $snapshot.$table
+        if ($null -eq $entities) {
+            Write-Host "  [SKIP] Table '$table' not found in snapshot." -ForegroundColor DarkGray
+            continue
+        }
+
+        $total = $entities.Count
+        $ok    = 0
+        $fail  = 0
+
+        Write-Host "  Restoring $table ($total entities) ..." -ForegroundColor DarkGray
+
+        foreach ($entity in $entities) {
+            try {
+                Invoke-TableEntityUpsert -TableEndpoint $tableEndpoint -TableName $table -SasToken $sasToken -Entity $entity
+                $ok++
+            } catch {
+                $fail++
+                Write-Host "  [WARN] $_" -ForegroundColor Yellow
+            }
+
+            # Progress every 100
+            if (($ok + $fail) % 100 -eq 0) {
+                Write-Host "    ... $($ok + $fail) / $total (ok=$ok fail=$fail)" -ForegroundColor DarkGray
+            }
+        }
+
+        $counts[$table] = [ordered]@{ ok = $ok; fail = $fail }
+        $color = if ($fail -gt 0) { 'Yellow' } else { 'White' }
+        Write-Host ("    {0,-14}: ok={1}  fail={2}" -f $table, $ok, $fail) -ForegroundColor $color
+    }
+
+    # ---- summary banner ----
+    Write-Host ''
+    Write-Host '=====================================================' -ForegroundColor Green
+    Write-Host '   Restore complete' -ForegroundColor Green
+    Write-Host '=====================================================' -ForegroundColor Green
+    foreach ($table in $tables) {
+        if ($counts.ContainsKey($table)) {
+            $c = $counts[$table]
+            $color = if ($c.fail -gt 0) { 'Yellow' } else { 'White' }
+            Write-Host ("  {0,-14}: ok={1}  fail={2}" -f $table, $c.ok, $c.fail) -ForegroundColor $color
+        }
+    }
+    Write-Host ''
+}
+
+
+
 # ==========================================================================
 # DISPATCH  --  interactive menu when no action parameter is supplied
 # ==========================================================================
 
-$hasActionParam = $SeedData -or $CheckCounts -or $DeleteAll `
+$hasActionParam = $SeedData -or $CheckCounts -or $DeleteAll -or $Snapshot -or $Restore `
                -or $Username -or $Password -or $Email -or $Token
 
 if (-not $hasActionParam) {
@@ -436,6 +950,8 @@ if (-not $hasActionParam) {
     Write-Host '  2  Seed 10 patients x 2 examinations' -ForegroundColor White
     Write-Host '  3  Check patient / examination counts' -ForegroundColor White
     Write-Host '  4  Delete ALL patients (cascade examinations)' -ForegroundColor White
+    Write-Host '  5  Create DB snapshot to local disk' -ForegroundColor White
+    Write-Host '  6  Restore DB from snapshot file' -ForegroundColor White
     Write-Host '  Q  Quit' -ForegroundColor DarkGray
     Write-Host ''
 
@@ -461,6 +977,14 @@ if (-not $hasActionParam) {
             Invoke-DeleteAll -BaseUrl $BaseUrl -User $LoginUsername -Pass $LoginPassword
             exit 0
         }
+        '5' {
+            Invoke-Snapshot -Environment $Environment -ConnectionString $ConnectionString
+            exit 0
+        }
+        '6' {
+            Invoke-Restore -Environment $Environment -ConnectionString $ConnectionString -SnapshotFile $SnapshotFile
+            exit 0
+        }
         'Q' { Write-Host '  Bye.' -ForegroundColor DarkGray; exit 0 }
         default {
             Write-Host "  Unknown option '$choice'. Exiting." -ForegroundColor Red
@@ -470,7 +994,16 @@ if (-not $hasActionParam) {
 }
 
 # Switch-based explicit invocation (non-interactive)
-if ($SeedData -or $CheckCounts -or $DeleteAll) {
+if ($SeedData -or $CheckCounts -or $DeleteAll -or $Snapshot -or $Restore) {
+    if ($Snapshot) {
+        Invoke-Snapshot -Environment $Environment -ConnectionString $ConnectionString
+        exit 0
+    }
+    if ($Restore) {
+        Invoke-Restore -Environment $Environment -ConnectionString $ConnectionString -SnapshotFile $SnapshotFile
+        exit 0
+    }
+
     if (-not $LoginUsername) { $LoginUsername = Read-Host '  Username for login' }
     if (-not $LoginPassword) { $LoginPassword = Read-Host '  Password for login' }
 

@@ -58,8 +58,8 @@ function mkAnatomyPairs(a: ExamPdfViewModel['anatomy'] | AnatomyViewModel): Arra
 // ─── FT Biometry: structured 3-column renderer ───────────────────────────────
 
 /**
- * Render FT biometry as a 3-column table: Measurement | Value | GA from CRL.
- * The "GA from CRL" column has a value only on the CRL row; other rows are blank in col 3.
+ * Render FT biometry as a 3-column table: Measurement | Value | GA.
+ * Sub-Task 4: col-3 header renamed from "GA from CRL" to "GA"; NT and NB rows gain per-measurement GA.
  * Column proportions: label ~40%, value ~35%, GA ~25% of colW.
  * Row pitch: 3.85 mm. Returns Y after all rows.
  */
@@ -79,22 +79,23 @@ function renderFtBiometryBlock(
   const xValue = xStart + labelW;
   const xGA    = xStart + labelW + valueW;
 
-  // Header row: "Measurement" | "Value" | "GA from CRL"
+  // Header row: "Measurement" | "Value" | "GA" (Sub-Task 4: renamed from "GA from CRL")
   doc.setFont(fontId, 'normal');
   doc.setFontSize(7);
   setTextColor(doc, C_MID);
   doc.text('Measurement', xStart, y);
   doc.text('Value',       xValue, y);
-  doc.text('GA from CRL', xGA,    y);
+  doc.text('GA',          xGA,    y);
   y += PITCH;
 
-  // Data rows: label, value, optional GA from CRL (CRL row only)
+  // Data rows: label, value, optional GA
+  // Sub-Task 4: NT and NB rows now show gaFromNt / gaFromNb (undefined until calculation wired)
   type FtBioRow = { label: string; value: string | undefined; ga?: string };
   const rows: FtBioRow[] = [
-    { label: 'CRL (mm)',        value: b.crl,  ga: b.gaFromCrl },
-    { label: 'NT (mm)',         value: b.nt },
-    { label: 'NB (mm)',         value: b.nb },
-    { label: 'Heart Rate (bpm)',value: b.puls },
+    { label: 'CRL (mm)',         value: b.crl,  ga: b.gaFromCrl },
+    { label: 'NT (mm)',          value: b.nt,   ga: b.gaFromNt },
+    { label: 'NB (mm)',          value: b.nb,   ga: b.gaFromNb },
+    { label: 'Heart Rate (bpm)', value: b.puls },
   ];
 
   for (const row of rows) {
@@ -226,10 +227,16 @@ function renderFtDopplerBlock(
  * Header row drawn first, then 15 data rows. Row pitch: 3.3 mm.
  * Returns Y after all rows.
  */
+/**
+ * renderBiometryBlock — v2 update (Sub-Task 4):
+ *   - EFW moved to row 8 (after FL); Sub-Task 1 order: BPD OFD HC TAD APAD AC FL EFW TCD Vp CM NF NB LA LC
+ *   - Col-4 header renamed from "GA from Bio" to "GA"
+ *   - Per-measurement GA shown on BPD, OFD, HC, TAD, APAD, AC, FL, EFW rows
+ *   - Expanded percentile set: OFD, TAD, APAD join BPD, HC, AC, FL, EFW
+ */
 function renderBiometryBlock(
   doc: jsPDF,
   b: BiometryViewModel,
-  gaFromBio: string | undefined,
   y: number,
   xStart: number,
   colW: number,
@@ -244,34 +251,36 @@ function renderBiometryBlock(
   const xPct   = xStart + labelW + valueW;
   const xGA    = xStart + labelW + valueW + pctW;
 
-  // Header row: "Measurement" | "Value" | "Percentile" | "GA from Bio"
+  // Header row: "Measurement" | "Value" | "Percentile" | "GA" (Sub-Task 4: renamed from "GA from Bio")
   doc.setFont(fontId, 'normal');
   doc.setFontSize(7);
   setTextColor(doc, C_MID);
   doc.text('Measurement', xStart, y);
   doc.text('Value',       xValue, y);
   doc.text('Percentile',  xPct,   y);
-  doc.text('GA from Bio', xGA,    y);
+  doc.text('GA',          xGA,    y);
   y += PITCH;
 
-  // Rows: label (with unit), value field, percentile (or "—"), GA from Bio on BPD row only
-  type BioRow = { label: string; value: string | undefined; hasPct: boolean; pct?: string; gaAppend?: string };
+  // Sub-Task 4: Rows in v2 order (EFW at position 8, after FL)
+  // pct field: use persisted percentile from view model where available; falls back to '—' on undefined
+  // gaAppend: per-measurement GA string (undefined → no text drawn)
+  type BioRow = { label: string; value: string | undefined; pct?: string; gaAppend?: string };
   const rows: BioRow[] = [
-    { label: 'BPD (mm)',    value: b.bpd,        hasPct: true,  pct: b.bpdPct, gaAppend: gaFromBio },
-    { label: 'OFD (mm)',    value: b.ofd,        hasPct: false },
-    { label: 'HC (mm)',     value: b.hc,         hasPct: true,  pct: b.hcPct },
-    { label: 'TAD (mm)',    value: b.tad,        hasPct: false },
-    { label: 'APAD (mm)',   value: b.apad,       hasPct: false },
-    { label: 'AC (mm)',     value: b.ac,         hasPct: true,  pct: b.acPct },
-    { label: 'FL (mm)',     value: b.fl,         hasPct: true,  pct: b.flPct },
-    { label: 'TCD (mm)',    value: b.tcd,        hasPct: false },
-    { label: 'Vp',          value: b.vp,         hasPct: false },
-    { label: 'CM (mm)',     value: b.cm,         hasPct: false },
-    { label: 'NF (mm)',     value: b.nuchalFold, hasPct: false },
-    { label: 'NB (mm)',     value: b.nb,         hasPct: false },
-    { label: 'EFW (grams)', value: b.efw,        hasPct: true,  pct: b.efwPct },
-    { label: 'LA',          value: b.la,         hasPct: false },
-    { label: 'LC (mm)',     value: b.lc,         hasPct: false },
+    { label: 'BPD (mm)',    value: b.bpd,        pct: b.bpdPct,  gaAppend: b.bpdGa },
+    { label: 'OFD (mm)',    value: b.ofd,        pct: b.ofdPct,  gaAppend: b.ofdGa },
+    { label: 'HC (mm)',     value: b.hc,         pct: b.hcPct,   gaAppend: b.hcGa },
+    { label: 'TAD (mm)',    value: b.tad,        pct: b.tadPct,  gaAppend: b.tadGa },
+    { label: 'APAD (mm)',   value: b.apad,       pct: b.apadPct, gaAppend: b.apadGa },
+    { label: 'AC (mm)',     value: b.ac,         pct: b.acPct,   gaAppend: b.acGa },
+    { label: 'FL (mm)',     value: b.fl,         pct: b.flPct,   gaAppend: b.flGa },
+    { label: 'EFW (grams)', value: b.efw,        pct: b.efwPct,  gaAppend: b.efwGa },
+    { label: 'TCD (mm)',    value: b.tcd },
+    { label: 'Vp',          value: b.vp },
+    { label: 'CM (mm)',     value: b.cm },
+    { label: 'NF (mm)',     value: b.nuchalFold },
+    { label: 'NB (mm)',     value: b.nb },
+    { label: 'LA',          value: b.la },
+    { label: 'LC (mm)',     value: b.lc },
   ];
 
   for (const row of rows) {
@@ -287,17 +296,13 @@ function renderBiometryBlock(
     setTextColor(doc, C_DARK);
     doc.text(row.value || '—', xValue, y);
 
-    // Percentile — show value if present, "—" if this row has no percentile
+    // Percentile — show value if present, otherwise "—"
     doc.setFont(fontId, 'normal');
     doc.setFontSize(7.5);
     setTextColor(doc, C_MID);
-    if (row.pct) {
-      doc.text(row.pct, xPct, y);
-    } else {
-      doc.text('—', xPct, y);
-    }
+    doc.text(row.pct ?? '—', xPct, y);
 
-    // GA from Bio — only on BPD row
+    // Per-measurement GA — draw only when value is present
     if (row.gaAppend) {
       doc.text(row.gaAppend, xGA, y);
     }
@@ -622,7 +627,7 @@ export function renderClinicalSections(
     if (visibility.biometry) {
       rule(doc, y); y += 4;
       y = sectionHeading(doc, 'Biometry Measurements', y);
-      y = renderBiometryBlock(doc, vm.biometry, vm.gestationalAgeFromBiometry, y, 14, 182, FONT_ID);
+      y = renderBiometryBlock(doc, vm.biometry, y, 14, 182, FONT_ID);
       y += 1;
     }
     if (visibility.anatomy) {
@@ -663,9 +668,9 @@ export function renderClinicalSections(
       // Twin biometry: render side-by-side using renderBiometryBlock
       const yStart = y;
       y = sectionHeadingAt(doc, 'Biometry', y, T1_X, T1_XEND);
-      const y1after = renderBiometryBlock(doc, vm.biometry, vm.gestationalAgeFromBiometry, y, T1_X, TWIN_COL_W, FONT_ID);
+      const y1after = renderBiometryBlock(doc, vm.biometry, y, T1_X, TWIN_COL_W, FONT_ID);
       const yH2 = sectionHeadingAt(doc, 'Biometry', yStart, T2_X, T2_XEND);
-      const y2after = renderBiometryBlock(doc, vm.biometry2, vm.gestationalAgeFromBiometry2, yH2, T2_X, TWIN_COL_W, FONT_ID);
+      const y2after = renderBiometryBlock(doc, vm.biometry2, yH2, T2_X, TWIN_COL_W, FONT_ID);
       y = Math.max(y1after, y2after) + 1;
     }
     if (visibility.anatomy && vm.anatomy2) {

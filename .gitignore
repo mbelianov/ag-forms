@@ -83,6 +83,9 @@ Thumbs.db
 ~$*.xls*
 ~$*.ppt*
 
+# DB snapshots (manage-data.ps1 -Snapshot)
+.snapshots/
+
 # Azure Functions
 local.settings.json
 __blobstorage__/

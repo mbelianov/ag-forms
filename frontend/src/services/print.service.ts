@@ -19,12 +19,25 @@ export interface BiometryViewModel {
   tad?: string;
   la?: string;
   lc?: string;
-  // Separate percentile strings for the new row-by-row biometry renderer
+  // Percentile strings for the row-by-row biometry renderer
   bpdPct?: string;
   hcPct?: string;
   acPct?: string;
   flPct?: string;
   efwPct?: string;
+  // Sub-Task 4: Expanded percentile set (OFD, TAD, APAD — NEW in v2)
+  ofdPct?: string;
+  tadPct?: string;
+  apadPct?: string;
+  // Sub-Task 4: Per-measurement GA strings (all string | undefined)
+  bpdGa?: string;
+  ofdGa?: string;
+  hcGa?: string;
+  tadGa?: string;
+  apadGa?: string;
+  acGa?: string;
+  flGa?: string;
+  efwGa?: string;
 }
 
 export interface DopplerViewModel {
@@ -69,6 +82,9 @@ export interface FtBiometryViewModel {
   nt?: string;
   nb?: string;
   puls?: string;
+  // Sub-Task 4: NT and NB per-measurement GA strings
+  gaFromNt?: string;
+  gaFromNb?: string;
 }
 
 export interface FtMarkersViewModel {

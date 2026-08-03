@@ -107,10 +107,14 @@ export interface AnatomyFindings {
 // UZPT — First Trimester examination interfaces
 export interface FtBiometry {
     crl?: number;        // Crown-Rump Length, mm
-    gaFromCrl?: string;  // "Xw Yd" — GA calculated from CRL
+    gaFromCrl?: string;  // "Xw Yd" — GA calculated from CRL (storage key; display label = "GA from Bio")
     nt?: number;         // Nuchal Translucency, mm
     nb?: number;         // Nasal Bone, mm
     puls?: number;       // Fetal heart rate (Puls), bpm
+    // Sub-Task 3: Per-measurement GA fields for first-trimester measurements
+    ntGa?:  string;  // GA derived from NT (placeholder; calculation deferred)
+    nbGa?:  string;  // GA derived from NB (placeholder; calculation deferred)
+    crlGa?: string;  // GA derived from CRL (alias; gaFromCrl is the legacy field, keep both)
 }
 
 export interface FtMarkers {
@@ -160,7 +164,12 @@ export interface ExaminationData {
 }
 
 /**
- * Biometry measurements for ultrasound examination
+ * Biometry measurements for ultrasound examination.
+ *
+ * Sub-Task 3 reserved field conventions:
+ *   Per-measurement GA: {measurementKey}Ga  (string "Xw Yd" | undefined)
+ *   Persisted percentile: {measurementKey}Percentile  (number | undefined)
+ *   gestationalAgeFromBiometry is retained for backward compatibility.
  */
 export interface BiometryData {
     bpd?: number; // Biparietal Diameter (float, mm)
@@ -180,6 +189,24 @@ export interface BiometryData {
     // TASK-035: LA and LC
     la?: string;          // Left Atrium (free-text string, migrated from float)
     lc?: number;          // Left Cardiac (float, mm)
+    // Sub-Task 3: Per-measurement GA fields ("Xw Yd" strings)
+    bpdGa?:   string;   // GA derived from BPD
+    ofdGa?:   string;   // GA derived from OFD
+    hcGa?:    string;   // GA derived from HC
+    tadGa?:   string;   // GA derived from TAD
+    apadGa?:  string;   // GA derived from APAD
+    acGa?:    string;   // GA derived from AC
+    flGa?:    string;   // GA derived from FL
+    efwGa?:   string;   // GA derived from EFW
+    // Sub-Task 3: Persisted percentile fields (v2 expanded set)
+    bpdPercentile?:   number;   // BPD percentile
+    ofdPercentile?:   number;   // OFD percentile (NEW — v2)
+    hcPercentile?:    number;   // HC percentile
+    tadPercentile?:   number;   // TAD percentile (NEW — v2)
+    apadPercentile?:  number;   // APAD percentile (NEW — v2)
+    acPercentile?:    number;   // AC percentile
+    flPercentile?:    number;   // FL percentile
+    efwPercentile?:   number;   // EFW percentile
 }
 
 /**

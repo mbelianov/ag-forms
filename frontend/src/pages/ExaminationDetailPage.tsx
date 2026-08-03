@@ -330,7 +330,7 @@ export default function ExaminationDetailPage() {
               {/* Row 1: LMP Date | GA from LMP */}
               {fieldBlock('LMP Date', lmp ? formatPlainDate(lmp) : '—')}
               {fieldBlock('GA from LMP', examination.gestationalAge || '—')}
-              {/* Row 2: Expected Delivery Date (highlighted) | GA from Bio or GA from CRL */}
+              {/* Row 2: Expected Delivery Date (highlighted) | GA from Bio (all exam types) */}
               <div style={{ backgroundColor: '#e8f1ff', padding: '0.5rem', borderRadius: '2px' }}>
                 <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
                   Expected Delivery Date
@@ -339,13 +339,15 @@ export default function ExaminationDetailPage() {
                   {edd || '—'}
                 </div>
               </div>
-              {isFt
-                ? fieldBlock('GA from CRL', isFtTwinsExam
+              {/* Sub-Task 5: "GA from Bio" unified across all exam types.
+                  For FT exams: GA from Bio = GA from CRL at current level of development. */}
+              {fieldBlock('GA from Bio', isFt
+                ? (isFtTwinsExam
                     ? `${examination.data?.ft_biometry?.gaFromCrl || '—'} / ${examination.data?.twin2_ft_biometry?.gaFromCrl || '—'}`
                     : examination.data?.ft_biometry?.gaFromCrl || '—')
-                : fieldBlock('GA from Bio', isTwins
+                : (isTwins
                     ? `${examination.gestationalAgeFromBiometry || '—'} / ${examination.gestationalAgeFromBiometry2 || '—'}`
-                    : examination.gestationalAgeFromBiometry || '—')}
+                    : examination.gestationalAgeFromBiometry || '—'))}
               {/* Row 3: Obstetric History | Family History */}
               {fieldBlock('Obstetric History', examination.data?.pregnancy_data?.obstetric_history || '—')}
               {fieldBlock('Family History', examination.data?.pregnancy_data?.family_history || '—')}

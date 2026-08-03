@@ -290,7 +290,9 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
     doc.setFont(FONT_ID, 'normal');
     setTextColor(doc, C_MID);
 
-    const secondGaLabel = isFt ? '  GA (CRL): ' : '  GA (Bio): ';
+    // Sub-Task 5: "GA (Bio): " unified across all exam types.
+    // For FT exams: GA from Bio = GA from CRL at current level of development.
+    const secondGaLabel = '  GA (Bio): ';
     const secondGaValue = isFt ? (gaFromCrlDisplay || '—') : (gaBioDisplay || '—');
     doc.text(secondGaLabel, MARGIN_L + 42, y);
     doc.setFont(FONT_ID, 'bold');
@@ -363,7 +365,8 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
 
     // Row 2: Expected Delivery Date | GA from CRL / GA from Bio (inline, 5 mm pitch, no bg)
     drawInlineCell(xL, y, 'Expected Delivery Date: ', vm.expectedDeliveryDate, true);
-    drawInlineCell(xR, y, (isFt ? 'GA from CRL: ' : 'GA from Bio: '), isFt ? gaFromCrlDisplay : gaBioDisplay);
+    // Sub-Task 5: "GA from Bio: " unified across all exam types.
+    drawInlineCell(xR, y, 'GA from Bio: ', isFt ? gaFromCrlDisplay : gaBioDisplay);
     y += 5;
 
     // Row 3: Obstetric History | Family History (stacked, 8 mm pitch)

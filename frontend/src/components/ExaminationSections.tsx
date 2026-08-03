@@ -120,7 +120,7 @@ export default function ExaminationSections({
 
   /**
    * Sub-Task 6: Render Ultrasound + Biometry sub-sections for one FT fetus column.
-   * Biometry is now a 3-column grid with "GA from CRL" in col 3 (first data row only).
+   * Biometry is now a 3-column grid with "GA" in col 3 (Sub-Task 3: renamed from "GA from CRL").
    */
   const renderFtTop = (prefix: 'ft' | 'twin2_ft') => {
     const d = examination.data;
@@ -137,26 +137,27 @@ export default function ExaminationSections({
         </div>
         {/* Sub-Task 6: BIOMETRY MEASUREMENTS sub-heading */}
         <div style={{ ...tileTitleStyle, marginTop: '1rem' }}>Biometry Measurements</div>
-        {/* Sub-Task 6: 3-column grid: Measurement | Value | GA from CRL (first row only) */}
+        {/* Sub-Task 6: 3-column grid: Measurement | Value | GA (Sub-Task 3: renamed from "GA from CRL") */}
         <div style={bioGridStyle3col}>
-          {/* Header row */}
+          {/* Header row — Sub-Task 3: col-3 header renamed from "GA from CRL" to "GA" */}
           <div style={bioLabelStyle}>Measurement</div>
           <div style={{ ...bioLabelStyle, textAlign: 'right' }}>Value</div>
-          <div style={bioLabelStyle}>GA from CRL</div>
+          <div style={bioLabelStyle}>GA</div>
           {/* Row 1: CRL — GA from CRL value in col 3 */}
           <div style={bioLabelStyle}>CRL (mm)</div>
           <div style={bioValueRightStyle}>{ftB?.crl !== undefined ? `${ftB.crl} mm` : '—'}</div>
           <div style={bioValueStyle}>{ftB?.gaFromCrl || '—'}</div>
-          {/* Remaining rows — col 3 empty */}
+          {/* NT row — Sub-Task 3: col 3 shows ntGa (placeholder until calculation wired) */}
           <div style={bioLabelStyle}>NT (mm)</div>
           <div style={bioValueRightStyle}>{ftB?.nt !== undefined ? `${ftB.nt} mm` : '—'}</div>
-          <div />
+          <div style={bioValueStyle}>{ftB?.ntGa || '—'}</div>
+          {/* NB row — Sub-Task 3: col 3 shows nbGa (placeholder until calculation wired) */}
           <div style={bioLabelStyle}>NB (mm)</div>
           <div style={bioValueRightStyle}>{ftB?.nb !== undefined ? `${ftB.nb} mm` : '—'}</div>
-          <div />
+          <div style={bioValueStyle}>{ftB?.nbGa || '—'}</div>
           <div style={bioLabelStyle}>Heart Rate (bpm)</div>
           <div style={bioValueRightStyle}>{ftB?.puls !== undefined ? `${ftB.puls} bpm` : '—'}</div>
-          <div />
+          <div style={bioValueStyle}>{'—'}</div>
         </div>
       </div>
     );
@@ -214,7 +215,6 @@ export default function ExaminationSections({
     efwPct: number | undefined,
   ) => {
     const bio = twin2 ? examination.biometry2 : examination.biometry;
-    const gaFromBio = twin2 ? examination.gestationalAgeFromBiometry2 : examination.gestationalAgeFromBiometry;
     const uf = twin2 ? examination.data?.twin2_ultrasound_findings : examination.data?.ultrasound_findings;
     const anat = twin2 ? examination.data?.twin2_anatomy : examination.data?.anatomy;
     const dop = twin2 ? examination.doppler2 : examination.doppler;
@@ -241,73 +241,77 @@ export default function ExaminationSections({
           <>
             <div style={{ ...tileTitleStyle }}>Biometry Measurements</div>
             <div style={bioGridStyle4col}>
-              {/* Header row: Measurement | Value | Percentile | GA from Bio */}
+              {/* Header row: Measurement | Value | Percentile | GA — Sub-Task 3: col-4 header renamed to "GA" */}
               <div style={bioLabelStyle}>Measurement</div>
               <div style={{ ...bioLabelStyle, textAlign: 'right' }}>Value</div>
               <div style={bioLabelStyle}>Percentile</div>
-              <div style={bioLabelStyle}>GA from Bio</div>
-              {/* Row 1: BPD — GA from Bio in col 4 */}
+              <div style={bioLabelStyle}>GA</div>
+              {/* Row 1: BPD — Sub-Task 3: col 4 shows bpdGa (placeholder until calculation wired) */}
               <div style={bioLabelStyle}>BPD (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.bpd, 'mm')}</div>
-              <div style={bioValueStyle}>{fmtPct(bpct?.bpd)}</div>
-              <div style={bioValueStyle}>{gaFromBio || '—'}</div>
-              {/* Remaining rows — col 4 empty */}
+              <div style={bioValueStyle}>{fmtPct(bio?.bpdPercentile ?? bpct?.bpd)}</div>
+              <div style={bioValueStyle}>{bio?.bpdGa ?? '—'}</div>
+              {/* OFD row — Sub-Task 3: expanded percentile; col 4 ofdGa placeholder */}
               <div style={bioLabelStyle}>OFD (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.ofd, 'mm')}</div>
-              <div style={bioValueStyle}>{fmtPct(undefined)}</div>
-              <div />
+              <div style={bioValueStyle}>{fmtPct(bio?.ofdPercentile)}</div>
+              <div style={bioValueStyle}>{bio?.ofdGa ?? '—'}</div>
               <div style={bioLabelStyle}>HC (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.hc, 'mm')}</div>
-              <div style={bioValueStyle}>{fmtPct(bpct?.hc)}</div>
-              <div />
+              <div style={bioValueStyle}>{fmtPct(bio?.hcPercentile ?? bpct?.hc)}</div>
+              <div style={bioValueStyle}>{bio?.hcGa ?? '—'}</div>
+              {/* TAD row — Sub-Task 3: expanded percentile; col 4 tadGa placeholder */}
               <div style={bioLabelStyle}>TAD (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.tad, 'mm')}</div>
-              <div style={bioValueStyle}>{fmtPct(undefined)}</div>
-              <div />
+              <div style={bioValueStyle}>{fmtPct(bio?.tadPercentile)}</div>
+              <div style={bioValueStyle}>{bio?.tadGa ?? '—'}</div>
+              {/* APAD row — Sub-Task 3: expanded percentile; col 4 apadGa placeholder */}
               <div style={bioLabelStyle}>APAD (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.apad, 'mm')}</div>
-              <div style={bioValueStyle}>{fmtPct(undefined)}</div>
-              <div />
+              <div style={bioValueStyle}>{fmtPct(bio?.apadPercentile)}</div>
+              <div style={bioValueStyle}>{bio?.apadGa ?? '—'}</div>
               <div style={bioLabelStyle}>AC (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.ac, 'mm')}</div>
-              <div style={bioValueStyle}>{fmtPct(bpct?.ac)}</div>
-              <div />
+              <div style={bioValueStyle}>{fmtPct(bio?.acPercentile ?? bpct?.ac)}</div>
+              <div style={bioValueStyle}>{bio?.acGa ?? '—'}</div>
               <div style={bioLabelStyle}>FL (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.fl, 'mm')}</div>
-              <div style={bioValueStyle}>{fmtPct(bpct?.fl)}</div>
-              <div />
+              <div style={bioValueStyle}>{fmtPct(bio?.flPercentile ?? bpct?.fl)}</div>
+              <div style={bioValueStyle}>{bio?.flGa ?? '—'}</div>
+              {/* EFW row — Sub-Task 1: EFW now at position 8 (after FL) in the detail view */}
+              <div style={bioLabelStyle}>EFW (grams)</div>
+              <div style={bioValueRightStyle}>{fmtVal(bio?.efw, 'g')}</div>
+              <div style={bioValueStyle}>{fmtPct(bio?.efwPercentile ?? efwPct)}</div>
+              <div style={bioValueStyle}>{bio?.efwGa ?? '—'}</div>
+              {/* TCD–LC rows — no GA formula, col 4 shows '—' */}
               <div style={bioLabelStyle}>TCD (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.tcd, 'mm')}</div>
               <div style={bioValueStyle}>{fmtPct(undefined)}</div>
-              <div />
+              <div style={bioValueStyle}>{'—'}</div>
               <div style={bioLabelStyle}>Vp</div>
               <div style={bioValueRightStyle}>{bio?.vp ?? '—'}</div>
               <div style={bioValueStyle}>{fmtPct(undefined)}</div>
-              <div />
+              <div style={bioValueStyle}>{'—'}</div>
               <div style={bioLabelStyle}>CM (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.cm, 'mm')}</div>
               <div style={bioValueStyle}>{fmtPct(undefined)}</div>
-              <div />
+              <div style={bioValueStyle}>{'—'}</div>
               <div style={bioLabelStyle}>NF (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.nuchalFold, 'mm')}</div>
               <div style={bioValueStyle}>{fmtPct(undefined)}</div>
-              <div />
+              <div style={bioValueStyle}>{'—'}</div>
               <div style={bioLabelStyle}>NB (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.nb, 'mm')}</div>
               <div style={bioValueStyle}>{fmtPct(undefined)}</div>
-              <div />
-              <div style={bioLabelStyle}>EFW (grams)</div>
-              <div style={bioValueRightStyle}>{fmtVal(bio?.efw, 'g')}</div>
-              <div style={bioValueStyle}>{fmtPct(efwPct)}</div>
-              <div />
+              <div style={bioValueStyle}>{'—'}</div>
               <div style={bioLabelStyle}>LA</div>
               <div style={bioValueRightStyle}>{bio?.la ?? '—'}</div>
               <div style={bioValueStyle}>{fmtPct(undefined)}</div>
-              <div />
+              <div style={bioValueStyle}>{'—'}</div>
               <div style={bioLabelStyle}>LC (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.lc, 'mm')}</div>
               <div style={bioValueStyle}>{fmtPct(undefined)}</div>
-              <div />
+              <div style={bioValueStyle}>{'—'}</div>
             </div>
             {isTwins && (
               <div style={{ fontSize: '0.75rem', color: '#525252', marginTop: '0.25rem', marginBottom: '1rem', fontStyle: 'italic' }}>
