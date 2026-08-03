@@ -194,11 +194,11 @@ export default function ExaminationSections({
           <div style={{ fontSize: '0.75rem', color: '#525252' }}>PI</div>
           <div style={{ fontSize: '0.75rem', color: '#525252' }}>RI</div>
           <div style={{ fontSize: '0.75rem', color: '#525252' }}>A. ut. Dex.</div>
-          <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{ftD?.utADexPI !== undefined ? String(ftD.utADexPI) : '—'}</div>
-          <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{ftD?.utADexRI !== undefined ? String(ftD.utADexRI) : '—'}</div>
+          <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{ftD?.utADexPI !== undefined ? ftD.utADexPI.toFixed(2) : '—'}</div>
+          <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{ftD?.utADexRI !== undefined ? ftD.utADexRI.toFixed(2) : '—'}</div>
           <div style={{ fontSize: '0.75rem', color: '#525252' }}>A. ut. Sin.</div>
-          <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{ftD?.utASinPI !== undefined ? String(ftD.utASinPI) : '—'}</div>
-          <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{ftD?.utASinRI !== undefined ? String(ftD.utASinRI) : '—'}</div>
+          <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{ftD?.utASinPI !== undefined ? ftD.utASinPI.toFixed(2) : '—'}</div>
+          <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{ftD?.utASinRI !== undefined ? ftD.utASinRI.toFixed(2) : '—'}</div>
         </div>
       </div>
     );
@@ -280,8 +280,8 @@ export default function ExaminationSections({
               <div style={bioValueRightStyle}>{fmtVal(bio?.tcd, 'mm')}</div>
               <div style={bioValueStyle}>{fmtPct(undefined)}</div>
               <div />
-              <div style={bioLabelStyle}>Vp (mm)</div>
-              <div style={bioValueRightStyle}>{fmtVal(bio?.vp, 'mm')}</div>
+              <div style={bioLabelStyle}>Vp</div>
+              <div style={bioValueRightStyle}>{bio?.vp ?? '—'}</div>
               <div style={bioValueStyle}>{fmtPct(undefined)}</div>
               <div />
               <div style={bioLabelStyle}>CM (mm)</div>
@@ -300,8 +300,8 @@ export default function ExaminationSections({
               <div style={bioValueRightStyle}>{fmtVal(bio?.efw, 'g')}</div>
               <div style={bioValueStyle}>{fmtPct(efwPct)}</div>
               <div />
-              <div style={bioLabelStyle}>LA (mm)</div>
-              <div style={bioValueRightStyle}>{fmtVal(bio?.la, 'mm')}</div>
+              <div style={bioLabelStyle}>LA</div>
+              <div style={bioValueRightStyle}>{bio?.la ?? '—'}</div>
               <div style={bioValueStyle}>{fmtPct(undefined)}</div>
               <div />
               <div style={bioLabelStyle}>LC (mm)</div>
@@ -348,23 +348,23 @@ export default function ExaminationSections({
               <div style={{ fontSize: '0.875rem', color: '#525252', paddingBottom: '0.5rem' }}>RI</div>
               <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>A. ut. Dex.</div>
               {/* Sub-Task 5: value cells use color #161616 + fontWeight 600 */}
-              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.utADexPI !== undefined ? String(dop.utADexPI) : '—'}</div>
-              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.utADexRI !== undefined ? String(dop.utADexRI) : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.utADexPI !== undefined ? dop.utADexPI.toFixed(2) : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.utADexRI !== undefined ? dop.utADexRI.toFixed(2) : '—'}</div>
               <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>A. ut. Sin.</div>
-              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.utASinPI !== undefined ? String(dop.utASinPI) : '—'}</div>
-              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.utASinRI !== undefined ? String(dop.utASinRI) : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.utASinPI !== undefined ? dop.utASinPI.toFixed(2) : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.utASinRI !== undefined ? dop.utASinRI.toFixed(2) : '—'}</div>
               <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>A. Umb.</div>
-              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.pi !== undefined ? String(dop.pi) : '—'}</div>
-              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.ri !== undefined ? String(dop.ri) : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.pi !== undefined ? dop.pi.toFixed(2) : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.ri !== undefined ? dop.ri.toFixed(2) : '—'}</div>
             </div>
             {/* Sub-grid B: Measurement | Value */}
             <div style={{ display: 'grid', gridTemplateColumns: '8rem 1fr', gap: '0.5rem', alignItems: 'end' }}>
               <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>CMA PI</div>
-              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.cma !== undefined ? String(dop.cma) : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.cma !== undefined ? dop.cma.toFixed(2) : '—'}</div>
               <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>PSV</div>
-              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.psv !== undefined ? String(dop.psv) : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.psv !== undefined ? dop.psv.toFixed(2) : '—'}</div>
               <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>CPR</div>
-              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.cpr !== undefined ? String(dop.cpr) : '—'}</div>
+              <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.cpr !== undefined ? dop.cpr.toFixed(2) : '—'}</div>
               <div style={{ fontSize: '0.875rem', color: '#525252', textAlign: 'left' as const }}>Duc. Ven.</div>
               <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{dop?.ducVen || '—'}</div>
             </div>

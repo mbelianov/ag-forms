@@ -19,9 +19,21 @@ export interface GetExaminationsOptions {
 
 function extractMessage(err: unknown, fallback: string): string {
   if (err && typeof err === 'object' && 'response' in err) {
-    const r = (err as { response?: { data?: { error?: { message?: string } | string } } }).response;
+    const r = (err as {
+      response?: {
+        data?: {
+          error?: { message?: string; details?: { errors?: string[] } } | string;
+        };
+      };
+    }).response;
     const e = r?.data?.error;
-    if (typeof e === 'object' && e?.message) return e.message;
+    if (typeof e === 'object' && e?.message) {
+      const details = e.details?.errors;
+      if (details && details.length > 0) {
+        return e.message + '\n• ' + details.join('\n• ');
+      }
+      return e.message;
+    }
     if (typeof e === 'string') return e;
   }
   return fallback;

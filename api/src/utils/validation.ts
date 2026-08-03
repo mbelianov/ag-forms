@@ -7,6 +7,8 @@ import * as Joi from 'joi';
 import { ValidationResult } from '../types';
 import { EXAM_TYPE_KEYS } from '../constants/examinationTypes';
 
+const GA_REGEX = /^(\d{1,2}w\s?\d{1}d|\d{1,2}с\s?\d{1}д)$/;
+
 /**
  * User validation schema
  */
@@ -176,15 +178,15 @@ const biometrySchema = Joi.object({
     }),
     // TASK-034: Extended biometry
     ofd: Joi.number().min(0).max(200).optional().messages({ 'number.base': 'OFD must be a valid number' }),
-    vp:  Joi.number().min(0).max(100).optional().messages({ 'number.base': 'Vp must be a valid number' }),
+    vp:  Joi.string().max(500).optional().allow(''),
     tcd: Joi.number().min(0).max(100).optional().messages({ 'number.base': 'TCD must be a valid number' }),
     cm:  Joi.number().min(0).max(50).optional().messages({ 'number.base': 'CM must be a valid number' }),
     nuchalFold: Joi.number().min(0).max(30).optional().messages({ 'number.base': 'Nuchal Fold must be a valid number' }),
     nb:  Joi.number().min(0).max(30).optional().messages({ 'number.base': 'NB must be a valid number' }),
     apad: Joi.number().min(0).max(200).optional().messages({ 'number.base': 'APAD must be a valid number' }),
     tad:  Joi.number().min(0).max(200).optional().messages({ 'number.base': 'TAD must be a valid number' }),
-    // TASK-035: LA and LC
-    la: Joi.number().min(0).max(100).optional().messages({ 'number.base': 'LA must be a valid number' }),
+    // TASK-035: LA (migrated to string) and LC
+    la: Joi.string().max(500).optional().allow(''),
     lc: Joi.number().min(0).max(100).optional().messages({ 'number.base': 'LC must be a valid number' })
 }).optional();
 
@@ -264,7 +266,7 @@ const anatomySchema = Joi.object({
  */
 const ftBiometrySchema = Joi.object({
     crl:       Joi.number().min(0).max(200).optional(),
-    gaFromCrl: Joi.string().pattern(/^\d{1,2}w\s?\d{1}d$/).optional().allow(''),
+    gaFromCrl: Joi.string().pattern(GA_REGEX).optional().allow(''),
     nt:        Joi.number().min(0).max(30).optional(),
     nb:        Joi.number().min(0).max(30).optional(),
     puls:      Joi.number().integer().min(0).max(300).optional(),
@@ -343,18 +345,18 @@ const examinationSchema = Joi.object({
             'any.required': 'Exam date is required'
         }),
     gestationalAge: Joi.string()
-        .pattern(/^\d{1,2}w\s?\d{1}d$/)
+        .pattern(GA_REGEX)
         .optional()
         .allow('')
         .messages({
-            'string.pattern.base': 'Gestational age must be in format "28w 3d"'
+            'string.pattern.base': 'Gestational age must be in format "28w 3d" or "28с 3д"'
         }),
     gestationalAgeFromBiometry: Joi.string()
-        .pattern(/^\d{1,2}w\s?\d{1}d$/)
+        .pattern(GA_REGEX)
         .optional()
         .allow('')
         .messages({
-            'string.pattern.base': 'Gestational age from biometry must be in format "28w 3d"'
+            'string.pattern.base': 'Gestational age from biometry must be in format "28w 3d" or "28с 3д"'
         }),
     status: Joi.string()
         .valid('draft', 'completed', 'reviewed')
@@ -370,11 +372,11 @@ const examinationSchema = Joi.object({
     biometry2: biometrySchema,
     doppler2: dopplerSchema,
     gestationalAgeFromBiometry2: Joi.string()
-        .pattern(/^\d{1,2}w\s?\d{1}d$/)
+        .pattern(GA_REGEX)
         .optional()
         .allow('')
         .messages({
-            'string.pattern.base': 'Gestational age from biometry (Twin 2) must be in format "28w 3d"'
+            'string.pattern.base': 'Gestational age from biometry (Twin 2) must be in format "28w 3d" or "28с 3д"'
         }),
     notes: Joi.string()
         .max(5000)

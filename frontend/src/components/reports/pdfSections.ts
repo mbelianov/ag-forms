@@ -265,12 +265,12 @@ function renderBiometryBlock(
     { label: 'AC (mm)',     value: b.ac,         hasPct: true,  pct: b.acPct },
     { label: 'FL (mm)',     value: b.fl,         hasPct: true,  pct: b.flPct },
     { label: 'TCD (mm)',    value: b.tcd,        hasPct: false },
-    { label: 'Vp (mm)',     value: b.vp,         hasPct: false },
+    { label: 'Vp',          value: b.vp,         hasPct: false },
     { label: 'CM (mm)',     value: b.cm,         hasPct: false },
     { label: 'NF (mm)',     value: b.nuchalFold, hasPct: false },
     { label: 'NB (mm)',     value: b.nb,         hasPct: false },
     { label: 'EFW (grams)', value: b.efw,        hasPct: true,  pct: b.efwPct },
-    { label: 'LA (mm)',     value: b.la,         hasPct: false },
+    { label: 'LA',          value: b.la,         hasPct: false },
     { label: 'LC (mm)',     value: b.lc,         hasPct: false },
   ];
 

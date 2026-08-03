@@ -83,10 +83,18 @@ export default function ExaminationForm(props: ExaminationFormProps) {
           <InlineNotification
             kind="error"
             title="Error"
-            subtitle={submitError}
+            subtitle={submitError.includes('\n') ? '' : submitError}
             onCloseButtonClick={() => setSubmitError(null)}
             lowContrast
-          />
+          >
+            {submitError.includes('\n') && (
+              <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                {submitError.split('\n').map((line, i) => (
+                  <li key={i}>{line.startsWith('• ') ? line.slice(2) : line}</li>
+                ))}
+              </ul>
+            )}
+          </InlineNotification>
         )}
 
         {/* ── Patient (full width) ── */}

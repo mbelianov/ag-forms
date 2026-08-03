@@ -14,6 +14,30 @@ import type {
 } from '../types';
 import { calcGAFromLMP, calcEDD, calculateAgeAtDate } from '../utils/calculations';
 import { getSectionVisibility, isFirstTrimester, isFtTwins } from '../constants/examinationTypes';
+import {
+  validatePositiveFloat,
+  validateNonNegativeFloat,
+  validateIntegerField,
+  GA_REGEX,
+} from '../utils/validators';
+
+// ── Validation rule interfaces ────────────────────────────────────────────────
+
+interface ValidationRule {
+  errorKey: string;           // key written into newErrors — always prefixed, e.g. 't1_bpd'
+  formKey: string;            // key read from formData — bare for T1, prefixed for T2/FT
+  validate: (raw: string) => string | undefined;
+  onlyWhen?: () => boolean;   // runtime guard — closes over isTwins / isFt / isFtTwinsMode
+}
+
+// ── Field registry interfaces ─────────────────────────────────────────────────
+
+interface FieldDef {
+  formKey: string;           // key in formData
+  payloadPath: string;       // dot-path into the output object, e.g. 'biometry.bpd'
+  outType: 'float' | 'integer' | 'string' | 'trim';
+  onlyWhen?: () => boolean;  // runtime guard — same pattern as ValidationRule
+}
 
 export interface ExaminationFormProps {
   examination?: Examination;
@@ -59,14 +83,14 @@ export function useExaminationForm({
     fl: examination?.biometry?.fl != null ? examination.biometry.fl.toFixed(2) : '',
     efw: examination?.biometry?.efw != null ? examination.biometry.efw.toFixed(2) : '',
     ofd: examination?.biometry?.ofd != null ? examination.biometry.ofd.toFixed(2) : '',
-    vp: examination?.biometry?.vp != null ? examination.biometry.vp.toFixed(2) : '',
+    vp: examination?.biometry?.vp ?? '',
     tcd: examination?.biometry?.tcd != null ? examination.biometry.tcd.toFixed(2) : '',
     cm: examination?.biometry?.cm != null ? examination.biometry.cm.toFixed(2) : '',
     nuchalFold: examination?.biometry?.nuchalFold != null ? examination.biometry.nuchalFold.toFixed(2) : '',
     nb: examination?.biometry?.nb != null ? examination.biometry.nb.toFixed(2) : '',
     apad: examination?.biometry?.apad != null ? examination.biometry.apad.toFixed(2) : '',
     tad: examination?.biometry?.tad != null ? examination.biometry.tad.toFixed(2) : '',
-    la: examination?.biometry?.la != null ? examination.biometry.la.toFixed(2) : '',
+    la: examination?.biometry?.la ?? '',
     lc: examination?.biometry?.lc != null ? examination.biometry.lc.toFixed(2) : '',
     // GA fields (both stored separately)
     gestationalAge: examination?.gestationalAge || '',                         // GA from LMP
@@ -116,14 +140,14 @@ export function useExaminationForm({
     t2_fl: examination?.biometry2?.fl != null ? examination.biometry2.fl.toFixed(2) : '',
     t2_efw: examination?.biometry2?.efw != null ? examination.biometry2.efw.toFixed(2) : '',
     t2_ofd: examination?.biometry2?.ofd != null ? examination.biometry2.ofd.toFixed(2) : '',
-    t2_vp: examination?.biometry2?.vp != null ? examination.biometry2.vp.toFixed(2) : '',
+    t2_vp: examination?.biometry2?.vp ?? '',
     t2_tcd: examination?.biometry2?.tcd != null ? examination.biometry2.tcd.toFixed(2) : '',
     t2_cm: examination?.biometry2?.cm != null ? examination.biometry2.cm.toFixed(2) : '',
     t2_nuchalFold: examination?.biometry2?.nuchalFold != null ? examination.biometry2.nuchalFold.toFixed(2) : '',
     t2_nb: examination?.biometry2?.nb != null ? examination.biometry2.nb.toFixed(2) : '',
     t2_apad: examination?.biometry2?.apad != null ? examination.biometry2.apad.toFixed(2) : '',
     t2_tad: examination?.biometry2?.tad != null ? examination.biometry2.tad.toFixed(2) : '',
-    t2_la: examination?.biometry2?.la != null ? examination.biometry2.la.toFixed(2) : '',
+    t2_la: examination?.biometry2?.la ?? '',
     t2_lc: examination?.biometry2?.lc != null ? examination.biometry2.lc.toFixed(2) : '',
     t2_gestationalAgeFromBiometry: examination?.gestationalAgeFromBiometry2 || '',
     // uzd-twins: Twin 2 doppler fields
@@ -228,21 +252,21 @@ export function useExaminationForm({
         examDate: examDateToYMD(examination.examDate),
         status: examination.status,
         examinationType: examination.examinationType || 'ultrasound_prenatal',
-        bpd: examination.biometry?.bpd?.toString() || '',
-        hc: examination.biometry?.hc?.toString() || '',
-        ac: examination.biometry?.ac?.toString() || '',
-        fl: examination.biometry?.fl?.toString() || '',
-        efw: examination.biometry?.efw?.toString() || '',
-        ofd: examination.biometry?.ofd?.toString() || '',
+        bpd: examination.biometry?.bpd != null ? examination.biometry.bpd.toFixed(2) : '',
+        hc: examination.biometry?.hc != null ? examination.biometry.hc.toFixed(2) : '',
+        ac: examination.biometry?.ac != null ? examination.biometry.ac.toFixed(2) : '',
+        fl: examination.biometry?.fl != null ? examination.biometry.fl.toFixed(2) : '',
+        efw: examination.biometry?.efw != null ? examination.biometry.efw.toFixed(2) : '',
+        ofd: examination.biometry?.ofd != null ? examination.biometry.ofd.toFixed(2) : '',
         vp: examination.biometry?.vp?.toString() || '',
-        tcd: examination.biometry?.tcd?.toString() || '',
-        cm: examination.biometry?.cm?.toString() || '',
-        nuchalFold: examination.biometry?.nuchalFold?.toString() || '',
-        nb: examination.biometry?.nb?.toString() || '',
-        apad: examination.biometry?.apad?.toString() || '',
-        tad: examination.biometry?.tad?.toString() || '',
+        tcd: examination.biometry?.tcd != null ? examination.biometry.tcd.toFixed(2) : '',
+        cm: examination.biometry?.cm != null ? examination.biometry.cm.toFixed(2) : '',
+        nuchalFold: examination.biometry?.nuchalFold != null ? examination.biometry.nuchalFold.toFixed(2) : '',
+        nb: examination.biometry?.nb != null ? examination.biometry.nb.toFixed(2) : '',
+        apad: examination.biometry?.apad != null ? examination.biometry.apad.toFixed(2) : '',
+        tad: examination.biometry?.tad != null ? examination.biometry.tad.toFixed(2) : '',
         la: examination.biometry?.la?.toString() || '',
-        lc: examination.biometry?.lc?.toString() || '',
+        lc: examination.biometry?.lc != null ? examination.biometry.lc.toFixed(2) : '',
         gestationalAge: examination.gestationalAge || '',
         gestationalAgeFromBiometry: examination.gestationalAgeFromBiometry || '',
         pi: examination.doppler?.pi?.toString() || '',
@@ -279,21 +303,21 @@ export function useExaminationForm({
         anat_thorax: examination.data?.anatomy?.thorax || '',
         comments: examination.data?.comments || '',
         // uzd-twins: Twin 2 biometry
-        t2_bpd: examination.biometry2?.bpd?.toString() || '',
-        t2_hc: examination.biometry2?.hc?.toString() || '',
-        t2_ac: examination.biometry2?.ac?.toString() || '',
-        t2_fl: examination.biometry2?.fl?.toString() || '',
-        t2_efw: examination.biometry2?.efw?.toString() || '',
-        t2_ofd: examination.biometry2?.ofd?.toString() || '',
+        t2_bpd: examination.biometry2?.bpd != null ? examination.biometry2.bpd.toFixed(2) : '',
+        t2_hc: examination.biometry2?.hc != null ? examination.biometry2.hc.toFixed(2) : '',
+        t2_ac: examination.biometry2?.ac != null ? examination.biometry2.ac.toFixed(2) : '',
+        t2_fl: examination.biometry2?.fl != null ? examination.biometry2.fl.toFixed(2) : '',
+        t2_efw: examination.biometry2?.efw != null ? examination.biometry2.efw.toFixed(2) : '',
+        t2_ofd: examination.biometry2?.ofd != null ? examination.biometry2.ofd.toFixed(2) : '',
         t2_vp: examination.biometry2?.vp?.toString() || '',
-        t2_tcd: examination.biometry2?.tcd?.toString() || '',
-        t2_cm: examination.biometry2?.cm?.toString() || '',
-        t2_nuchalFold: examination.biometry2?.nuchalFold?.toString() || '',
-        t2_nb: examination.biometry2?.nb?.toString() || '',
-        t2_apad: examination.biometry2?.apad?.toString() || '',
-        t2_tad: examination.biometry2?.tad?.toString() || '',
+        t2_tcd: examination.biometry2?.tcd != null ? examination.biometry2.tcd.toFixed(2) : '',
+        t2_cm: examination.biometry2?.cm != null ? examination.biometry2.cm.toFixed(2) : '',
+        t2_nuchalFold: examination.biometry2?.nuchalFold != null ? examination.biometry2.nuchalFold.toFixed(2) : '',
+        t2_nb: examination.biometry2?.nb != null ? examination.biometry2.nb.toFixed(2) : '',
+        t2_apad: examination.biometry2?.apad != null ? examination.biometry2.apad.toFixed(2) : '',
+        t2_tad: examination.biometry2?.tad != null ? examination.biometry2.tad.toFixed(2) : '',
         t2_la: examination.biometry2?.la?.toString() || '',
-        t2_lc: examination.biometry2?.lc?.toString() || '',
+        t2_lc: examination.biometry2?.lc != null ? examination.biometry2.lc.toFixed(2) : '',
         t2_gestationalAgeFromBiometry: examination.gestationalAgeFromBiometry2 || '',
         // uzd-twins: Twin 2 doppler
         t2_pi: examination.doppler2?.pi?.toString() || '',
@@ -423,12 +447,107 @@ export function useExaminationForm({
     handleChange(stripped, value);
   };
 
-  // ── Validation ────────────────────────────────────────────────────────────
-  const gaRegex = /^\d{1,2}w\s?\d{1}d$/;
+  // ── Validation ─────────────────────────────────────────────────────────────
+  const validateGA = (raw: string): string | undefined =>
+    raw && !GA_REGEX.test(raw) ? 'Format must be "28w 3d" or "28с 3д"' : undefined;
+
+  // Declarative validation rules table (ST-2).
+  // errorKey: written into newErrors (always prefixed for T1 prenatal — fixes D-1).
+  // formKey: read from formData (bare for T1 prenatal because handleChangeT1 strips prefix).
+  // onlyWhen: runtime guard closing over derived booleans.
+  const VALIDATION_RULES: ValidationRule[] = [
+    // ── Prenatal T1 biometry (excl. la — string field) ──────────────────────
+    { errorKey: 't1_bpd',        formKey: 'bpd',        validate: (r) => validatePositiveFloat(r, 'BPD') },
+    { errorKey: 't1_hc',         formKey: 'hc',         validate: (r) => validatePositiveFloat(r, 'HC') },
+    { errorKey: 't1_ac',         formKey: 'ac',         validate: (r) => validatePositiveFloat(r, 'AC') },
+    { errorKey: 't1_fl',         formKey: 'fl',         validate: (r) => validatePositiveFloat(r, 'FL') },
+    { errorKey: 't1_efw',        formKey: 'efw',        validate: (r) => validatePositiveFloat(r, 'EFW') },
+    { errorKey: 't1_ofd',        formKey: 'ofd',        validate: (r) => validatePositiveFloat(r, 'OFD') },
+    // vp is now a string field — no validation rule
+    { errorKey: 't1_tcd',        formKey: 'tcd',        validate: (r) => validatePositiveFloat(r, 'TCD') },
+    { errorKey: 't1_cm',         formKey: 'cm',         validate: (r) => validatePositiveFloat(r, 'CM') },
+    { errorKey: 't1_nuchalFold', formKey: 'nuchalFold', validate: (r) => validatePositiveFloat(r, 'NF') },
+    { errorKey: 't1_nb',         formKey: 'nb',         validate: (r) => validatePositiveFloat(r, 'NB') },
+    { errorKey: 't1_apad',       formKey: 'apad',       validate: (r) => validatePositiveFloat(r, 'APAD') },
+    { errorKey: 't1_tad',        formKey: 'tad',        validate: (r) => validatePositiveFloat(r, 'TAD') },
+    { errorKey: 't1_lc',         formKey: 'lc',         validate: (r) => validatePositiveFloat(r, 'LC') },
+    // ── Prenatal T1 GA from biometry ─────────────────────────────────────────
+    { errorKey: 't1_gestationalAgeFromBiometry', formKey: 'gestationalAgeFromBiometry', validate: validateGA },
+    // ── Prenatal T1 doppler ──────────────────────────────────────────────────
+    { errorKey: 't1_pi',       formKey: 'pi',       validate: (r) => validateNonNegativeFloat(r, 'PI') },
+    { errorKey: 't1_ri',       formKey: 'ri',       validate: (r) => validateNonNegativeFloat(r, 'RI') },
+    { errorKey: 't1_utADexPI', formKey: 'utADexPI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Dex PI') },
+    { errorKey: 't1_utADexRI', formKey: 'utADexRI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Dex RI') },
+    { errorKey: 't1_utASinPI', formKey: 'utASinPI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Sin PI') },
+    { errorKey: 't1_utASinRI', formKey: 'utASinRI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Sin RI') },
+    { errorKey: 't1_cma',      formKey: 'cma',      validate: (r) => validateNonNegativeFloat(r, 'CMA') },
+    { errorKey: 't1_psv',      formKey: 'psv',      validate: (r) => validateNonNegativeFloat(r, 'PSV') },
+    { errorKey: 't1_cpr',      formKey: 'cpr',      validate: (r) => validateNonNegativeFloat(r, 'CPR') },
+    // ── Prenatal T1 heart rate ────────────────────────────────────────────────
+    { errorKey: 't1_heart_rate', formKey: 'heart_rate', validate: (r) => validateIntegerField(r, 'Heart rate') },
+    // ── Prenatal T2 biometry (excl. t2_la) ───────────────────────────────────
+    { errorKey: 't2_bpd',        formKey: 't2_bpd',        validate: (r) => validatePositiveFloat(r, 'BPD (T2)'),   onlyWhen: () => isTwins },
+    { errorKey: 't2_hc',         formKey: 't2_hc',         validate: (r) => validatePositiveFloat(r, 'HC (T2)'),    onlyWhen: () => isTwins },
+    { errorKey: 't2_ac',         formKey: 't2_ac',         validate: (r) => validatePositiveFloat(r, 'AC (T2)'),    onlyWhen: () => isTwins },
+    { errorKey: 't2_fl',         formKey: 't2_fl',         validate: (r) => validatePositiveFloat(r, 'FL (T2)'),    onlyWhen: () => isTwins },
+    { errorKey: 't2_efw',        formKey: 't2_efw',        validate: (r) => validatePositiveFloat(r, 'EFW (T2)'),   onlyWhen: () => isTwins },
+    { errorKey: 't2_ofd',        formKey: 't2_ofd',        validate: (r) => validatePositiveFloat(r, 'OFD (T2)'),   onlyWhen: () => isTwins },
+    // t2_vp is now a string field — no validation rule
+    { errorKey: 't2_tcd',        formKey: 't2_tcd',        validate: (r) => validatePositiveFloat(r, 'TCD (T2)'),   onlyWhen: () => isTwins },
+    { errorKey: 't2_cm',         formKey: 't2_cm',         validate: (r) => validatePositiveFloat(r, 'CM (T2)'),    onlyWhen: () => isTwins },
+    { errorKey: 't2_nuchalFold', formKey: 't2_nuchalFold', validate: (r) => validatePositiveFloat(r, 'NF (T2)'),    onlyWhen: () => isTwins },
+    { errorKey: 't2_nb',         formKey: 't2_nb',         validate: (r) => validatePositiveFloat(r, 'NB (T2)'),    onlyWhen: () => isTwins },
+    { errorKey: 't2_apad',       formKey: 't2_apad',       validate: (r) => validatePositiveFloat(r, 'APAD (T2)'),  onlyWhen: () => isTwins },
+    { errorKey: 't2_tad',        formKey: 't2_tad',        validate: (r) => validatePositiveFloat(r, 'TAD (T2)'),   onlyWhen: () => isTwins },
+    { errorKey: 't2_lc',         formKey: 't2_lc',         validate: (r) => validatePositiveFloat(r, 'LC (T2)'),    onlyWhen: () => isTwins },
+    // ── Prenatal T2 GA from biometry ─────────────────────────────────────────
+    { errorKey: 't2_gestationalAgeFromBiometry', formKey: 't2_gestationalAgeFromBiometry', validate: validateGA, onlyWhen: () => isTwins },
+    // ── Prenatal T2 doppler ──────────────────────────────────────────────────
+    { errorKey: 't2_pi',       formKey: 't2_pi',       validate: (r) => validateNonNegativeFloat(r, 'PI (T2)'),         onlyWhen: () => isTwins },
+    { errorKey: 't2_ri',       formKey: 't2_ri',       validate: (r) => validateNonNegativeFloat(r, 'RI (T2)'),         onlyWhen: () => isTwins },
+    { errorKey: 't2_utADexPI', formKey: 't2_utADexPI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Dex PI (T2)'), onlyWhen: () => isTwins },
+    { errorKey: 't2_utADexRI', formKey: 't2_utADexRI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Dex RI (T2)'), onlyWhen: () => isTwins },
+    { errorKey: 't2_utASinPI', formKey: 't2_utASinPI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Sin PI (T2)'), onlyWhen: () => isTwins },
+    { errorKey: 't2_utASinRI', formKey: 't2_utASinRI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Sin RI (T2)'), onlyWhen: () => isTwins },
+    { errorKey: 't2_cma',      formKey: 't2_cma',      validate: (r) => validateNonNegativeFloat(r, 'CMA (T2)'),        onlyWhen: () => isTwins },
+    { errorKey: 't2_psv',      formKey: 't2_psv',      validate: (r) => validateNonNegativeFloat(r, 'PSV (T2)'),        onlyWhen: () => isTwins },
+    { errorKey: 't2_cpr',      formKey: 't2_cpr',      validate: (r) => validateNonNegativeFloat(r, 'CPR (T2)'),        onlyWhen: () => isTwins },
+    // ── Prenatal T2 heart rate ────────────────────────────────────────────────
+    { errorKey: 't2_heart_rate', formKey: 't2_heart_rate', validate: (r) => validateIntegerField(r, 'Heart rate (T2)'), onlyWhen: () => isTwins },
+    // ── FT T1 biometry ────────────────────────────────────────────────────────
+    { errorKey: 't1_ft_crl', formKey: 't1_ft_crl', validate: (r) => validatePositiveFloat(r, 'CRL'), onlyWhen: () => isFt },
+    { errorKey: 't1_ft_nt',  formKey: 't1_ft_nt',  validate: (r) => validatePositiveFloat(r, 'NT'),  onlyWhen: () => isFt },
+    { errorKey: 't1_ft_nb',  formKey: 't1_ft_nb',  validate: (r) => validatePositiveFloat(r, 'NB'),  onlyWhen: () => isFt },
+    // ── FT T1 GA from CRL ─────────────────────────────────────────────────────
+    { errorKey: 't1_ft_gaFromCrl', formKey: 't1_ft_gaFromCrl', validate: validateGA, onlyWhen: () => isFt },
+    // ── FT T1 integer fields ─────────────────────────────────────────────────
+    { errorKey: 't1_ft_puls',      formKey: 't1_ft_puls',      validate: (r) => validateIntegerField(r, 'Pulse'),      onlyWhen: () => isFt },
+    { errorKey: 't1_ft_heartRate', formKey: 't1_ft_heartRate', validate: (r) => validateIntegerField(r, 'Heart rate'), onlyWhen: () => isFt },
+    // ── FT T1 doppler ─────────────────────────────────────────────────────────
+    { errorKey: 't1_ft_utADexPI', formKey: 't1_ft_utADexPI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Dex PI'), onlyWhen: () => isFt },
+    { errorKey: 't1_ft_utADexRI', formKey: 't1_ft_utADexRI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Dex RI'), onlyWhen: () => isFt },
+    { errorKey: 't1_ft_utASinPI', formKey: 't1_ft_utASinPI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Sin PI'), onlyWhen: () => isFt },
+    { errorKey: 't1_ft_utASinRI', formKey: 't1_ft_utASinRI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Sin RI'), onlyWhen: () => isFt },
+    // ── FT T2 biometry ────────────────────────────────────────────────────────
+    { errorKey: 't2_ft_crl', formKey: 't2_ft_crl', validate: (r) => validatePositiveFloat(r, 'CRL (T2)'), onlyWhen: () => isFtTwinsMode },
+    { errorKey: 't2_ft_nt',  formKey: 't2_ft_nt',  validate: (r) => validatePositiveFloat(r, 'NT (T2)'),  onlyWhen: () => isFtTwinsMode },
+    { errorKey: 't2_ft_nb',  formKey: 't2_ft_nb',  validate: (r) => validatePositiveFloat(r, 'NB (T2)'),  onlyWhen: () => isFtTwinsMode },
+    // ── FT T2 GA from CRL ─────────────────────────────────────────────────────
+    { errorKey: 't2_ft_gaFromCrl', formKey: 't2_ft_gaFromCrl', validate: validateGA, onlyWhen: () => isFtTwinsMode },
+    // ── FT T2 integer fields ─────────────────────────────────────────────────
+    { errorKey: 't2_ft_puls',      formKey: 't2_ft_puls',      validate: (r) => validateIntegerField(r, 'Pulse (T2)'),      onlyWhen: () => isFtTwinsMode },
+    { errorKey: 't2_ft_heartRate', formKey: 't2_ft_heartRate', validate: (r) => validateIntegerField(r, 'Heart rate (T2)'), onlyWhen: () => isFtTwinsMode },
+    // ── FT T2 doppler ─────────────────────────────────────────────────────────
+    { errorKey: 't2_ft_utADexPI', formKey: 't2_ft_utADexPI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Dex PI (T2)'), onlyWhen: () => isFtTwinsMode },
+    { errorKey: 't2_ft_utADexRI', formKey: 't2_ft_utADexRI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Dex RI (T2)'), onlyWhen: () => isFtTwinsMode },
+    { errorKey: 't2_ft_utASinPI', formKey: 't2_ft_utASinPI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Sin PI (T2)'), onlyWhen: () => isFtTwinsMode },
+    { errorKey: 't2_ft_utASinRI', formKey: 't2_ft_utASinRI', validate: (r) => validateNonNegativeFloat(r, 'A.ut.Sin RI (T2)'), onlyWhen: () => isFtTwinsMode },
+  ];
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
+    // ── Imperative preamble: date/patient/GA checks (no repetitive structure) ──
     if (!isEdit && !formData.patientId) newErrors.patientId = 'Patient is required';
 
     if (!formData.examDate) {
@@ -449,128 +568,109 @@ export function useExaminationForm({
       if (lmpDate > today) newErrors.last_menstrual_period = 'LMP cannot be in the future';
     }
 
-    if (formData.gestationalAge && !gaRegex.test(formData.gestationalAge))
-      newErrors.gestationalAge = 'Format must be "28w 3d"';
+    if (formData.gestationalAge && !GA_REGEX.test(formData.gestationalAge))
+      newErrors.gestationalAge = 'Format must be "28w 3d" or "28с 3д"';
 
-    if (formData.gestationalAgeFromBiometry && !gaRegex.test(formData.gestationalAgeFromBiometry))
-      newErrors.gestationalAgeFromBiometry = 'Format must be "28w 3d"';
-
-    const biometryFields = ['bpd', 'hc', 'ac', 'fl', 'efw', 'ofd', 'vp', 'tcd', 'cm', 'nuchalFold', 'nb', 'apad', 'tad', 'la', 'lc'];
-    biometryFields.forEach(field => {
-      const value = formData[field as keyof typeof formData] as string;
-      if (value && value.trim()) {
-        const parsed = parseFloat(value);
-        if (isNaN(parsed) || !isFinite(parsed) || parsed <= 0) newErrors[field] = 'Must be a positive number';
-      }
-    });
-
-    const dopplerFields = ['pi', 'ri', 'utADexPI', 'utADexRI', 'utASinPI', 'utASinRI', 'cma', 'psv', 'cpr'];
-    dopplerFields.forEach(field => {
-      const value = formData[field as keyof typeof formData] as string;
-      if (value && value.trim()) {
-        const parsed = parseFloat(value);
-        if (isNaN(parsed) || parsed < 0) newErrors[field] = 'Must be a valid number';
-      }
-    });
-
-    if (formData.heart_rate && formData.heart_rate.trim()) {
-      const parsed = parseInt(formData.heart_rate);
-      if (isNaN(parsed) || parsed.toString() !== formData.heart_rate.trim()) {
-        newErrors.heart_rate = 'Must be a whole number (bpm)';
-      } else if (parsed <= 0) {
-        newErrors.heart_rate = 'Must be a positive number';
-      }
-    }
-
-    if (isTwins) {
-      const t2BiometryFields = ['t2_bpd', 't2_hc', 't2_ac', 't2_fl', 't2_efw', 't2_ofd', 't2_vp', 't2_tcd', 't2_cm', 't2_nuchalFold', 't2_nb', 't2_apad', 't2_tad', 't2_la', 't2_lc'];
-      t2BiometryFields.forEach(field => {
-        const value = formData[field as keyof typeof formData] as string;
-        if (value && value.trim()) {
-          const parsed = parseFloat(value);
-          if (isNaN(parsed) || !isFinite(parsed) || parsed <= 0) newErrors[field] = 'Must be a positive number';
-        }
-      });
-      if (formData.t2_gestationalAgeFromBiometry && !gaRegex.test(formData.t2_gestationalAgeFromBiometry))
-        newErrors.t2_gestationalAgeFromBiometry = 'Format must be "28w 3d"';
-      const t2DopplerFields = ['t2_pi', 't2_ri', 't2_utADexPI', 't2_utADexRI', 't2_utASinPI', 't2_utASinRI', 't2_cma', 't2_psv', 't2_cpr'];
-      t2DopplerFields.forEach(field => {
-        const value = formData[field as keyof typeof formData] as string;
-        if (value && value.trim()) {
-          const parsed = parseFloat(value);
-          if (isNaN(parsed) || parsed < 0) newErrors[field] = 'Must be a valid number';
-        }
-      });
-      if (formData.t2_heart_rate && formData.t2_heart_rate.trim()) {
-        const parsed = parseInt(formData.t2_heart_rate);
-        if (isNaN(parsed) || parsed.toString() !== formData.t2_heart_rate.trim()) {
-          newErrors.t2_heart_rate = 'Must be a whole number (bpm)';
-        } else if (parsed <= 0) {
-          newErrors.t2_heart_rate = 'Must be a positive number';
-        }
-      }
-    }
-
-    if (isFt) {
-      const ftFloatFields = ['t1_ft_crl', 't1_ft_nt', 't1_ft_nb'];
-      ftFloatFields.forEach(field => {
-        const value = formData[field as keyof typeof formData] as string;
-        if (value && value.trim()) {
-          const parsed = parseFloat(value);
-          if (isNaN(parsed) || parsed <= 0) newErrors[field] = 'Must be a positive number';
-        }
-      });
-      const ftIntFields = ['t1_ft_puls', 't1_ft_heartRate'];
-      ftIntFields.forEach(field => {
-        const value = formData[field as keyof typeof formData] as string;
-        if (value && value.trim()) {
-          const parsed = parseInt(value);
-          if (isNaN(parsed) || parsed <= 0) newErrors[field] = 'Must be a positive whole number';
-        }
-      });
-      if (formData.t1_ft_gaFromCrl && !gaRegex.test(formData.t1_ft_gaFromCrl))
-        newErrors.t1_ft_gaFromCrl = 'Format must be "12w 3d"';
-      const ftDopplerFields = ['t1_ft_utADexPI', 't1_ft_utADexRI', 't1_ft_utASinPI', 't1_ft_utASinRI'];
-      ftDopplerFields.forEach(field => {
-        const value = formData[field as keyof typeof formData] as string;
-        if (value && value.trim()) {
-          const parsed = parseFloat(value);
-          if (isNaN(parsed) || parsed < 0) newErrors[field] = 'Must be a valid number';
-        }
-      });
-      if (isFtTwinsMode) {
-        const t2FtFloatFields = ['t2_ft_crl', 't2_ft_nt', 't2_ft_nb'];
-        t2FtFloatFields.forEach(field => {
-          const value = formData[field as keyof typeof formData] as string;
-          if (value && value.trim()) {
-            const parsed = parseFloat(value);
-            if (isNaN(parsed) || parsed <= 0) newErrors[field] = 'Must be a positive number';
-          }
-        });
-        const t2FtIntFields = ['t2_ft_puls', 't2_ft_heartRate'];
-        t2FtIntFields.forEach(field => {
-          const value = formData[field as keyof typeof formData] as string;
-          if (value && value.trim()) {
-            const parsed = parseInt(value);
-            if (isNaN(parsed) || parsed <= 0) newErrors[field] = 'Must be a positive whole number';
-          }
-        });
-        if (formData.t2_ft_gaFromCrl && !gaRegex.test(formData.t2_ft_gaFromCrl))
-          newErrors.t2_ft_gaFromCrl = 'Format must be "12w 3d"';
-        const t2FtDopplerFields = ['t2_ft_utADexPI', 't2_ft_utADexRI', 't2_ft_utASinPI', 't2_ft_utASinRI'];
-        t2FtDopplerFields.forEach(field => {
-          const value = formData[field as keyof typeof formData] as string;
-          if (value && value.trim()) {
-            const parsed = parseFloat(value);
-            if (isNaN(parsed) || parsed < 0) newErrors[field] = 'Must be a valid number';
-          }
-        });
-      }
+    // ── Declarative table runner (ST-2) ────────────────────────────────────
+    const fd = formData as Record<string, string>;
+    for (const rule of VALIDATION_RULES) {
+      if (rule.onlyWhen && !rule.onlyWhen()) continue;
+      const err = rule.validate(fd[rule.formKey] ?? '');
+      if (err) newErrors[rule.errorKey] = err;
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+  // ── Field registry (ST-3) ──────────────────────────────────────────────────
+  // FIELD_REGISTRY covers all numeric biometry/doppler/FT fields.
+  // outType transforms: float → parseFloat, integer → Math.trunc(parseFloat), trim → string.trim
+  // la/t2_la use outType 'trim' (string field — Additional Change).
+  const FIELD_REGISTRY: FieldDef[] = [
+    // ── T1 prenatal biometry (bare keys — handleChangeT1 strips t1_ prefix) ─
+    { formKey: 'bpd',        payloadPath: 'biometry.bpd',        outType: 'float' },
+    { formKey: 'hc',         payloadPath: 'biometry.hc',         outType: 'float' },
+    { formKey: 'ac',         payloadPath: 'biometry.ac',         outType: 'float' },
+    { formKey: 'fl',         payloadPath: 'biometry.fl',         outType: 'float' },
+    { formKey: 'efw',        payloadPath: 'biometry.efw',        outType: 'float' },
+    { formKey: 'ofd',        payloadPath: 'biometry.ofd',        outType: 'float' },
+    { formKey: 'vp',         payloadPath: 'biometry.vp',         outType: 'trim' },
+    { formKey: 'tcd',        payloadPath: 'biometry.tcd',        outType: 'float' },
+    { formKey: 'cm',         payloadPath: 'biometry.cm',         outType: 'float' },
+    { formKey: 'nuchalFold', payloadPath: 'biometry.nuchalFold', outType: 'float' },
+    { formKey: 'nb',         payloadPath: 'biometry.nb',         outType: 'float' },
+    { formKey: 'apad',       payloadPath: 'biometry.apad',       outType: 'float' },
+    { formKey: 'tad',        payloadPath: 'biometry.tad',        outType: 'float' },
+    { formKey: 'la',         payloadPath: 'biometry.la',         outType: 'trim' },  // string field
+    { formKey: 'lc',         payloadPath: 'biometry.lc',         outType: 'float' },
+    // ── T1 doppler ────────────────────────────────────────────────────────────
+    { formKey: 'pi',       payloadPath: 'doppler.pi',       outType: 'float' },
+    { formKey: 'ri',       payloadPath: 'doppler.ri',       outType: 'float' },
+    { formKey: 'utADexPI', payloadPath: 'doppler.utADexPI', outType: 'float' },
+    { formKey: 'utADexRI', payloadPath: 'doppler.utADexRI', outType: 'float' },
+    { formKey: 'utASinPI', payloadPath: 'doppler.utASinPI', outType: 'float' },
+    { formKey: 'utASinRI', payloadPath: 'doppler.utASinRI', outType: 'float' },
+    { formKey: 'cma',      payloadPath: 'doppler.cma',      outType: 'float' },
+    { formKey: 'psv',      payloadPath: 'doppler.psv',      outType: 'float' },
+    { formKey: 'cpr',      payloadPath: 'doppler.cpr',      outType: 'float' },
+    { formKey: 'ducVen',   payloadPath: 'doppler.ducVen',   outType: 'trim' },
+    // ── T1 integer (heart rate) ───────────────────────────────────────────────
+    { formKey: 'heart_rate', payloadPath: 'ultrasound.heart_rate', outType: 'integer' },
+    // ── T2 prenatal biometry ─────────────────────────────────────────────────
+    { formKey: 't2_bpd',        payloadPath: 'biometry2.bpd',        outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_hc',         payloadPath: 'biometry2.hc',         outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_ac',         payloadPath: 'biometry2.ac',         outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_fl',         payloadPath: 'biometry2.fl',         outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_efw',        payloadPath: 'biometry2.efw',        outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_ofd',        payloadPath: 'biometry2.ofd',        outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_vp',         payloadPath: 'biometry2.vp',         outType: 'trim',    onlyWhen: () => isTwins },
+    { formKey: 't2_tcd',        payloadPath: 'biometry2.tcd',        outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_cm',         payloadPath: 'biometry2.cm',         outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_nuchalFold', payloadPath: 'biometry2.nuchalFold', outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_nb',         payloadPath: 'biometry2.nb',         outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_apad',       payloadPath: 'biometry2.apad',       outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_tad',        payloadPath: 'biometry2.tad',        outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_la',         payloadPath: 'biometry2.la',         outType: 'trim',    onlyWhen: () => isTwins }, // string field
+    { formKey: 't2_lc',         payloadPath: 'biometry2.lc',         outType: 'float',   onlyWhen: () => isTwins },
+    // ── T2 doppler ────────────────────────────────────────────────────────────
+    { formKey: 't2_pi',       payloadPath: 'doppler2.pi',       outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_ri',       payloadPath: 'doppler2.ri',       outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_utADexPI', payloadPath: 'doppler2.utADexPI', outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_utADexRI', payloadPath: 'doppler2.utADexRI', outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_utASinPI', payloadPath: 'doppler2.utASinPI', outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_utASinRI', payloadPath: 'doppler2.utASinRI', outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_cma',      payloadPath: 'doppler2.cma',      outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_psv',      payloadPath: 'doppler2.psv',      outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_cpr',      payloadPath: 'doppler2.cpr',      outType: 'float',   onlyWhen: () => isTwins },
+    { formKey: 't2_ducVen',   payloadPath: 'doppler2.ducVen',   outType: 'trim',    onlyWhen: () => isTwins },
+    // ── T2 integer (heart rate) ───────────────────────────────────────────────
+    { formKey: 't2_heart_rate', payloadPath: 'twin2_ultrasound.heart_rate', outType: 'integer', onlyWhen: () => isTwins },
+    // ── FT T1 biometry ────────────────────────────────────────────────────────
+    { formKey: 't1_ft_crl', payloadPath: 'ft_biometry.crl', outType: 'float',   onlyWhen: () => isFt },
+    { formKey: 't1_ft_nt',  payloadPath: 'ft_biometry.nt',  outType: 'float',   onlyWhen: () => isFt },
+    { formKey: 't1_ft_nb',  payloadPath: 'ft_biometry.nb',  outType: 'float',   onlyWhen: () => isFt },
+    // ── FT T1 integer fields ─────────────────────────────────────────────────
+    { formKey: 't1_ft_puls',      payloadPath: 'ft_biometry.puls',      outType: 'integer', onlyWhen: () => isFt },
+    { formKey: 't1_ft_heartRate', payloadPath: 'ft_ultrasound.heartRate', outType: 'integer', onlyWhen: () => isFt },
+    // ── FT T1 doppler ─────────────────────────────────────────────────────────
+    { formKey: 't1_ft_utADexPI', payloadPath: 'ft_doppler.utADexPI', outType: 'float', onlyWhen: () => isFt },
+    { formKey: 't1_ft_utADexRI', payloadPath: 'ft_doppler.utADexRI', outType: 'float', onlyWhen: () => isFt },
+    { formKey: 't1_ft_utASinPI', payloadPath: 'ft_doppler.utASinPI', outType: 'float', onlyWhen: () => isFt },
+    { formKey: 't1_ft_utASinRI', payloadPath: 'ft_doppler.utASinRI', outType: 'float', onlyWhen: () => isFt },
+    // ── FT T2 biometry ────────────────────────────────────────────────────────
+    { formKey: 't2_ft_crl', payloadPath: 'twin2_ft_biometry.crl', outType: 'float',   onlyWhen: () => isFtTwinsMode },
+    { formKey: 't2_ft_nt',  payloadPath: 'twin2_ft_biometry.nt',  outType: 'float',   onlyWhen: () => isFtTwinsMode },
+    { formKey: 't2_ft_nb',  payloadPath: 'twin2_ft_biometry.nb',  outType: 'float',   onlyWhen: () => isFtTwinsMode },
+    // ── FT T2 integer fields ─────────────────────────────────────────────────
+    { formKey: 't2_ft_puls',      payloadPath: 'twin2_ft_biometry.puls',      outType: 'integer', onlyWhen: () => isFtTwinsMode },
+    { formKey: 't2_ft_heartRate', payloadPath: 'twin2_ft_ultrasound.heartRate', outType: 'integer', onlyWhen: () => isFtTwinsMode },
+    // ── FT T2 doppler ─────────────────────────────────────────────────────────
+    { formKey: 't2_ft_utADexPI', payloadPath: 'twin2_ft_doppler.utADexPI', outType: 'float', onlyWhen: () => isFtTwinsMode },
+    { formKey: 't2_ft_utADexRI', payloadPath: 'twin2_ft_doppler.utADexRI', outType: 'float', onlyWhen: () => isFtTwinsMode },
+    { formKey: 't2_ft_utASinPI', payloadPath: 'twin2_ft_doppler.utASinPI', outType: 'float', onlyWhen: () => isFtTwinsMode },
+    { formKey: 't2_ft_utASinRI', payloadPath: 'twin2_ft_doppler.utASinRI', outType: 'float', onlyWhen: () => isFtTwinsMode },
+  ];
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
@@ -579,34 +679,40 @@ export function useExaminationForm({
     if (!validateForm()) return;
     setIsSubmitting(true);
     try {
-      const floatOrUndef = (v: string) => (v && v.trim() ? parseFloat(v) : undefined);
+      const fd = formData as Record<string, string>;
 
-      const biometry = (
-        formData.bpd || formData.hc || formData.ac || formData.fl || formData.efw ||
-        formData.ofd || formData.vp || formData.tcd || formData.cm || formData.nuchalFold ||
-        formData.nb || formData.apad || formData.tad || formData.la || formData.lc
-      ) ? {
-        bpd: floatOrUndef(formData.bpd), hc: floatOrUndef(formData.hc),
-        ac: floatOrUndef(formData.ac), fl: floatOrUndef(formData.fl),
-        efw: floatOrUndef(formData.efw), ofd: floatOrUndef(formData.ofd),
-        vp: floatOrUndef(formData.vp), tcd: floatOrUndef(formData.tcd),
-        cm: floatOrUndef(formData.cm), nuchalFold: floatOrUndef(formData.nuchalFold),
-        nb: floatOrUndef(formData.nb), apad: floatOrUndef(formData.apad),
-        tad: floatOrUndef(formData.tad), la: floatOrUndef(formData.la),
-        lc: floatOrUndef(formData.lc),
-      } : undefined;
+      // ── Generic assembler (ST-3) ──────────────────────────────────────────
+      // Walks FIELD_REGISTRY, applies outType transform, writes into nested output.
+      const assembled: Record<string, Record<string, unknown>> = {};
+      for (const entry of FIELD_REGISTRY) {
+        if (entry.onlyWhen && !entry.onlyWhen()) continue;
+        const raw = fd[entry.formKey] ?? '';
+        if (!raw || !raw.trim()) continue;
+        let value: unknown;
+        if (entry.outType === 'float') {
+          value = parseFloat(raw);
+          if (isNaN(value as number)) continue;
+        } else if (entry.outType === 'integer') {
+          value = Math.trunc(parseFloat(raw));
+          if (isNaN(value as number)) continue;
+        } else {
+          // 'trim' or 'string'
+          value = raw.trim() || undefined;
+          if (!value) continue;
+        }
+        const [group, key] = entry.payloadPath.split('.');
+        if (!assembled[group]) assembled[group] = {};
+        assembled[group][key] = value;
+      }
 
-      const doppler = (
-        formData.pi || formData.ri ||
-        formData.utADexPI || formData.utADexRI || formData.utASinPI || formData.utASinRI ||
-        formData.cma || formData.psv || formData.cpr || formData.ducVen
-      ) ? {
-        pi: floatOrUndef(formData.pi), ri: floatOrUndef(formData.ri),
-        utADexPI: floatOrUndef(formData.utADexPI), utADexRI: floatOrUndef(formData.utADexRI),
-        utASinPI: floatOrUndef(formData.utASinPI), utASinRI: floatOrUndef(formData.utASinRI),
-        cma: floatOrUndef(formData.cma), psv: floatOrUndef(formData.psv),
-        cpr: floatOrUndef(formData.cpr), ducVen: formData.ducVen.trim() || undefined,
-      } : undefined;
+      // ── Build structured payload from assembled groups ────────────────────
+      const biometry = assembled.biometry
+        ? (assembled.biometry as CreateExaminationRequest['biometry'])
+        : undefined;
+      const doppler = assembled.doppler ? {
+        ...(assembled.doppler as Record<string, unknown>),
+        ducVen: (assembled.doppler as Record<string, string>).ducVen,
+      } as CreateExaminationRequest['doppler'] : undefined;
 
       const pregnancy_data = (
         formData.last_menstrual_period || formData.obstetric_history || formData.family_history
@@ -616,13 +722,14 @@ export function useExaminationForm({
         family_history: formData.family_history.trim() || undefined,
       } : undefined;
 
+      const ultrasoundBase = assembled.ultrasound as Record<string, unknown> | undefined;
       const ultrasound_findings = (
         formData.presentation || formData.gender || formData.heart_rate ||
         formData.fetal_movement || formData.placenta || formData.umbilical_cord
       ) ? {
         presentation: formData.presentation.trim() || undefined,
         gender: formData.gender || undefined,
-        heart_rate: formData.heart_rate ? parseInt(formData.heart_rate) : undefined,
+        heart_rate: ultrasoundBase?.heart_rate as number | undefined,
         fetal_movement: formData.fetal_movement.trim() || undefined,
         placenta: formData.placenta.trim() || undefined,
         umbilical_cord: formData.umbilical_cord.trim() || undefined,
@@ -647,38 +754,21 @@ export function useExaminationForm({
       let twin2_ultrasound_findings: ExaminationData['twin2_ultrasound_findings'] | undefined;
       let twin2_anatomy: ExaminationData['twin2_anatomy'] | undefined;
       if (isTwins) {
-        biometry2 = (
-          formData.t2_bpd || formData.t2_hc || formData.t2_ac || formData.t2_fl || formData.t2_efw ||
-          formData.t2_ofd || formData.t2_vp || formData.t2_tcd || formData.t2_cm || formData.t2_nuchalFold ||
-          formData.t2_nb || formData.t2_apad || formData.t2_tad || formData.t2_la || formData.t2_lc
-        ) ? {
-          bpd: floatOrUndef(formData.t2_bpd), hc: floatOrUndef(formData.t2_hc),
-          ac: floatOrUndef(formData.t2_ac), fl: floatOrUndef(formData.t2_fl),
-          efw: floatOrUndef(formData.t2_efw), ofd: floatOrUndef(formData.t2_ofd),
-          vp: floatOrUndef(formData.t2_vp), tcd: floatOrUndef(formData.t2_tcd),
-          cm: floatOrUndef(formData.t2_cm), nuchalFold: floatOrUndef(formData.t2_nuchalFold),
-          nb: floatOrUndef(formData.t2_nb), apad: floatOrUndef(formData.t2_apad),
-          tad: floatOrUndef(formData.t2_tad), la: floatOrUndef(formData.t2_la),
-          lc: floatOrUndef(formData.t2_lc),
-        } : undefined;
-        doppler2 = (
-          formData.t2_pi || formData.t2_ri ||
-          formData.t2_utADexPI || formData.t2_utADexRI || formData.t2_utASinPI || formData.t2_utASinRI ||
-          formData.t2_cma || formData.t2_psv || formData.t2_cpr || formData.t2_ducVen
-        ) ? {
-          pi: floatOrUndef(formData.t2_pi), ri: floatOrUndef(formData.t2_ri),
-          utADexPI: floatOrUndef(formData.t2_utADexPI), utADexRI: floatOrUndef(formData.t2_utADexRI),
-          utASinPI: floatOrUndef(formData.t2_utASinPI), utASinRI: floatOrUndef(formData.t2_utASinRI),
-          cma: floatOrUndef(formData.t2_cma), psv: floatOrUndef(formData.t2_psv),
-          cpr: floatOrUndef(formData.t2_cpr), ducVen: formData.t2_ducVen.trim() || undefined,
-        } : undefined;
+        biometry2 = assembled.biometry2
+          ? (assembled.biometry2 as CreateExaminationRequest['biometry2'])
+          : undefined;
+        doppler2 = assembled.doppler2 ? {
+          ...(assembled.doppler2 as Record<string, unknown>),
+          ducVen: (assembled.doppler2 as Record<string, string>).ducVen,
+        } as CreateExaminationRequest['doppler2'] : undefined;
+        const twin2UltraBase = assembled.twin2_ultrasound as Record<string, unknown> | undefined;
         twin2_ultrasound_findings = (
           formData.t2_presentation || formData.t2_gender || formData.t2_heart_rate ||
           formData.t2_fetal_movement || formData.t2_placenta || formData.t2_umbilical_cord
         ) ? {
           presentation: formData.t2_presentation.trim() || undefined,
           gender: formData.t2_gender || undefined,
-          heart_rate: formData.t2_heart_rate ? parseInt(formData.t2_heart_rate) : undefined,
+          heart_rate: twin2UltraBase?.heart_rate as number | undefined,
           fetal_movement: formData.t2_fetal_movement.trim() || undefined,
           placenta: formData.t2_placenta.trim() || undefined,
           umbilical_cord: formData.t2_umbilical_cord.trim() || undefined,
@@ -710,18 +800,19 @@ export function useExaminationForm({
       let twin2_ft_anatomy: ExaminationData['twin2_ft_anatomy'] | undefined;
       let twin2_ft_doppler: ExaminationData['twin2_ft_doppler'] | undefined;
       if (isFt) {
-        const fd = formData as Record<string, string>;
+        const ftBiomAssembled = assembled.ft_biometry as Record<string, unknown> | undefined;
+        const ftUltraAssembled = assembled.ft_ultrasound as Record<string, unknown> | undefined;
         ft_ultrasound = (fd.t1_ft_placenta || fd.t1_ft_heartRate || fd.t1_ft_umbilicalCord) ? {
           placenta: fd.t1_ft_placenta.trim() || undefined,
-          heartRate: fd.t1_ft_heartRate ? parseInt(fd.t1_ft_heartRate) : undefined,
+          heartRate: ftUltraAssembled?.heartRate as number | undefined,
           umbilicalCord: fd.t1_ft_umbilicalCord.trim() || undefined,
         } : undefined;
         ft_biometry = (fd.t1_ft_crl || fd.t1_ft_nt || fd.t1_ft_nb || fd.t1_ft_puls || fd.t1_ft_gaFromCrl) ? {
-          crl: floatOrUndef(fd.t1_ft_crl),
+          crl: ftBiomAssembled?.crl as number | undefined,
           gaFromCrl: fd.t1_ft_gaFromCrl.trim() || undefined,
-          nt: floatOrUndef(fd.t1_ft_nt),
-          nb: floatOrUndef(fd.t1_ft_nb),
-          puls: fd.t1_ft_puls ? parseInt(fd.t1_ft_puls) : undefined,
+          nt: ftBiomAssembled?.nt as number | undefined,
+          nb: ftBiomAssembled?.nb as number | undefined,
+          puls: ftBiomAssembled?.puls as number | undefined,
         } : undefined;
         ft_markers = (fd.t1_ft_arrhythmia || fd.t1_ft_tricuspidRegurgitation || fd.t1_ft_abnormalDvFlow || fd.t1_ft_echogenicCardiacFocus || fd.t1_ft_singleUmbilicalArtery || fd.t1_ft_choroidPlexusCysts || fd.t1_ft_exomphalos || fd.t1_ft_megacystis || fd.t1_ft_markerPlacenta || fd.t1_ft_cordInsertion) ? {
           arrhythmia: fd.t1_ft_arrhythmia || undefined,
@@ -743,24 +834,21 @@ export function useExaminationForm({
           neckSkin: fd.t1_anat_neckSkin.trim() || undefined, spine: fd.t1_anat_spine.trim() || undefined,
           thorax: fd.t1_anat_thorax.trim() || undefined,
         } : undefined;
-        ft_doppler = (fd.t1_ft_utADexPI || fd.t1_ft_utADexRI || fd.t1_ft_utASinPI || fd.t1_ft_utASinRI) ? {
-          utADexPI: floatOrUndef(fd.t1_ft_utADexPI),
-          utADexRI: floatOrUndef(fd.t1_ft_utADexRI),
-          utASinPI: floatOrUndef(fd.t1_ft_utASinPI),
-          utASinRI: floatOrUndef(fd.t1_ft_utASinRI),
-        } : undefined;
+        ft_doppler = assembled.ft_doppler ? (assembled.ft_doppler as ExaminationData['ft_doppler']) : undefined;
         if (isFtTwinsMode) {
+          const t2FtBiomAssembled = assembled.twin2_ft_biometry as Record<string, unknown> | undefined;
+          const t2FtUltraAssembled = assembled.twin2_ft_ultrasound as Record<string, unknown> | undefined;
           twin2_ft_ultrasound = (fd.t2_ft_placenta || fd.t2_ft_heartRate || fd.t2_ft_umbilicalCord) ? {
             placenta: fd.t2_ft_placenta.trim() || undefined,
-            heartRate: fd.t2_ft_heartRate ? parseInt(fd.t2_ft_heartRate) : undefined,
+            heartRate: t2FtUltraAssembled?.heartRate as number | undefined,
             umbilicalCord: fd.t2_ft_umbilicalCord.trim() || undefined,
           } : undefined;
           twin2_ft_biometry = (fd.t2_ft_crl || fd.t2_ft_nt || fd.t2_ft_nb || fd.t2_ft_puls || fd.t2_ft_gaFromCrl) ? {
-            crl: floatOrUndef(fd.t2_ft_crl),
+            crl: t2FtBiomAssembled?.crl as number | undefined,
             gaFromCrl: fd.t2_ft_gaFromCrl.trim() || undefined,
-            nt: floatOrUndef(fd.t2_ft_nt),
-            nb: floatOrUndef(fd.t2_ft_nb),
-            puls: fd.t2_ft_puls ? parseInt(fd.t2_ft_puls) : undefined,
+            nt: t2FtBiomAssembled?.nt as number | undefined,
+            nb: t2FtBiomAssembled?.nb as number | undefined,
+            puls: t2FtBiomAssembled?.puls as number | undefined,
           } : undefined;
           twin2_ft_markers = (fd.t2_ft_arrhythmia || fd.t2_ft_tricuspidRegurgitation || fd.t2_ft_abnormalDvFlow || fd.t2_ft_echogenicCardiacFocus || fd.t2_ft_singleUmbilicalArtery || fd.t2_ft_choroidPlexusCysts || fd.t2_ft_exomphalos || fd.t2_ft_megacystis || fd.t2_ft_markerPlacenta || fd.t2_ft_cordInsertion) ? {
             arrhythmia: fd.t2_ft_arrhythmia || undefined,
@@ -782,12 +870,9 @@ export function useExaminationForm({
             neckSkin: fd.t2_anat_neckSkin.trim() || undefined, spine: fd.t2_anat_spine.trim() || undefined,
             thorax: fd.t2_anat_thorax.trim() || undefined,
           } : undefined;
-          twin2_ft_doppler = (fd.t2_ft_utADexPI || fd.t2_ft_utADexRI || fd.t2_ft_utASinPI || fd.t2_ft_utASinRI) ? {
-            utADexPI: floatOrUndef(fd.t2_ft_utADexPI),
-            utADexRI: floatOrUndef(fd.t2_ft_utADexRI),
-            utASinPI: floatOrUndef(fd.t2_ft_utASinPI),
-            utASinRI: floatOrUndef(fd.t2_ft_utASinRI),
-          } : undefined;
+          twin2_ft_doppler = assembled.twin2_ft_doppler
+            ? (assembled.twin2_ft_doppler as ExaminationData['twin2_ft_doppler'])
+            : undefined;
         }
       }
 

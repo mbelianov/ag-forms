@@ -151,7 +151,7 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
         <div /><div />
 
         {/* Vp row */}
-        <TextInput id={p('vp')} labelText="Vp (mm)" placeholder="e.g., 0.0"
+        <TextInput id={p('vp')} labelText="Vp" placeholder="e.g., custom value"
           value={data.vp} onChange={(e) => onChange(p('vp'), e.target.value)}
           invalid={!!errors[p('vp')]} invalidText={errors[p('vp')]} disabled={isSubmitting} autoComplete="off" />
         <div /><div />
@@ -183,7 +183,7 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
         <div />
 
         {/* LA row */}
-        <TextInput id={p('la')} labelText="LA (mm)" placeholder="e.g., 0.0"
+        <TextInput id={p('la')} labelText="LA" placeholder="e.g., custom value"
           value={data.la} onChange={(e) => onChange(p('la'), e.target.value)}
           invalid={!!errors[p('la')]} invalidText={errors[p('la')]} disabled={isSubmitting} autoComplete="off" />
         <div /><div />

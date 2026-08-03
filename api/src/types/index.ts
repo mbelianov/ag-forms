@@ -170,7 +170,7 @@ export interface BiometryData {
     efw?: number; // Estimated Fetal Weight (float, grams)
     // TASK-034: Extended biometry parameters
     ofd?: number;         // Occipito-frontal Diameter (float, mm)
-    vp?: number;          // Vermis (float, mm)
+    vp?: string;          // Vermis (free-text string, migrated from float)
     tcd?: number;         // Transcerebellar Diameter (float, mm)
     cm?: number;          // Cisterna Magna (float, mm)
     nuchalFold?: number;  // Nuchal Fold (float, mm)
@@ -178,7 +178,7 @@ export interface BiometryData {
     apad?: number;        // Antero-Posterior Abdominal Diameter (float, mm)
     tad?: number;         // Transverse Abdominal Diameter (float, mm)
     // TASK-035: LA and LC
-    la?: number;          // Left Atrium (float, mm)
+    la?: string;          // Left Atrium (free-text string, migrated from float)
     lc?: number;          // Left Cardiac (float, mm)
 }
 

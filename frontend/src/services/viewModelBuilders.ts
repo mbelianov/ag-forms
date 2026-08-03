@@ -65,10 +65,10 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
   const buildFtBiometry = (b: typeof exam.data.ft_biometry): FtBiometryViewModel | undefined => {
     if (!b) return undefined;
     return {
-      crl:      b.crl  != null ? `${b.crl} mm` : undefined,
+      crl:      b.crl  != null ? `${b.crl.toFixed(2)} mm` : undefined,
       gaFromCrl: b.gaFromCrl ?? undefined,
-      nt:       b.nt   != null ? `${b.nt} mm` : undefined,
-      nb:       b.nb   != null ? `${b.nb} mm` : undefined,
+      nt:       b.nt   != null ? `${b.nt.toFixed(2)} mm` : undefined,
+      nb:       b.nb   != null ? `${b.nb.toFixed(2)} mm` : undefined,
       puls:     b.puls != null ? `${b.puls} bpm` : undefined,
     };
   };
@@ -107,10 +107,10 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
   const buildFtDoppler = (d: typeof exam.data.ft_doppler): FtDopplerViewModel | undefined => {
     if (!d) return undefined;
     return {
-      utADexPI: d.utADexPI != null ? String(d.utADexPI) : undefined,
-      utADexRI: d.utADexRI != null ? String(d.utADexRI) : undefined,
-      utASinPI: d.utASinPI != null ? String(d.utASinPI) : undefined,
-      utASinRI: d.utASinRI != null ? String(d.utASinRI) : undefined,
+      utADexPI: d.utADexPI != null ? d.utADexPI.toFixed(2) : undefined,
+      utADexRI: d.utADexRI != null ? d.utADexRI.toFixed(2) : undefined,
+      utASinPI: d.utASinPI != null ? d.utASinPI.toFixed(2) : undefined,
+      utASinRI: d.utASinRI != null ? d.utASinRI.toFixed(2) : undefined,
     };
   };
   let biometry2: ExamPdfViewModel['biometry2'] | undefined;
@@ -139,27 +139,27 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
       flPct:  pctStr(percentiles2?.fl),
       efwPct: pctStr(efwPct2),
       ofd:       exam.biometry2?.ofd       != null ? `${fmtBiometry(exam.biometry2.ofd)} mm`       : undefined,
-      vp:        exam.biometry2?.vp        != null ? `${fmtBiometry(exam.biometry2.vp)} mm`        : undefined,
+      vp:        exam.biometry2?.vp?.trim() || undefined,
       tcd:       exam.biometry2?.tcd       != null ? `${fmtBiometry(exam.biometry2.tcd)} mm`       : undefined,
       cm:        exam.biometry2?.cm        != null ? `${fmtBiometry(exam.biometry2.cm)} mm`        : undefined,
       nuchalFold: exam.biometry2?.nuchalFold != null ? `${fmtBiometry(exam.biometry2.nuchalFold)} mm` : undefined,
       nb:        exam.biometry2?.nb        != null ? `${fmtBiometry(exam.biometry2.nb)} mm`        : undefined,
       apad:      exam.biometry2?.apad      != null ? `${fmtBiometry(exam.biometry2.apad)} mm`      : undefined,
       tad:       exam.biometry2?.tad       != null ? `${fmtBiometry(exam.biometry2.tad)} mm`       : undefined,
-      la:  exam.biometry2?.la != null ? `${fmtBiometry(exam.biometry2.la)} mm` : undefined,
+      la:  exam.biometry2?.la?.trim() || undefined,
       lc:  exam.biometry2?.lc != null ? `${fmtBiometry(exam.biometry2.lc)} mm` : undefined,
     };
 
     doppler2 = {
-      pi:     exam.doppler2?.pi     != null ? String(exam.doppler2.pi)     : undefined,
-      ri:     exam.doppler2?.ri     != null ? String(exam.doppler2.ri)     : undefined,
-      utADexPI: exam.doppler2?.utADexPI != null ? String(exam.doppler2.utADexPI) : undefined,
-      utADexRI: exam.doppler2?.utADexRI != null ? String(exam.doppler2.utADexRI) : undefined,
-      utASinPI: exam.doppler2?.utASinPI != null ? String(exam.doppler2.utASinPI) : undefined,
-      utASinRI: exam.doppler2?.utASinRI != null ? String(exam.doppler2.utASinRI) : undefined,
-      cma:    exam.doppler2?.cma     != null ? String(exam.doppler2.cma)    : undefined,
-      psv:    exam.doppler2?.psv     != null ? String(exam.doppler2.psv)    : undefined,
-      cpr:    exam.doppler2?.cpr     != null ? String(exam.doppler2.cpr)    : undefined,
+      pi:     exam.doppler2?.pi     != null ? exam.doppler2.pi.toFixed(2)     : undefined,
+      ri:     exam.doppler2?.ri     != null ? exam.doppler2.ri.toFixed(2)     : undefined,
+      utADexPI: exam.doppler2?.utADexPI != null ? exam.doppler2.utADexPI.toFixed(2) : undefined,
+      utADexRI: exam.doppler2?.utADexRI != null ? exam.doppler2.utADexRI.toFixed(2) : undefined,
+      utASinPI: exam.doppler2?.utASinPI != null ? exam.doppler2.utASinPI.toFixed(2) : undefined,
+      utASinRI: exam.doppler2?.utASinRI != null ? exam.doppler2.utASinRI.toFixed(2) : undefined,
+      cma:    exam.doppler2?.cma     != null ? exam.doppler2.cma.toFixed(2)    : undefined,
+      psv:    exam.doppler2?.psv     != null ? exam.doppler2.psv.toFixed(2)    : undefined,
+      cpr:    exam.doppler2?.cpr     != null ? exam.doppler2.cpr.toFixed(2)    : undefined,
       ducVen: exam.doppler2?.ducVen  ?? undefined,
     };
 
@@ -240,27 +240,27 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
       flPct:  pctStr(percentiles?.fl),
       efwPct: pctStr(efwPct),
       ofd:       exam.biometry?.ofd       != null ? `${fmtBiometry(exam.biometry.ofd)} mm`       : undefined,
-      vp:        exam.biometry?.vp        != null ? `${fmtBiometry(exam.biometry.vp)} mm`        : undefined,
+      vp:        exam.biometry?.vp?.trim() || undefined,
       tcd:       exam.biometry?.tcd       != null ? `${fmtBiometry(exam.biometry.tcd)} mm`       : undefined,
       cm:        exam.biometry?.cm        != null ? `${fmtBiometry(exam.biometry.cm)} mm`        : undefined,
       nuchalFold: exam.biometry?.nuchalFold != null ? `${fmtBiometry(exam.biometry.nuchalFold)} mm` : undefined,
       nb:        exam.biometry?.nb        != null ? `${fmtBiometry(exam.biometry.nb)} mm`        : undefined,
       apad:      exam.biometry?.apad      != null ? `${fmtBiometry(exam.biometry.apad)} mm`      : undefined,
       tad:       exam.biometry?.tad       != null ? `${fmtBiometry(exam.biometry.tad)} mm`       : undefined,
-      la: exam.biometry?.la != null ? `${fmtBiometry(exam.biometry.la)} mm` : undefined,
+      la: exam.biometry?.la?.trim() || undefined,
       lc: exam.biometry?.lc != null ? `${fmtBiometry(exam.biometry.lc)} mm` : undefined,
     },
 
     doppler: {
-      pi:     exam.doppler?.pi     != null ? String(exam.doppler.pi)     : undefined,
-      ri:     exam.doppler?.ri     != null ? String(exam.doppler.ri)     : undefined,
-      utADexPI: exam.doppler?.utADexPI != null ? String(exam.doppler.utADexPI) : undefined,
-      utADexRI: exam.doppler?.utADexRI != null ? String(exam.doppler.utADexRI) : undefined,
-      utASinPI: exam.doppler?.utASinPI != null ? String(exam.doppler.utASinPI) : undefined,
-      utASinRI: exam.doppler?.utASinRI != null ? String(exam.doppler.utASinRI) : undefined,
-      cma:     exam.doppler?.cma     != null ? String(exam.doppler.cma)     : undefined,
-      psv:     exam.doppler?.psv     != null ? String(exam.doppler.psv)     : undefined,
-      cpr:     exam.doppler?.cpr     != null ? String(exam.doppler.cpr)     : undefined,
+      pi:     exam.doppler?.pi     != null ? exam.doppler.pi.toFixed(2)     : undefined,
+      ri:     exam.doppler?.ri     != null ? exam.doppler.ri.toFixed(2)     : undefined,
+      utADexPI: exam.doppler?.utADexPI != null ? exam.doppler.utADexPI.toFixed(2) : undefined,
+      utADexRI: exam.doppler?.utADexRI != null ? exam.doppler.utADexRI.toFixed(2) : undefined,
+      utASinPI: exam.doppler?.utASinPI != null ? exam.doppler.utASinPI.toFixed(2) : undefined,
+      utASinRI: exam.doppler?.utASinRI != null ? exam.doppler.utASinRI.toFixed(2) : undefined,
+      cma:     exam.doppler?.cma     != null ? exam.doppler.cma.toFixed(2)     : undefined,
+      psv:     exam.doppler?.psv     != null ? exam.doppler.psv.toFixed(2)     : undefined,
+      cpr:     exam.doppler?.cpr     != null ? exam.doppler.cpr.toFixed(2)     : undefined,
       ducVen:  exam.doppler?.ducVen  ?? undefined,
     },
 
