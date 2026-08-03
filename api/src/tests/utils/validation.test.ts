@@ -165,7 +165,7 @@ describe('Validation Utilities', () => {
             });
 
             expect(result.valid).toBe(false);
-            expect(result.errors).toContain('Gestational age must be in format "28w 3d"');
+            expect(result.errors).toContain('Gestational age must be in format "28w 3d" or "28с 3д"');
         });
 
         test('should accept float biometry values', () => {
