@@ -138,7 +138,7 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
   };
 
   return (
-    <Form onSubmit={handleSubmit}>
+    <Form onSubmit={handleSubmit} autoComplete="off">
       <Stack gap={6}>
         {submitError && (
           <InlineNotification
@@ -151,7 +151,7 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
         )}
 
         <TextInput
-          id="name"
+          id="patient-name"
           labelText="Name"
           placeholder="Enter patient name"
           value={formData.name}
@@ -159,6 +159,7 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
           invalid={!!errors.name}
           invalidText={errors.name}
           aria-label="Patient name"
+          autoComplete="new-password"
           required
           disabled={isSubmitting}
         />
@@ -182,7 +183,7 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
           }}
         >
           <DatePickerInput
-            id="birthDate"
+            id="patient-birthDate"
             labelText="Date of Birth"
             placeholder="dd/mm/yyyy"
             invalid={!!errors.birthDate}
@@ -192,7 +193,7 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
         </DatePicker>
 
         <TextInput
-          id="phone"
+          id="patient-phone"
           labelText="Phone"
           placeholder="e.g. +1234567890"
           value={formData.phone}
@@ -200,12 +201,13 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
           invalid={!!errors.phone}
           invalidText={errors.phone}
           aria-label="Patient phone number"
+          autoComplete="new-password"
           required
           disabled={isSubmitting}
         />
 
         <TextInput
-          id="email"
+          id="patient-email"
           labelText="Email (optional)"
           placeholder="Enter email address"
           type="email"
@@ -214,17 +216,19 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
           invalid={!!errors.email}
           invalidText={errors.email}
           aria-label="Patient email address"
+          autoComplete="off"
           disabled={isSubmitting}
         />
 
         <TextArea
-          id="address"
+          id="patient-address"
           labelText="Address (optional)"
           placeholder="Enter address"
           value={formData.address}
           onChange={(e) => handleChange('address', e.target.value)}
           rows={3}
           aria-label="Patient address"
+          autoComplete="new-password"
           disabled={isSubmitting}
         />
 

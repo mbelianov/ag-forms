@@ -132,7 +132,7 @@ function kvGridAt(
   cols: number,
   xStart: number,
   colW: number,
-  fontSize = 8,
+  bodyFontSize = 8
 ): number {
   const visible = pairs.map(([label, value]) => [label, value || '—'] as [string, string]);
 
@@ -156,7 +156,7 @@ function kvGridAt(
 
     // Value (may wrap)
     doc.setFont(FONT_ID, 'bold');
-    doc.setFontSize(fontSize);
+    doc.setFontSize(bodyFontSize);
     setTextColor(doc, C_DARK);
     const lines = doc.splitTextToSize(value, valueW) as string[];
     doc.text(lines, x + labelW, rowY);
@@ -174,7 +174,7 @@ function kvGridAt(
 
   // col === 0: last row was complete and already flushed; rowY holds the next-row start.
   // col > 0:  last row was partial and never flushed; add pitch from rowBottom.
-  return col === 0 ? rowY : rowBottom + 3.85;
+  return col === 0 ? rowY - 3.85/2 : rowBottom + 3.85/2 ;
 }
 
 /**
@@ -187,6 +187,7 @@ function textBlock(
   body: string | undefined,
   y: number,
   maxLines = 6,
+  bodyFontSize = 8,
 ): number {
   if (!body) return y;
 
@@ -196,6 +197,7 @@ function textBlock(
   doc.text(caption + ':', MARGIN_L, y);
 
   doc.setFont(FONT_ID, 'normal');
+  doc.setFontSize(bodyFontSize);
   setTextColor(doc, C_DARK);
   let lines = doc.splitTextToSize(body, COL_W) as string[];
   if (lines.length > maxLines) {
@@ -309,7 +311,7 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
     setTextColor(doc, C_MID);
     doc.setFontSize(8);
 
-    y += 6;
+    y += 4;
   }
 
   rule(doc, y);
@@ -372,8 +374,7 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
     // Row 3: Obstetric History | Family History (stacked, 8 mm pitch)
     drawCell(xL, y, 'Obstetric History', vm.pregnancy.obstetricHistory);
     drawCell(xR, y, 'Family History',    vm.pregnancy.familyHistory);
-    y += 8;
-
+    y += 3.5;
     y += 1;
   }
 
@@ -392,7 +393,7 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   y += 2;
   y = textBlock(doc, 'Comments', vm.comments ?? '—', y, 4);
   y += 2;
-  y = textBlock(doc, 'Notes', vm.notes ?? '—', y, 5);
+  y = textBlock(doc, 'Notes', vm.notes ?? '—', y, 10, 6);
   y += 2;
 
   // ── 9. Doctor Signature ──────────────────────────────────────────────────────

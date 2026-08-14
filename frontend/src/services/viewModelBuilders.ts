@@ -2,11 +2,12 @@
  * viewModelBuilders.ts — extracted from print.service.ts (Sub-Task 0d).
  * Contains buildViewModel and its helpers (fmtDate, withPct, pctStr).
  * print.service.ts imports buildViewModel from here.
+ *
+ * KI-009: Percentile and GA-from-measurement values are now sourced from stored exam data.
+ * calcBiometryPercentiles and calcEFWPercentile are no longer called from this file.
  */
 import {
   calcEDD,
-  calcBiometryPercentiles,
-  calcEFWPercentile,
   fmtBiometry,
 } from '../utils/calculations';
 import { isFirstTrimester, isFtTwins } from '../constants/examinationTypes';
@@ -32,30 +33,45 @@ function withPct(value: number): string {
   return `${fmtBiometry(value)} mm`;
 }
 
-/** Returns a "N %-ile" percentile string (e.g. "45 %-ile") or undefined when pct is absent. */
-function pctStr(pct: number | undefined): string | undefined {
-  return pct !== undefined ? `${pct} %-ile` : undefined;
+function withManualMarker(value: string | undefined, isManual?: boolean): string | undefined {
+  if (!value) {
+    return value;
+  }
+
+  return isManual ? `${value} †` : value;
 }
+
+/** Returns a "N %-ile" percentile string (e.g. "45 %-ile") or undefined when pct is absent. */
+function pctStr(pct: number | undefined, isManual?: boolean): string | undefined {
+  if (pct === undefined) {
+    return undefined;
+  }
+
+  return withManualMarker(`${pct} %-ile`, isManual);
+}
+
+// ─── KI-009: Biometric citation constants ────────────────────────────────────
+// Static small-print citations appended to the PDF Notes section.
+// Prenatal exams use PRENATAL_BIOMETRY_CITATIONS; FT exams use FT_BIOMETRY_CITATIONS.
+
+const PRENATAL_BIOMETRY_CITATIONS =
+  '1. Hadlock FP, Deter RL, Harrist RB, Park SK. Radiology. 1984;152(2):497–501. PMID 6739822. ' +
+  '(GA from BPD, HC, AC, FL — direct regression)\n' +
+  '2. Hadlock FP, Deter RL, Harrist RB, Park SK. Obstet Gynecol. 1984;63(4):457–65. ' +
+  '(BPD, HC, AC, FL, OFD percentile reference ranges)\n' +
+  '3. Hadlock FP, et al. Am J Obstet Gynecol. 1985;150(5):535–40. (EFW formula)\n' +
+  '4. Hadlock FP, et al. Am J Obstet Gynecol. 1985;151(7):333–7. (Composite GA from BPD+HC+AC+FL)\n' +
+  '5. Combs CA, et al. Am J Obstet Gynecol. 1993;169(4):775–83. (EFW percentile and GA from EFW)';
+
+const FT_BIOMETRY_CITATIONS =
+  '6. Robinson HP. Br Med J. 1975;4(5986):28–31. PMID 1182090. (GA from CRL)';
 
 // ─── Build view model ─────────────────────────────────────────────────────────
 
 export function buildViewModel(exam: Examination): ExamPdfViewModel {
   const lmp = exam.data?.pregnancy_data?.last_menstrual_period;
-  const gaForPct = exam.gestationalAge;
 
-  const percentiles = calcBiometryPercentiles(
-    exam.biometry?.bpd,
-    exam.biometry?.hc,
-    exam.biometry?.ac,
-    exam.biometry?.fl,
-    gaForPct ?? '',
-  );
-
-  const efwPct =
-    exam.biometry?.efw && gaForPct
-      ? calcEFWPercentile(exam.biometry.efw, gaForPct)
-      : undefined;
-
+  // KI-009: Percentiles sourced from stored exam data — no client-side recomputation
   // uzd-twins / UZPT detection
   const isTwins = exam.examinationType === 'ultrasound_prenatal_twins';
   const isFt = isFirstTrimester(exam.examinationType);
@@ -66,7 +82,8 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
     if (!b) return undefined;
     return {
       crl:       b.crl  != null ? `${b.crl.toFixed(2)} mm` : undefined,
-      gaFromCrl: b.gaFromCrl ?? undefined,
+      // KI-009: prefer stored gaFromBio; fallback to gaFromCrl for backward compat
+      gaFromCrl: withManualMarker(b.gaFromBio ?? b.gaFromCrl ?? undefined, b.gaFromCrlIsManual),
       nt:        b.nt   != null ? `${b.nt.toFixed(2)} mm` : undefined,
       nb:        b.nb   != null ? `${b.nb.toFixed(2)} mm` : undefined,
       puls:      b.puls != null ? `${b.puls} bpm` : undefined,
@@ -122,38 +139,31 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
   let anatomy2: ExamPdfViewModel['anatomy2'] | undefined;
 
   if (isTwins) {
-    const percentiles2 = calcBiometryPercentiles(
-      exam.biometry2?.bpd, exam.biometry2?.hc, exam.biometry2?.ac, exam.biometry2?.fl,
-      gaForPct ?? '',
-    );
-    const efwPct2 = exam.biometry2?.efw && gaForPct
-      ? calcEFWPercentile(exam.biometry2.efw, gaForPct)
-      : undefined;
-
     biometry2 = {
       bpd: exam.biometry2?.bpd != null ? withPct(exam.biometry2.bpd) : undefined,
       hc:  exam.biometry2?.hc  != null ? withPct(exam.biometry2.hc)  : undefined,
       ac:  exam.biometry2?.ac  != null ? withPct(exam.biometry2.ac)  : undefined,
       fl:  exam.biometry2?.fl  != null ? withPct(exam.biometry2.fl)  : undefined,
       efw: exam.biometry2?.efw != null ? `${fmtBiometry(exam.biometry2.efw)} g` : undefined,
-      bpdPct: pctStr(percentiles2?.bpd),
-      hcPct:  pctStr(percentiles2?.hc),
-      acPct:  pctStr(percentiles2?.ac),
-      flPct:  pctStr(percentiles2?.fl),
-      efwPct: pctStr(efwPct2),
+      // KI-009: percentiles sourced from stored data
+      bpdPct: pctStr(exam.biometry2?.bpdPercentile, exam.biometry2?.bpdPercentileIsManual),
+      hcPct:  pctStr(exam.biometry2?.hcPercentile, exam.biometry2?.hcPercentileIsManual),
+      acPct:  pctStr(exam.biometry2?.acPercentile, exam.biometry2?.acPercentileIsManual),
+      flPct:  pctStr(exam.biometry2?.flPercentile, exam.biometry2?.flPercentileIsManual),
+      efwPct: pctStr(exam.biometry2?.efwPercentile, exam.biometry2?.efwPercentileIsManual),
       // Sub-Task 4: expanded percentile set for T2
-      ofdPct:  pctStr(exam.biometry2?.ofdPercentile),
+      ofdPct:  pctStr(exam.biometry2?.ofdPercentile, exam.biometry2?.ofdPercentileIsManual),
       tadPct:  pctStr(exam.biometry2?.tadPercentile),
       apadPct: pctStr(exam.biometry2?.apadPercentile),
       // Sub-Task 4: per-measurement GA for T2
-      bpdGa:  exam.biometry2?.bpdGa  ?? undefined,
-      ofdGa:  exam.biometry2?.ofdGa  ?? undefined,
-      hcGa:   exam.biometry2?.hcGa   ?? undefined,
+      bpdGa:  withManualMarker(exam.biometry2?.bpdGa  ?? undefined, exam.biometry2?.bpdGaIsManual),
+      ofdGa:  withManualMarker(exam.biometry2?.ofdGa  ?? undefined, exam.biometry2?.ofdGaIsManual),
+      hcGa:   withManualMarker(exam.biometry2?.hcGa   ?? undefined, exam.biometry2?.hcGaIsManual),
       tadGa:  exam.biometry2?.tadGa  ?? undefined,
       apadGa: exam.biometry2?.apadGa ?? undefined,
-      acGa:   exam.biometry2?.acGa   ?? undefined,
-      flGa:   exam.biometry2?.flGa   ?? undefined,
-      efwGa:  exam.biometry2?.efwGa  ?? undefined,
+      acGa:   withManualMarker(exam.biometry2?.acGa   ?? undefined, exam.biometry2?.acGaIsManual),
+      flGa:   withManualMarker(exam.biometry2?.flGa   ?? undefined, exam.biometry2?.flGaIsManual),
+      efwGa:  withManualMarker(exam.biometry2?.efwGa  ?? undefined, exam.biometry2?.efwGaIsManual),
       ofd:       exam.biometry2?.ofd       != null ? `${fmtBiometry(exam.biometry2.ofd)} mm`       : undefined,
       vp:        exam.biometry2?.vp?.trim() || undefined,
       tcd:       exam.biometry2?.tcd       != null ? `${fmtBiometry(exam.biometry2.tcd)} mm`       : undefined,
@@ -225,8 +235,8 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
     examinationType: exam.examinationType,
     patientAgeAtExam: exam.patientAgeAtExam,
 
-    gestationalAge: exam.gestationalAge,
-    gestationalAgeFromBiometry: exam.gestationalAgeFromBiometry,
+    gestationalAge: withManualMarker(exam.gestationalAge, exam.gestationalAgeIsManual),
+    gestationalAgeFromBiometry: withManualMarker(exam.gestationalAgeFromBiometry, exam.biometry?.gestationalAgeFromBiometryIsManual),
     expectedDeliveryDate: lmp ? calcEDD(lmp) : undefined,
     gestationalAgeFromBiometry2: exam.gestationalAgeFromBiometry2,
     biometry2,
@@ -250,24 +260,25 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
       ac:  exam.biometry?.ac  != null ? withPct(exam.biometry.ac)  : undefined,
       fl:  exam.biometry?.fl  != null ? withPct(exam.biometry.fl)  : undefined,
       efw: exam.biometry?.efw != null ? `${fmtBiometry(exam.biometry.efw)} g` : undefined,
-      bpdPct: pctStr(percentiles?.bpd),
-      hcPct:  pctStr(percentiles?.hc),
-      acPct:  pctStr(percentiles?.ac),
-      flPct:  pctStr(percentiles?.fl),
-      efwPct: pctStr(efwPct),
+      // KI-009: percentiles sourced from stored data
+      bpdPct: pctStr(exam.biometry?.bpdPercentile, exam.biometry?.bpdPercentileIsManual),
+      hcPct:  pctStr(exam.biometry?.hcPercentile, exam.biometry?.hcPercentileIsManual),
+      acPct:  pctStr(exam.biometry?.acPercentile, exam.biometry?.acPercentileIsManual),
+      flPct:  pctStr(exam.biometry?.flPercentile, exam.biometry?.flPercentileIsManual),
+      efwPct: pctStr(exam.biometry?.efwPercentile, exam.biometry?.efwPercentileIsManual),
       // Sub-Task 4: expanded percentile set for T1
-      ofdPct:  pctStr(exam.biometry?.ofdPercentile),
+      ofdPct:  pctStr(exam.biometry?.ofdPercentile, exam.biometry?.ofdPercentileIsManual),
       tadPct:  pctStr(exam.biometry?.tadPercentile),
       apadPct: pctStr(exam.biometry?.apadPercentile),
       // Sub-Task 4: per-measurement GA for T1
-      bpdGa:  exam.biometry?.bpdGa  ?? undefined,
-      ofdGa:  exam.biometry?.ofdGa  ?? undefined,
-      hcGa:   exam.biometry?.hcGa   ?? undefined,
+      bpdGa:  withManualMarker(exam.biometry?.bpdGa  ?? undefined, exam.biometry?.bpdGaIsManual),
+      ofdGa:  withManualMarker(exam.biometry?.ofdGa  ?? undefined, exam.biometry?.ofdGaIsManual),
+      hcGa:   withManualMarker(exam.biometry?.hcGa   ?? undefined, exam.biometry?.hcGaIsManual),
       tadGa:  exam.biometry?.tadGa  ?? undefined,
       apadGa: exam.biometry?.apadGa ?? undefined,
-      acGa:   exam.biometry?.acGa   ?? undefined,
-      flGa:   exam.biometry?.flGa   ?? undefined,
-      efwGa:  exam.biometry?.efwGa  ?? undefined,
+      acGa:   withManualMarker(exam.biometry?.acGa   ?? undefined, exam.biometry?.acGaIsManual),
+      flGa:   withManualMarker(exam.biometry?.flGa   ?? undefined, exam.biometry?.flGaIsManual),
+      efwGa:  withManualMarker(exam.biometry?.efwGa  ?? undefined, exam.biometry?.efwGaIsManual),
       ofd:       exam.biometry?.ofd       != null ? `${fmtBiometry(exam.biometry.ofd)} mm`       : undefined,
       vp:        exam.biometry?.vp?.trim() || undefined,
       tcd:       exam.biometry?.tcd       != null ? `${fmtBiometry(exam.biometry.tcd)} mm`       : undefined,
@@ -325,7 +336,30 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
     },
 
     findings: exam.findings,
-    notes: exam.notes,
+    // KI-009: Notes field populated with static citation text; user notes field removed from form
+    notes: `${isFt ? FT_BIOMETRY_CITATIONS : PRENATAL_BIOMETRY_CITATIONS}${
+      (
+        (!isFt && (
+          exam.gestationalAgeIsManual
+          || exam.biometry?.gestationalAgeFromBiometryIsManual
+          || exam.biometry?.bpdPercentileIsManual || exam.biometry?.hcPercentileIsManual || exam.biometry?.acPercentileIsManual
+          || exam.biometry?.flPercentileIsManual || exam.biometry?.ofdPercentileIsManual || exam.biometry?.efwPercentileIsManual
+          || exam.biometry?.bpdGaIsManual || exam.biometry?.hcGaIsManual || exam.biometry?.acGaIsManual
+          || exam.biometry?.flGaIsManual || exam.biometry?.ofdGaIsManual || exam.biometry?.efwGaIsManual
+          || exam.biometry2?.gestationalAgeFromBiometryIsManual
+          || exam.biometry2?.bpdPercentileIsManual || exam.biometry2?.hcPercentileIsManual || exam.biometry2?.acPercentileIsManual
+          || exam.biometry2?.flPercentileIsManual || exam.biometry2?.ofdPercentileIsManual || exam.biometry2?.efwPercentileIsManual
+          || exam.biometry2?.bpdGaIsManual || exam.biometry2?.hcGaIsManual || exam.biometry2?.acGaIsManual
+          || exam.biometry2?.flGaIsManual || exam.biometry2?.ofdGaIsManual || exam.biometry2?.efwGaIsManual
+        ))
+        || (isFt && (
+          exam.data?.ft_biometry?.gaFromCrlIsManual
+          || exam.data?.twin2_ft_biometry?.gaFromCrlIsManual
+        ))
+      )
+        ? '\n† Value manually entered'
+        : ''
+    }`,
     comments: exam.data?.comments,
     createdBy: exam.createdByName ?? exam.createdBy,
     createdAt: new Date(exam.createdAt).toLocaleString('en-GB'),

@@ -144,6 +144,41 @@ describe('Validation Utilities', () => {
             expect(result.valid).toBe(true);
         });
 
+        test('should accept persisted prenatal derived biometry fields', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                gestationalAge: '28w 3d',
+                gestationalAgeIsManual: true,
+                status: 'draft',
+                biometry: {
+                    bpdGa: '28w 1d',
+                    ofdGa: '28w 2d',
+                    hcGa: '28w 3d',
+                    acGa: '28w 4d',
+                    flGa: '28w 5d',
+                    efwGa: '28w 6d',
+                    bpdPercentile: 45,
+                    hcPercentile: 55,
+                    acPercentile: 65,
+                    flPercentile: 35,
+                    ofdPercentile: 50,
+                    efwPercentile: 60,
+                    bpdGaIsManual: true,
+                    bpdPercentileIsManual: true,
+                },
+                data: {
+                    ft_biometry: {
+                        gaFromCrl: '12w 3d',
+                        gaFromCrlIsManual: true,
+                        gaFromBio: '12w 3d',
+                    }
+                }
+            });
+
+            expect(result.valid).toBe(true);
+        });
+
         test('should reject future exam date', () => {
             const futureDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
             const result = validateExamination({

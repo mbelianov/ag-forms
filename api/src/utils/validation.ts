@@ -187,7 +187,42 @@ const biometrySchema = Joi.object({
     tad:  Joi.number().min(0).max(200).optional().messages({ 'number.base': 'TAD must be a valid number' }),
     // TASK-035: LA (migrated to string) and LC
     la: Joi.string().max(500).optional().allow(''),
-    lc: Joi.number().min(0).max(100).optional().messages({ 'number.base': 'LC must be a valid number' })
+    lc: Joi.number().min(0).max(100).optional().messages({ 'number.base': 'LC must be a valid number' }),
+    // KI-009: Per-measurement GA fields
+    bpdGa:  Joi.string().pattern(GA_REGEX).optional().allow(''),
+    hcGa:   Joi.string().pattern(GA_REGEX).optional().allow(''),
+    acGa:   Joi.string().pattern(GA_REGEX).optional().allow(''),
+    flGa:   Joi.string().pattern(GA_REGEX).optional().allow(''),
+    ofdGa:  Joi.string().pattern(GA_REGEX).optional().allow(''),
+    tadGa:  Joi.string().pattern(GA_REGEX).optional().allow(''),
+    apadGa: Joi.string().pattern(GA_REGEX).optional().allow(''),
+    efwGa:  Joi.string().pattern(GA_REGEX).optional().allow(''),
+    // KI-009: Persisted percentile fields (integers 1–99)
+    bpdPercentile:  Joi.number().integer().min(1).max(99).optional(),
+    hcPercentile:   Joi.number().integer().min(1).max(99).optional(),
+    acPercentile:   Joi.number().integer().min(1).max(99).optional(),
+    flPercentile:   Joi.number().integer().min(1).max(99).optional(),
+    ofdPercentile:  Joi.number().integer().min(1).max(99).optional(),
+    tadPercentile:  Joi.number().integer().min(1).max(99).optional(),
+    apadPercentile: Joi.number().integer().min(1).max(99).optional(),
+    efwPercentile:  Joi.number().integer().min(1).max(99).optional(),
+    // KI-009: IsManual flags
+    bpdPercentileIsManual:  Joi.boolean().optional(),
+    hcPercentileIsManual:   Joi.boolean().optional(),
+    acPercentileIsManual:   Joi.boolean().optional(),
+    flPercentileIsManual:   Joi.boolean().optional(),
+    ofdPercentileIsManual:  Joi.boolean().optional(),
+    tadPercentileIsManual:  Joi.boolean().optional(),
+    apadPercentileIsManual: Joi.boolean().optional(),
+    efwPercentileIsManual:  Joi.boolean().optional(),
+    bpdGaIsManual:  Joi.boolean().optional(),
+    hcGaIsManual:   Joi.boolean().optional(),
+    acGaIsManual:   Joi.boolean().optional(),
+    flGaIsManual:   Joi.boolean().optional(),
+    ofdGaIsManual:  Joi.boolean().optional(),
+    tadGaIsManual:  Joi.boolean().optional(),
+    apadGaIsManual: Joi.boolean().optional(),
+    efwGaIsManual:  Joi.boolean().optional(),
 }).optional();
 
 /**
@@ -267,9 +302,12 @@ const anatomySchema = Joi.object({
 const ftBiometrySchema = Joi.object({
     crl:       Joi.number().min(0).max(200).optional(),
     gaFromCrl: Joi.string().pattern(GA_REGEX).optional().allow(''),
+    gaFromCrlIsManual: Joi.boolean().optional(),
     nt:        Joi.number().min(0).max(30).optional(),
     nb:        Joi.number().min(0).max(30).optional(),
     puls:      Joi.number().integer().min(0).max(300).optional(),
+    // KI-009: GA from biometry composite field for first-trimester common section
+    gaFromBio: Joi.string().pattern(GA_REGEX).optional().allow(''),
 }).optional();
 
 const ftMarkersSchema = Joi.object({
@@ -351,6 +389,7 @@ const examinationSchema = Joi.object({
         .messages({
             'string.pattern.base': 'Gestational age must be in format "28w 3d" or "28с 3д"'
         }),
+    gestationalAgeIsManual: Joi.boolean().optional(),
     gestationalAgeFromBiometry: Joi.string()
         .pattern(GA_REGEX)
         .optional()

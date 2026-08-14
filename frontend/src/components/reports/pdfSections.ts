@@ -119,6 +119,8 @@ function renderFtBiometryBlock(
     y += PITCH;
   }
 
+  y -= PITCH/2;
+
   return y;
 }
 
@@ -166,6 +168,7 @@ function renderFtMarkersBlock(
     doc.text(value || '—', xValue, y);
     y += PITCH;
   }
+  y -= PITCH/2;
   return y;
 }
 
@@ -216,6 +219,7 @@ function renderFtDopplerBlock(
     doc.text(row.ri || '—', xRI, y);
     y += PITCH;
   }
+  y -= PITCH/2;
   return y;
 }
 
@@ -310,6 +314,7 @@ function renderBiometryBlock(
     y += PITCH;
   }
 
+  y -= PITCH/2;
   return y;
 }
 
@@ -371,6 +376,7 @@ function renderDopplerBlock(
 
     y += PITCH;
   }
+  y -= PITCH/2;
 
   // ── Sub-grid B: header row — "Measurement | Value" ───────────────────────────
   const xValue = xStart + labelW;
@@ -400,7 +406,9 @@ function renderDopplerBlock(
 
     y += PITCH;
   }
-
+  
+  y -= PITCH/2;
+  
   return y;
 }
 
@@ -517,7 +525,7 @@ export function renderClinicalSections(
 
     rule(doc, y); y += 4;
     y = sectionHeading(doc, 'Biometry', y);
-    y = renderFtBiometryBlock(doc, vm.ftBiometry ?? emptyB, y, 14, 182, FONT_ID);
+    y = renderFtBiometryBlock(doc, vm.ftBiometry ?? emptyB, y, T1_X, TWIN_COL_W, FONT_ID);
     y += 1;
 
     rule(doc, y); y += 4;
@@ -532,7 +540,7 @@ export function renderClinicalSections(
 
     rule(doc, y); y += 4;
     y = sectionHeading(doc, 'Doppler', y);
-    y = renderFtDopplerBlock(doc, vm.ftDoppler ?? emptyD, y, 14, 182, FONT_ID);
+    y = renderFtDopplerBlock(doc, vm.ftDoppler ?? emptyD, y, T1_X, TWIN_COL_W, FONT_ID);
     y += 1;
 
     return y;
@@ -627,7 +635,7 @@ export function renderClinicalSections(
     if (visibility.biometry) {
       rule(doc, y); y += 4;
       y = sectionHeading(doc, 'Biometry Measurements', y);
-      y = renderBiometryBlock(doc, vm.biometry, y, 14, 182, FONT_ID);
+      y = renderBiometryBlock(doc, vm.biometry, y, T1_X, TWIN_COL_W, FONT_ID);
       y += 1;
     }
     if (visibility.anatomy) {
@@ -639,7 +647,7 @@ export function renderClinicalSections(
     if (visibility.doppler) {
       rule(doc, y); y += 4;
       y = sectionHeading(doc, 'Doppler Measurements', y);
-      y = renderDopplerBlock(doc, vm.doppler, y, 14, 182, FONT_ID);
+      y = renderDopplerBlock(doc, vm.doppler, y, T1_X, TWIN_COL_W, FONT_ID);
       y += 1;
     }
   } else {
