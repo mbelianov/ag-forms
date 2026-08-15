@@ -45,7 +45,9 @@ describe('computeBiometryDerivedFields', () => {
     expect('acGa' in diff).toBe(true);
     expect('flGa' in diff).toBe(true);
     expect('ofdGa' in diff).toBe(true);
+    expect(diff.ofdGa).toBe('27w 4d');
     expect('efwGa' in diff).toBe(true);
+    expect(diff.ofdPercentile).toBe('37');
   });
 
   it('omits bpdPercentile and bpdPercentileIsManual when bpdPercentileIsManual is true (DISC-1 fix)', () => {

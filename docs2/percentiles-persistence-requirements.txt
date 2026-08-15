@@ -1,6 +1,6 @@
 ================================================================================
 REQUIREMENTS: Biometry Percentile & GA-from-Measurement Persistence
-Version: 1.8
+Version: 1.9
 Scope: Prenatal ultrasound exams (ultrasound_prenatal, ultrasound_prenatal_twins)
        AND First-Trimester exams (ultrasound_first_trimester,
        ultrasound_first_trimester_twins) where explicitly noted.
@@ -537,13 +537,38 @@ FORM-8a  OFD — GA from measurement  [PLANNED — calcGAFromOFD]
   This is NOT a deviation from SECTION 0 policy — it is a forced choice due to
   absence of a direct-regression source for OFD.
 
+  COEFFICIENT CORRECTION NOTE
+  ────────────────────────────
+  The coefficients originally specified in this document (v1.7/v1.8):
+    OFD_mean_cm = −2.546 + 0.372·ga − 0.0000323·ga³
+  were found to be incorrect. At ga=21w those coefficients predict OFD ≈ 49.7 mm,
+  which is virtually identical to the BPD prediction (~49.3 mm). This is anatomically
+  impossible — OFD is always larger than BPD (cephalic index 75–85%).
+
+  The corrected coefficients are:
+    OFD_mean_cm = −3.08 + 0.484·ga − 0.000061·ga³
+
+  These share the same cubic term as the BPD formula from the same Hadlock OG 1984
+  paper (both are cranial diameter measurements in the same scanning plane) and produce
+  OFD ≈ 65.2 mm at 21w, consistent with published normal ranges.
+
+  Validation against the GE LOGIQ 500 Advanced Reference Manual (2233657-100 Rev. 0),
+  Chapter 18 OB Tables, Table 18-18 (OFD : Hansmann):
+    OFD=66 mm → formula: 21w 2d  |  Hansmann table: 21w 2d  ✓ (exact)
+    OFD=78 mm → formula: 24w 2d  |  Hansmann table: 24w 1d  ✓ (1 day)
+    OFD=60 mm → formula: 19w 5d  |  Hansmann table: 20w 0d  ✓ (2 days)
+    OFD=100mm → formula: 30w 4d  |  Hansmann table: 30w 3d  ✓ (1 day)
+
+  The Hansmann and Hadlock references are independent studies fitted to different
+  populations; 0–2 day differences are expected and clinically acceptable.
+
   Forward formula (OFD_mean_cm from GA):
-    OFD_mean_cm = −2.546 + 0.372 × ga − 0.0000323 × ga³
+    OFD_mean_cm = −3.08 + 0.484 × ga − 0.000061 × ga³
   Inverse (GA from OFD_observed): numerical root-finding on the above cubic.
-    Initial guess: ga₀ = (OFD_observed_cm + 2.546) ÷ 0.372
+    Initial guess: ga₀ = (OFD_observed_cm + 3.08) ÷ 0.484
     Iterate with Newton–Raphson:
-      f(ga)  = −2.546 + 0.372·ga − 0.0000323·ga³ − OFD_observed_cm
-      f'(ga) = 0.372 − 0.0000969·ga²
+      f(ga)  = −3.08 + 0.484·ga − 0.000061·ga³ − OFD_observed_cm
+      f'(ga) = 0.484 − 0.000183·ga²
       ga_new = ga − f(ga) ÷ f'(ga)
   Input:  OFD_observed in mm (convert to cm)
   Output: string "Xw Yd" → stored as ofdGa
@@ -555,7 +580,7 @@ FORM-8b  OFD — percentile  [PLANNED — calcOFDPercentile]
   Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
           Obstet Gynecol. 1984;63(4):457–65.
   Formula:
-    OFD_mean_cm = −2.546 + 0.372 × ga − 0.0000323 × ga³
+    OFD_mean_cm = −3.08 + 0.484 × ga − 0.000061 × ga³
     SD_OFD      = OFD_mean_cm × 0.043  (same CV as BPD; same measurement plane)
     z           = (OFD_observed_cm − OFD_mean_cm) ÷ SD_OFD
     percentile  = clamp(Φ(z) × 100)

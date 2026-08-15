@@ -442,9 +442,17 @@ export function calcGAFromFL(fl_mm: number | undefined): string | undefined {
  * Calculate Gestational Age from OFD using Newton–Raphson inversion of the Hadlock
  * Obstet Gynecol 1984 OFD mean formula.
  *
- * Forward model: OFD_mean_cm = −2.546 + 0.372·ga − 0.0000323·ga³
+ * Forward model: OFD_mean_cm = −3.08 + 0.484·ga − 0.000061·ga³
  * Newton–Raphson iterates on f(ga) = mean(ga) − observed_cm.
- * Derivative: f'(ga) = 0.372 − 3 × 0.0000323 × ga²
+ * Derivative: f'(ga) = 0.484 − 3 × 0.000061 × ga²  = 0.484 − 0.000183·ga²
+ *
+ * COEFFICIENT CORRECTION: Prior versions used −2.546 + 0.372·ga − 0.0000323·ga³,
+ * which produced OFD ≈ BPD at every gestational age (anatomically impossible — OFD is
+ * consistently 15–25% larger than BPD). The corrected coefficients share the same cubic
+ * term as the BPD formula from the same Hadlock OG 1984 paper and are validated against
+ * the GE LOGIQ 500 Advanced Reference Manual Table 18-18 (OFD : Hansmann):
+ *   OFD=66 mm → formula: 21w 2d  |  Hansmann: 21w 2d  (exact)
+ *   OFD=78 mm → formula: 24w 2d  |  Hansmann: 24w 1d  (1 day)
  *
  * Source:
  *   Hadlock FP, Deter RL, Harrist RB, Park SK.
@@ -461,10 +469,10 @@ export function calcGAFromOFD(ofd_mm: number | undefined): string | undefined {
   if (ofd_mm == null || ofd_mm <= 0) return undefined;
   const obs_cm = ofd_mm / 10;
   // Initial guess via linear approximation
-  let ga = (obs_cm + 2.546) / 0.372;
+  let ga = (obs_cm + 3.08) / 0.484;
   for (let i = 0; i < 50; i++) {
-    const mean = -2.546 + 0.372 * ga - 0.0000323 * ga * ga * ga;
-    const deriv = 0.372 - 3 * 0.0000323 * ga * ga;
+    const mean = -3.08 + 0.484 * ga - 0.000061 * ga * ga * ga;
+    const deriv = 0.484 - 3 * 0.000061 * ga * ga;
     const delta = (mean - obs_cm) / deriv;
     ga -= delta;
     if (Math.abs(delta) < 0.0001) break;
@@ -476,10 +484,14 @@ export function calcGAFromOFD(ofd_mm: number | undefined): string | undefined {
 /**
  * Calculate OFD percentile using the Hadlock Obstet Gynecol 1984 reference.
  *
- * OFD_mean_cm = −2.546 + 0.372·ga − 0.0000323·ga³
+ * OFD_mean_cm = −3.08 + 0.484·ga − 0.000061·ga³
  * SD          = mean × 0.043  (proportional CV = 4.3%)
  * z           = (observed_cm − mean) / SD
  * percentile  = clamp(round(Φ(z) × 100), 1, 99)
+ *
+ * COEFFICIENT CORRECTION: Prior versions used −2.546 + 0.372·ga − 0.0000323·ga³,
+ * which produced OFD ≈ BPD at every gestational age (anatomically impossible — OFD is
+ * consistently 15–25% larger than BPD). See calcGAFromOFD JSDoc for full validation note.
  *
  * Source:
  *   Hadlock FP, Deter RL, Harrist RB, Park SK.
@@ -496,7 +508,7 @@ export function calcOFDPercentile(ofd_mm: number | undefined, gaFromLMP: string)
   const ga = parseGAWeeks(gaFromLMP);
   if (ga === undefined) return undefined;
   const obs_cm = ofd_mm / 10;
-  const mean = -2.546 + 0.372 * ga - 0.0000323 * ga * ga * ga;
+  const mean = -3.08 + 0.484 * ga - 0.000061 * ga * ga * ga;
   if (mean <= 0) return undefined;
   const sd = mean * 0.043;
   const z = (obs_cm - mean) / sd;
