@@ -27,47 +27,53 @@ import {
   calcGAFromFL,
   calcGAFromOFD,
   calcGAFromEFW,
+  calcGAFromTCD,
+  calcTCDPercentile,
 } from '../utils/calculations';
 
 /** The subset of formData fields consumed/produced by this hook (T1 only). */
 export interface BiometryAutoCalcInput {
   // Measurements (string floats)
   bpd: string; hc: string; ac: string; fl: string; ofd: string;
-  tad: string; apad: string; efw: string;
+  tad: string; apad: string; efw: string; tcd: string;
   gestationalAge: string; // GA from LMP — drives percentile calcs
   gestationalAgeFromBiometry: string;
   // Existing computed values (kept if IsManual is true)
   bpdPercentile: string; hcPercentile: string; acPercentile: string; flPercentile: string;
   ofdPercentile: string; tadPercentile: string; apadPercentile: string; efwPercentile: string;
+  tcdPercentile: string;
   bpdGa: string; hcGa: string; acGa: string; flGa: string;
   ofdGa: string; tadGa: string; apadGa: string; efwGa: string;
+  tcdGa: string;
   // IsManual flags (booleans stored in formData)
   bpdPercentileIsManual: boolean; hcPercentileIsManual: boolean;
   acPercentileIsManual: boolean; flPercentileIsManual: boolean;
   ofdPercentileIsManual: boolean; tadPercentileIsManual: boolean;
   apadPercentileIsManual: boolean; efwPercentileIsManual: boolean;
+  tcdPercentileIsManual: boolean;
   bpdGaIsManual: boolean; hcGaIsManual: boolean;
   acGaIsManual: boolean; flGaIsManual: boolean;
   ofdGaIsManual: boolean; tadGaIsManual: boolean;
   apadGaIsManual: boolean; efwGaIsManual: boolean;
+  tcdGaIsManual: boolean;
   efwIsManual: boolean;
   gestationalAgeFromBiometryIsManual: boolean;
 }
 
 export type BiometryAutoCalcDiff = Partial<{
   bpdPercentile: string; hcPercentile: string; acPercentile: string; flPercentile: string;
-  ofdPercentile: string; efwPercentile: string;
+  ofdPercentile: string; efwPercentile: string; tcdPercentile: string;
   bpdGa: string; hcGa: string; acGa: string; flGa: string;
-  ofdGa: string; efwGa: string;
+  ofdGa: string; efwGa: string; tcdGa: string;
   efw: string;
   gestationalAgeFromBiometry: string;
   // IsManual resets
   bpdPercentileIsManual: boolean; hcPercentileIsManual: boolean;
   acPercentileIsManual: boolean; flPercentileIsManual: boolean;
-  ofdPercentileIsManual: boolean; efwPercentileIsManual: boolean;
+  ofdPercentileIsManual: boolean; efwPercentileIsManual: boolean; tcdPercentileIsManual: boolean;
   bpdGaIsManual: boolean; hcGaIsManual: boolean;
   acGaIsManual: boolean; flGaIsManual: boolean;
-  ofdGaIsManual: boolean; efwGaIsManual: boolean;
+  ofdGaIsManual: boolean; efwGaIsManual: boolean; tcdGaIsManual: boolean;
   efwIsManual: boolean;
   gestationalAgeFromBiometryIsManual: boolean;
 }>;
@@ -85,6 +91,7 @@ export function computeBiometryDerivedFields(input: BiometryAutoCalcInput): Biom
   const ac  = parseFloat(input.ac)  || undefined;
   const fl  = parseFloat(input.fl)  || undefined;
   const ofd = parseFloat(input.ofd) || undefined;
+  const tcd = parseFloat(input.tcd) || undefined;
   const gaStr = input.gestationalAge;
   const autoEfw = calcEFW(bpd, hc, ac, fl);
 
@@ -116,6 +123,13 @@ export function computeBiometryDerivedFields(input: BiometryAutoCalcInput): Biom
     const ofdPct = gaStr ? calcOFDPercentile(ofd, gaStr) : undefined;
     diff.ofdPercentile = ofdPct != null ? String(ofdPct) : '';
     diff.ofdPercentileIsManual = false;
+  }
+
+  // TCD percentile
+  if (!input.tcdPercentileIsManual) {
+    const tcdPct = gaStr ? calcTCDPercentile(tcd, gaStr) : undefined;
+    diff.tcdPercentile = tcdPct != null ? String(tcdPct) : '';
+    diff.tcdPercentileIsManual = false;
   }
 
   // EFW
@@ -162,6 +176,11 @@ export function computeBiometryDerivedFields(input: BiometryAutoCalcInput): Biom
     diff.ofdGa = calcGAFromOFD(ofd) ?? '';
     diff.ofdGaIsManual = false;
   }
+  // GA from TCD
+  if (!input.tcdGaIsManual) {
+    diff.tcdGa = calcGAFromTCD(tcd) ?? '';
+    diff.tcdGaIsManual = false;
+  }
   // GA from EFW
   if (!input.efwGaIsManual) {
     diff.efwGa = calcGAFromEFW(autoEfw) ?? '';
@@ -183,7 +202,7 @@ export function useBiometryAutoCalc(
   const prevMeasurementsRef = useRef<string>('');
 
   useEffect(() => {
-    const measurements = [input.bpd, input.hc, input.ac, input.fl, input.ofd, input.efw, input.gestationalAge].join('|');
+    const measurements = [input.bpd, input.hc, input.ac, input.fl, input.ofd, input.tcd, input.efw, input.gestationalAge].join('|');
 
     // If measurements changed, auto-calculate and merge diff
     const diff = computeBiometryDerivedFields(input);
@@ -194,7 +213,7 @@ export function useBiometryAutoCalc(
     }
   // Run on every measurement or GA change
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input.bpd, input.hc, input.ac, input.fl, input.ofd, input.efw, input.gestationalAge]);
+  }, [input.bpd, input.hc, input.ac, input.fl, input.ofd, input.tcd, input.efw, input.gestationalAge]);
 }
 
 // Made with Bob

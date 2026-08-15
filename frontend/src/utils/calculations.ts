@@ -517,6 +517,58 @@ export function calcOFDPercentile(ofd_mm: number | undefined, gaFromLMP: string)
 }
 
 /**
+ * Calculate Gestational Age from Transverse Cerebellar Diameter (TCD) using the Chang 2000 linear model.
+ *
+ * ga = (tcd_mm + 10.632) / 1.5486
+ *
+ * Source:
+ *   Chang CH, Chang FM, Yu CH, et al.
+ *   "Assessment of fetal transverse cerebellar diameter by three-dimensional ultrasound."
+ *   Ultrasound Med Biol. 2000 Feb;26(3):341-7. PMID 10722905.
+ *   (FORM-15a)
+ *
+ * Valid output range: 14–40 weeks.
+ *
+ * @param tcd_mm - Transverse Cerebellar Diameter in mm
+ * @returns GA string "Xw Yd", or undefined if result is outside 14–40 wk or input is absent/invalid
+ */
+export function calcGAFromTCD(tcd_mm: number | undefined): string | undefined {
+  if (tcd_mm == null || tcd_mm <= 0) return undefined;
+  const ga = (tcd_mm + 10.632) / 1.5486;
+  if (ga < 14 || ga > 40) return undefined;
+  return formatGestationalAge(ga);
+}
+
+/**
+ * Calculate TCD percentile using the Chang 2000 reference.
+ *
+ * TCD_mean_mm = -10.632 + 1.5486 * ga
+ * SD          = 2.96 (absolute constant)
+ * z           = (observed_mm - mean) / SD
+ * percentile  = clamp(round(Φ(z) * 100), 1, 99)
+ *
+ * Source:
+ *   Chang CH, Chang FM, Yu CH, et al.
+ *   "Assessment of fetal transverse cerebellar diameter by three-dimensional ultrasound."
+ *   Ultrasound Med Biol. 2000 Feb;26(3):341-7. PMID 10722905.
+ *   (FORM-15b)
+ *
+ * @param tcd_mm    - Transverse Cerebellar Diameter in mm
+ * @param gaFromLMP - Gestational age string from LMP e.g. "28w 3d"
+ * @returns Percentile [1–99], or undefined if inputs are missing / invalid
+ */
+export function calcTCDPercentile(tcd_mm: number | undefined, gaFromLMP: string): number | undefined {
+  if (tcd_mm == null || tcd_mm <= 0) return undefined;
+  const ga = parseGAWeeks(gaFromLMP);
+  if (ga === undefined) return undefined;
+  const mean = -10.632 + 1.5486 * ga;
+  const sd = 2.96;
+  const z = (tcd_mm - mean) / sd;
+  const clamp = (p: number) => Math.max(1, Math.min(99, Math.round(p)));
+  return clamp(normalCDF(z) * 100);
+}
+
+/**
  * Calculate Gestational Age from EFW using the Combs 1993 inverse quadratic.
  *
  * Combs 1993 log-mean: ln(mean_efw) = 0.578 + 0.332·ga − 0.00354·ga²

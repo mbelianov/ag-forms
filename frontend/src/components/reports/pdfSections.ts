@@ -278,7 +278,7 @@ function renderBiometryBlock(
     { label: 'AC (mm)',     value: b.ac,         pct: b.acPct,   gaAppend: b.acGa },
     { label: 'FL (mm)',     value: b.fl,         pct: b.flPct,   gaAppend: b.flGa },
     { label: 'EFW (grams)', value: b.efw,        pct: b.efwPct,  gaAppend: b.efwGa },
-    { label: 'TCD (mm)',    value: b.tcd },
+    { label: 'TCD (mm)',    value: b.tcd,        pct: b.tcdPct,  gaAppend: b.tcdGa },
     { label: 'Vp',          value: b.vp },
     { label: 'CM (mm)',     value: b.cm },
     { label: 'NF (mm)',     value: b.nuchalFold },

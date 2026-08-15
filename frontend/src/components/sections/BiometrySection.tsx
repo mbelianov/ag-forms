@@ -41,6 +41,7 @@ export interface BiometrySectionFormData {
   tadPercentile: string;
   apadPercentile: string;
   efwPercentile: string;
+  tcdPercentile: string;
   // KI-009: Per-measurement GA fields
   bpdGa: string;
   hcGa: string;
@@ -50,6 +51,7 @@ export interface BiometrySectionFormData {
   tadGa: string;
   apadGa: string;
   efwGa: string;
+  tcdGa: string;
   // KI-009: IsManual flags (not rendered but needed for submit)
   bpdPercentileIsManual: boolean;
   hcPercentileIsManual: boolean;
@@ -59,6 +61,7 @@ export interface BiometrySectionFormData {
   tadPercentileIsManual: boolean;
   apadPercentileIsManual: boolean;
   efwPercentileIsManual: boolean;
+  tcdPercentileIsManual: boolean;
   bpdGaIsManual: boolean;
   hcGaIsManual: boolean;
   acGaIsManual: boolean;
@@ -67,6 +70,7 @@ export interface BiometrySectionFormData {
   tadGaIsManual: boolean;
   apadGaIsManual: boolean;
   efwGaIsManual: boolean;
+  tcdGaIsManual: boolean;
   efwIsManual: boolean;
 }
 
@@ -200,7 +204,14 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
         <TextInput id={p('tcd')} labelText="TCD (mm)" placeholder="e.g., 0.0"
           value={data.tcd} onChange={(e) => onChange(p('tcd'), e.target.value)}
           invalid={!!errors[p('tcd')]} invalidText={errors[p('tcd')]} disabled={isSubmitting} autoComplete="off" />
-        <div /><div />
+        <TextInput id={p('tcdPercentile')} labelText={autoCalcLabel('TCD Percentile', data.tcdPercentileIsManual)}
+          placeholder="auto" value={data.tcdPercentile}
+          onChange={(e) => onChange(p('tcdPercentile'), e.target.value)}
+          disabled={isSubmitting} />
+        <TextInput id={p('tcdGa')} labelText={autoCalcLabel('TCD GA', data.tcdGaIsManual)}
+          placeholder="auto (10-51mm)" value={data.tcdGa}
+          onChange={(e) => onChange(p('tcdGa'), e.target.value)}
+          disabled={isSubmitting} />
 
         {/* Vp row */}
         <TextInput id={p('vp')} labelText="Vp" placeholder="e.g., custom value"

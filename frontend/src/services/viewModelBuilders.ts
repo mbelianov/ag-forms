@@ -61,10 +61,11 @@ const PRENATAL_BIOMETRY_CITATIONS =
   '(BPD, HC, AC, FL, OFD percentile reference ranges)\n' +
   '3. Hadlock FP, et al. Am J Obstet Gynecol. 1985;150(5):535–40. (EFW formula)\n' +
   '4. Hadlock FP, et al. Am J Obstet Gynecol. 1985;151(7):333–7. (Composite GA from BPD+HC+AC+FL)\n' +
-  '5. Combs CA, et al. Am J Obstet Gynecol. 1993;169(4):775–83. (EFW percentile and GA from EFW)';
+  '5. Combs CA, et al. Am J Obstet Gynecol. 1993;169(4):775–83. (EFW percentile and GA from EFW)\n' +
+  '6. Chang CH, Chang FM, Yu CH, et al. Ultrasound Med Biol. 2000;26(3):341–7. PMID 10722905. (TCD percentile and GA from TCD)';
 
 const FT_BIOMETRY_CITATIONS =
-  '6. Robinson HP. Br Med J. 1975;4(5986):28–31. PMID 1182090. (GA from CRL)';
+  '7. Robinson HP. Br Med J. 1975;4(5986):28–31. PMID 1182090. (GA from CRL)';
 
 // ─── Build view model ─────────────────────────────────────────────────────────
 
@@ -156,6 +157,7 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
       ofdPct:  pctStr(exam.biometry2?.ofdPercentile, exam.biometry2?.ofdPercentileIsManual),
       tadPct:  pctStr(exam.biometry2?.tadPercentile),
       apadPct: pctStr(exam.biometry2?.apadPercentile),
+      tcdPct:  pctStr(exam.biometry2?.tcdPercentile, exam.biometry2?.tcdPercentileIsManual),
       // Sub-Task 4: per-measurement GA for T2
       bpdGa:  withManualMarker(exam.biometry2?.bpdGa  ?? undefined, exam.biometry2?.bpdGaIsManual),
       ofdGa:  withManualMarker(exam.biometry2?.ofdGa  ?? undefined, exam.biometry2?.ofdGaIsManual),
@@ -165,6 +167,7 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
       acGa:   withManualMarker(exam.biometry2?.acGa   ?? undefined, exam.biometry2?.acGaIsManual),
       flGa:   withManualMarker(exam.biometry2?.flGa   ?? undefined, exam.biometry2?.flGaIsManual),
       efwGa:  withManualMarker(exam.biometry2?.efwGa  ?? undefined, exam.biometry2?.efwGaIsManual),
+      tcdGa:  withManualMarker(exam.biometry2?.tcdGa  ?? undefined, exam.biometry2?.tcdGaIsManual),
       ofd:       exam.biometry2?.ofd       != null ? `${fmtBiometry(exam.biometry2.ofd)} mm`       : undefined,
       vp:        exam.biometry2?.vp?.trim() || undefined,
       tcd:       exam.biometry2?.tcd       != null ? `${fmtBiometry(exam.biometry2.tcd)} mm`       : undefined,
@@ -272,6 +275,7 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
       ofdPct:  pctStr(exam.biometry?.ofdPercentile, exam.biometry?.ofdPercentileIsManual),
       tadPct:  pctStr(exam.biometry?.tadPercentile),
       apadPct: pctStr(exam.biometry?.apadPercentile),
+      tcdPct:  pctStr(exam.biometry?.tcdPercentile, exam.biometry?.tcdPercentileIsManual),
       // Sub-Task 4: per-measurement GA for T1
       bpdGa:  withManualMarker(exam.biometry?.bpdGa  ?? undefined, exam.biometry?.bpdGaIsManual),
       ofdGa:  withManualMarker(exam.biometry?.ofdGa  ?? undefined, exam.biometry?.ofdGaIsManual),
@@ -281,6 +285,7 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
       acGa:   withManualMarker(exam.biometry?.acGa   ?? undefined, exam.biometry?.acGaIsManual),
       flGa:   withManualMarker(exam.biometry?.flGa   ?? undefined, exam.biometry?.flGaIsManual),
       efwGa:  withManualMarker(exam.biometry?.efwGa  ?? undefined, exam.biometry?.efwGaIsManual),
+      tcdGa:  withManualMarker(exam.biometry?.tcdGa  ?? undefined, exam.biometry?.tcdGaIsManual),
       ofd:       exam.biometry?.ofd       != null ? `${fmtBiometry(exam.biometry.ofd)} mm`       : undefined,
       vp:        exam.biometry?.vp?.trim() || undefined,
       tcd:       exam.biometry?.tcd       != null ? `${fmtBiometry(exam.biometry.tcd)} mm`       : undefined,
@@ -345,14 +350,14 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
           exam.gestationalAgeIsManual
           || exam.biometry?.gestationalAgeFromBiometryIsManual
           || exam.biometry?.bpdPercentileIsManual || exam.biometry?.hcPercentileIsManual || exam.biometry?.acPercentileIsManual
-          || exam.biometry?.flPercentileIsManual || exam.biometry?.ofdPercentileIsManual || exam.biometry?.efwPercentileIsManual
+          || exam.biometry?.flPercentileIsManual || exam.biometry?.ofdPercentileIsManual || exam.biometry?.efwPercentileIsManual || exam.biometry?.tcdPercentileIsManual
           || exam.biometry?.bpdGaIsManual || exam.biometry?.hcGaIsManual || exam.biometry?.acGaIsManual
-          || exam.biometry?.flGaIsManual || exam.biometry?.ofdGaIsManual || exam.biometry?.efwGaIsManual
+          || exam.biometry?.flGaIsManual || exam.biometry?.ofdGaIsManual || exam.biometry?.efwGaIsManual || exam.biometry?.tcdGaIsManual
           || exam.biometry2?.gestationalAgeFromBiometryIsManual
           || exam.biometry2?.bpdPercentileIsManual || exam.biometry2?.hcPercentileIsManual || exam.biometry2?.acPercentileIsManual
-          || exam.biometry2?.flPercentileIsManual || exam.biometry2?.ofdPercentileIsManual || exam.biometry2?.efwPercentileIsManual
+          || exam.biometry2?.flPercentileIsManual || exam.biometry2?.ofdPercentileIsManual || exam.biometry2?.efwPercentileIsManual || exam.biometry2?.tcdPercentileIsManual
           || exam.biometry2?.bpdGaIsManual || exam.biometry2?.hcGaIsManual || exam.biometry2?.acGaIsManual
-          || exam.biometry2?.flGaIsManual || exam.biometry2?.ofdGaIsManual || exam.biometry2?.efwGaIsManual
+          || exam.biometry2?.flGaIsManual || exam.biometry2?.ofdGaIsManual || exam.biometry2?.efwGaIsManual || exam.biometry2?.tcdGaIsManual
         ))
         || (isFt && (
           exam.data?.ft_biometry?.gaFromCrlIsManual

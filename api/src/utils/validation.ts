@@ -197,6 +197,7 @@ const biometrySchema = Joi.object({
     tadGa:  Joi.string().pattern(GA_REGEX).optional().allow(''),
     apadGa: Joi.string().pattern(GA_REGEX).optional().allow(''),
     efwGa:  Joi.string().pattern(GA_REGEX).optional().allow(''),
+    tcdGa:  Joi.string().pattern(GA_REGEX).optional().allow(''),
     // KI-009: Persisted percentile fields (integers 1–99)
     bpdPercentile:  Joi.number().integer().min(1).max(99).optional(),
     hcPercentile:   Joi.number().integer().min(1).max(99).optional(),
@@ -206,6 +207,7 @@ const biometrySchema = Joi.object({
     tadPercentile:  Joi.number().integer().min(1).max(99).optional(),
     apadPercentile: Joi.number().integer().min(1).max(99).optional(),
     efwPercentile:  Joi.number().integer().min(1).max(99).optional(),
+    tcdPercentile:  Joi.number().integer().min(1).max(99).optional(),
     // KI-009: IsManual flags
     bpdPercentileIsManual:  Joi.boolean().optional(),
     hcPercentileIsManual:   Joi.boolean().optional(),
@@ -215,6 +217,7 @@ const biometrySchema = Joi.object({
     tadPercentileIsManual:  Joi.boolean().optional(),
     apadPercentileIsManual: Joi.boolean().optional(),
     efwPercentileIsManual:  Joi.boolean().optional(),
+    tcdPercentileIsManual:  Joi.boolean().optional(),
     bpdGaIsManual:  Joi.boolean().optional(),
     hcGaIsManual:   Joi.boolean().optional(),
     acGaIsManual:   Joi.boolean().optional(),
@@ -223,6 +226,7 @@ const biometrySchema = Joi.object({
     tadGaIsManual:  Joi.boolean().optional(),
     apadGaIsManual: Joi.boolean().optional(),
     efwGaIsManual:  Joi.boolean().optional(),
+    tcdGaIsManual:  Joi.boolean().optional(),
     efwIsManual:    Joi.boolean().optional(),
     gestationalAgeFromBiometryIsManual: Joi.boolean().optional(),
 }).optional();

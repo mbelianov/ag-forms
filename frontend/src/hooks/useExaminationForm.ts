@@ -109,6 +109,7 @@ export function useExaminationForm({
     acGa:   examination?.biometry?.acGa   || '',
     flGa:   examination?.biometry?.flGa   || '',
     efwGa:  examination?.biometry?.efwGa  || '',
+    tcdGa:  examination?.biometry?.tcdGa  || '',
     // KI-009: Persisted percentile fields (T1) — stored as strings in formData for input binding
     bpdPercentile:  examination?.biometry?.bpdPercentile  != null ? examination.biometry.bpdPercentile.toString() : '',
     hcPercentile:   examination?.biometry?.hcPercentile   != null ? examination.biometry.hcPercentile.toString() : '',
@@ -118,6 +119,7 @@ export function useExaminationForm({
     tadPercentile:  examination?.biometry?.tadPercentile  != null ? examination.biometry.tadPercentile.toString() : '',
     apadPercentile: examination?.biometry?.apadPercentile != null ? examination.biometry.apadPercentile.toString() : '',
     efwPercentile:  examination?.biometry?.efwPercentile  != null ? examination.biometry.efwPercentile.toString() : '',
+    tcdPercentile:  examination?.biometry?.tcdPercentile  != null ? examination.biometry.tcdPercentile.toString() : '',
     // KI-009: IsManual flags (T1)
     bpdPercentileIsManual:  examination?.biometry?.bpdPercentileIsManual  ?? false,
     hcPercentileIsManual:   examination?.biometry?.hcPercentileIsManual   ?? false,
@@ -127,6 +129,7 @@ export function useExaminationForm({
     tadPercentileIsManual:  examination?.biometry?.tadPercentileIsManual  ?? false,
     apadPercentileIsManual: examination?.biometry?.apadPercentileIsManual ?? false,
     efwPercentileIsManual:  examination?.biometry?.efwPercentileIsManual  ?? false,
+    tcdPercentileIsManual:  examination?.biometry?.tcdPercentileIsManual  ?? false,
     bpdGaIsManual:  examination?.biometry?.bpdGaIsManual  ?? false,
     hcGaIsManual:   examination?.biometry?.hcGaIsManual   ?? false,
     acGaIsManual:   examination?.biometry?.acGaIsManual   ?? false,
@@ -135,6 +138,7 @@ export function useExaminationForm({
     tadGaIsManual:  examination?.biometry?.tadGaIsManual  ?? false,
     apadGaIsManual: examination?.biometry?.apadGaIsManual ?? false,
     efwGaIsManual:  examination?.biometry?.efwGaIsManual  ?? false,
+    tcdGaIsManual:  examination?.biometry?.tcdGaIsManual  ?? false,
     // KI-009: FT gaFromBio
     t1_ft_gaFromBio: examination?.data?.ft_biometry?.gaFromBio || '',
     t1_ft_gaFromCrlIsManual: examination?.data?.ft_biometry?.gaFromCrlIsManual ?? false,
@@ -208,6 +212,7 @@ export function useExaminationForm({
     t2_acGa:   examination?.biometry2?.acGa   || '',
     t2_flGa:   examination?.biometry2?.flGa   || '',
     t2_efwGa:  examination?.biometry2?.efwGa  || '',
+    t2_tcdGa:  examination?.biometry2?.tcdGa  || '',
     // KI-009: Twin 2 persisted percentile fields
     t2_bpdPercentile:  examination?.biometry2?.bpdPercentile  != null ? examination.biometry2.bpdPercentile.toString() : '',
     t2_hcPercentile:   examination?.biometry2?.hcPercentile   != null ? examination.biometry2.hcPercentile.toString() : '',
@@ -217,6 +222,7 @@ export function useExaminationForm({
     t2_tadPercentile:  examination?.biometry2?.tadPercentile  != null ? examination.biometry2.tadPercentile.toString() : '',
     t2_apadPercentile: examination?.biometry2?.apadPercentile != null ? examination.biometry2.apadPercentile.toString() : '',
     t2_efwPercentile:  examination?.biometry2?.efwPercentile  != null ? examination.biometry2.efwPercentile.toString() : '',
+    t2_tcdPercentile:  examination?.biometry2?.tcdPercentile  != null ? examination.biometry2.tcdPercentile.toString() : '',
     // KI-009: Twin 2 IsManual flags
     t2_bpdPercentileIsManual:  examination?.biometry2?.bpdPercentileIsManual  ?? false,
     t2_hcPercentileIsManual:   examination?.biometry2?.hcPercentileIsManual   ?? false,
@@ -226,6 +232,7 @@ export function useExaminationForm({
     t2_tadPercentileIsManual:  examination?.biometry2?.tadPercentileIsManual  ?? false,
     t2_apadPercentileIsManual: examination?.biometry2?.apadPercentileIsManual ?? false,
     t2_efwPercentileIsManual:  examination?.biometry2?.efwPercentileIsManual  ?? false,
+    t2_tcdPercentileIsManual:  examination?.biometry2?.tcdPercentileIsManual  ?? false,
     t2_bpdGaIsManual:  examination?.biometry2?.bpdGaIsManual  ?? false,
     t2_hcGaIsManual:   examination?.biometry2?.hcGaIsManual   ?? false,
     t2_acGaIsManual:   examination?.biometry2?.acGaIsManual   ?? false,
@@ -234,6 +241,7 @@ export function useExaminationForm({
     t2_tadGaIsManual:  examination?.biometry2?.tadGaIsManual  ?? false,
     t2_apadGaIsManual: examination?.biometry2?.apadGaIsManual ?? false,
     t2_efwGaIsManual:  examination?.biometry2?.efwGaIsManual  ?? false,
+    t2_tcdGaIsManual:  examination?.biometry2?.tcdGaIsManual  ?? false,
     // uzd-twins: Twin 2 doppler fields
     t2_pi: examination?.doppler2?.pi?.toString() || '',
     t2_ri: examination?.doppler2?.ri?.toString() || '',
@@ -373,6 +381,7 @@ export function useExaminationForm({
         acGa:   examination.biometry?.acGa   || '',
         flGa:   examination.biometry?.flGa   || '',
         efwGa:  examination.biometry?.efwGa  || '',
+        tcdGa:  examination.biometry?.tcdGa  || '',
         // KI-009: Persisted percentile fields (T1)
         bpdPercentile:  examination.biometry?.bpdPercentile  != null ? examination.biometry.bpdPercentile.toString() : '',
         hcPercentile:   examination.biometry?.hcPercentile   != null ? examination.biometry.hcPercentile.toString() : '',
@@ -382,6 +391,7 @@ export function useExaminationForm({
         tadPercentile:  examination.biometry?.tadPercentile  != null ? examination.biometry.tadPercentile.toString() : '',
         apadPercentile: examination.biometry?.apadPercentile != null ? examination.biometry.apadPercentile.toString() : '',
         efwPercentile:  examination.biometry?.efwPercentile  != null ? examination.biometry.efwPercentile.toString() : '',
+        tcdPercentile:  examination.biometry?.tcdPercentile  != null ? examination.biometry.tcdPercentile.toString() : '',
         // KI-009: IsManual flags (T1)
         bpdPercentileIsManual:  examination.biometry?.bpdPercentileIsManual  ?? false,
         hcPercentileIsManual:   examination.biometry?.hcPercentileIsManual   ?? false,
@@ -391,6 +401,7 @@ export function useExaminationForm({
         tadPercentileIsManual:  examination.biometry?.tadPercentileIsManual  ?? false,
         apadPercentileIsManual: examination.biometry?.apadPercentileIsManual ?? false,
         efwPercentileIsManual:  examination.biometry?.efwPercentileIsManual  ?? false,
+        tcdPercentileIsManual:  examination.biometry?.tcdPercentileIsManual  ?? false,
         bpdGaIsManual:  examination.biometry?.bpdGaIsManual  ?? false,
         hcGaIsManual:   examination.biometry?.hcGaIsManual   ?? false,
         acGaIsManual:   examination.biometry?.acGaIsManual   ?? false,
@@ -399,6 +410,7 @@ export function useExaminationForm({
         tadGaIsManual:  examination.biometry?.tadGaIsManual  ?? false,
         apadGaIsManual: examination.biometry?.apadGaIsManual ?? false,
         efwGaIsManual:  examination.biometry?.efwGaIsManual  ?? false,
+        tcdGaIsManual:  examination.biometry?.tcdGaIsManual  ?? false,
         // KI-009: FT gaFromBio
         t1_ft_gaFromBio: examination.data?.ft_biometry?.gaFromBio || '',
         t1_ft_gaFromCrlIsManual: examination.data?.ft_biometry?.gaFromCrlIsManual ?? false,
@@ -467,6 +479,7 @@ export function useExaminationForm({
         t2_acGa:   examination.biometry2?.acGa   || '',
         t2_flGa:   examination.biometry2?.flGa   || '',
         t2_efwGa:  examination.biometry2?.efwGa  || '',
+        t2_tcdGa:  examination.biometry2?.tcdGa  || '',
         // KI-009: Twin 2 persisted percentile fields
         t2_bpdPercentile:  examination.biometry2?.bpdPercentile  != null ? examination.biometry2.bpdPercentile.toString() : '',
         t2_hcPercentile:   examination.biometry2?.hcPercentile   != null ? examination.biometry2.hcPercentile.toString() : '',
@@ -476,6 +489,7 @@ export function useExaminationForm({
         t2_tadPercentile:  examination.biometry2?.tadPercentile  != null ? examination.biometry2.tadPercentile.toString() : '',
         t2_apadPercentile: examination.biometry2?.apadPercentile != null ? examination.biometry2.apadPercentile.toString() : '',
         t2_efwPercentile:  examination.biometry2?.efwPercentile  != null ? examination.biometry2.efwPercentile.toString() : '',
+        t2_tcdPercentile:  examination.biometry2?.tcdPercentile  != null ? examination.biometry2.tcdPercentile.toString() : '',
         // KI-009: Twin 2 IsManual flags
         t2_bpdPercentileIsManual:  examination.biometry2?.bpdPercentileIsManual  ?? false,
         t2_hcPercentileIsManual:   examination.biometry2?.hcPercentileIsManual   ?? false,
@@ -485,6 +499,7 @@ export function useExaminationForm({
         t2_tadPercentileIsManual:  examination.biometry2?.tadPercentileIsManual  ?? false,
         t2_apadPercentileIsManual: examination.biometry2?.apadPercentileIsManual ?? false,
         t2_efwPercentileIsManual:  examination.biometry2?.efwPercentileIsManual  ?? false,
+        t2_tcdPercentileIsManual:  examination.biometry2?.tcdPercentileIsManual  ?? false,
         t2_bpdGaIsManual:  examination.biometry2?.bpdGaIsManual  ?? false,
         t2_hcGaIsManual:   examination.biometry2?.hcGaIsManual   ?? false,
         t2_acGaIsManual:   examination.biometry2?.acGaIsManual   ?? false,
@@ -493,6 +508,7 @@ export function useExaminationForm({
         t2_tadGaIsManual:  examination.biometry2?.tadGaIsManual  ?? false,
         t2_apadGaIsManual: examination.biometry2?.apadGaIsManual ?? false,
         t2_efwGaIsManual:  examination.biometry2?.efwGaIsManual  ?? false,
+        t2_tcdGaIsManual:  examination.biometry2?.tcdGaIsManual  ?? false,
         // uzd-twins: Twin 2 doppler
         t2_pi: examination.doppler2?.pi?.toString() || '',
         t2_ri: examination.doppler2?.ri?.toString() || '',
@@ -604,16 +620,18 @@ export function useExaminationForm({
     const diff = computeBiometryDerivedFields({
       bpd: fd.bpd as string, hc: fd.hc as string, ac: fd.ac as string,
       fl: fd.fl as string, ofd: fd.ofd as string, tad: fd.tad as string,
-      apad: fd.apad as string, efw: fd.efw as string,
+      apad: fd.apad as string, efw: fd.efw as string, tcd: fd.tcd as string,
       gestationalAge: fd.gestationalAge as string,
       gestationalAgeFromBiometry: fd.gestationalAgeFromBiometry as string,
       bpdPercentile: fd.bpdPercentile as string, hcPercentile: fd.hcPercentile as string,
       acPercentile: fd.acPercentile as string, flPercentile: fd.flPercentile as string,
       ofdPercentile: fd.ofdPercentile as string, tadPercentile: fd.tadPercentile as string,
       apadPercentile: fd.apadPercentile as string, efwPercentile: fd.efwPercentile as string,
+      tcdPercentile: fd.tcdPercentile as string,
       bpdGa: fd.bpdGa as string, hcGa: fd.hcGa as string, acGa: fd.acGa as string,
       flGa: fd.flGa as string, ofdGa: fd.ofdGa as string, tadGa: fd.tadGa as string,
       apadGa: fd.apadGa as string, efwGa: fd.efwGa as string,
+      tcdGa: fd.tcdGa as string,
       bpdPercentileIsManual: fd.bpdPercentileIsManual as boolean,
       hcPercentileIsManual: fd.hcPercentileIsManual as boolean,
       acPercentileIsManual: fd.acPercentileIsManual as boolean,
@@ -622,10 +640,12 @@ export function useExaminationForm({
       tadPercentileIsManual: fd.tadPercentileIsManual as boolean,
       apadPercentileIsManual: fd.apadPercentileIsManual as boolean,
       efwPercentileIsManual: fd.efwPercentileIsManual as boolean,
+      tcdPercentileIsManual: fd.tcdPercentileIsManual as boolean,
       bpdGaIsManual: fd.bpdGaIsManual as boolean, hcGaIsManual: fd.hcGaIsManual as boolean,
       acGaIsManual: fd.acGaIsManual as boolean, flGaIsManual: fd.flGaIsManual as boolean,
       ofdGaIsManual: fd.ofdGaIsManual as boolean, tadGaIsManual: fd.tadGaIsManual as boolean,
       apadGaIsManual: fd.apadGaIsManual as boolean, efwGaIsManual: fd.efwGaIsManual as boolean,
+      tcdGaIsManual: fd.tcdGaIsManual as boolean,
       efwIsManual: fd.efwIsManual as boolean,
       gestationalAgeFromBiometryIsManual: fd.gestationalAgeFromBiometryIsManual as boolean,
     });
@@ -636,7 +656,7 @@ export function useExaminationForm({
   // Deliberately only track measurement + GA changes (not IsManual flags) to avoid loops
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    formData.bpd, formData.hc, formData.ac, formData.fl, formData.ofd, formData.efw,
+    formData.bpd, formData.hc, formData.ac, formData.fl, formData.ofd, formData.efw, formData.tcd,
     formData.gestationalAge, isFt,
   ]);
 
@@ -646,16 +666,18 @@ export function useExaminationForm({
     const diff = computeBiometryDerivedFields({
       bpd: fd.t2_bpd as string, hc: fd.t2_hc as string, ac: fd.t2_ac as string,
       fl: fd.t2_fl as string, ofd: fd.t2_ofd as string, tad: fd.t2_tad as string,
-      apad: fd.t2_apad as string, efw: fd.t2_efw as string,
+      apad: fd.t2_apad as string, efw: fd.t2_efw as string, tcd: fd.t2_tcd as string,
       gestationalAge: fd.gestationalAge as string,
       gestationalAgeFromBiometry: fd.t2_gestationalAgeFromBiometry as string,
       bpdPercentile: fd.t2_bpdPercentile as string, hcPercentile: fd.t2_hcPercentile as string,
       acPercentile: fd.t2_acPercentile as string, flPercentile: fd.t2_flPercentile as string,
       ofdPercentile: fd.t2_ofdPercentile as string, tadPercentile: fd.t2_tadPercentile as string,
       apadPercentile: fd.t2_apadPercentile as string, efwPercentile: fd.t2_efwPercentile as string,
+      tcdPercentile: fd.t2_tcdPercentile as string,
       bpdGa: fd.t2_bpdGa as string, hcGa: fd.t2_hcGa as string, acGa: fd.t2_acGa as string,
       flGa: fd.t2_flGa as string, ofdGa: fd.t2_ofdGa as string, tadGa: fd.t2_tadGa as string,
       apadGa: fd.t2_apadGa as string, efwGa: fd.t2_efwGa as string,
+      tcdGa: fd.t2_tcdGa as string,
       bpdPercentileIsManual: fd.t2_bpdPercentileIsManual as boolean,
       hcPercentileIsManual: fd.t2_hcPercentileIsManual as boolean,
       acPercentileIsManual: fd.t2_acPercentileIsManual as boolean,
@@ -664,10 +686,12 @@ export function useExaminationForm({
       tadPercentileIsManual: fd.t2_tadPercentileIsManual as boolean,
       apadPercentileIsManual: fd.t2_apadPercentileIsManual as boolean,
       efwPercentileIsManual: fd.t2_efwPercentileIsManual as boolean,
+      tcdPercentileIsManual: fd.t2_tcdPercentileIsManual as boolean,
       bpdGaIsManual: fd.t2_bpdGaIsManual as boolean, hcGaIsManual: fd.t2_hcGaIsManual as boolean,
       acGaIsManual: fd.t2_acGaIsManual as boolean, flGaIsManual: fd.t2_flGaIsManual as boolean,
       ofdGaIsManual: fd.t2_ofdGaIsManual as boolean, tadGaIsManual: fd.t2_tadGaIsManual as boolean,
       apadGaIsManual: fd.t2_apadGaIsManual as boolean, efwGaIsManual: fd.t2_efwGaIsManual as boolean,
+      tcdGaIsManual: fd.t2_tcdGaIsManual as boolean,
       efwIsManual: fd.t2_efwIsManual as boolean,
       gestationalAgeFromBiometryIsManual: fd.t2_gestationalAgeFromBiometryIsManual as boolean,
     });
@@ -679,7 +703,7 @@ export function useExaminationForm({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     formData.t2_bpd, formData.t2_hc, formData.t2_ac, formData.t2_fl,
-    formData.t2_ofd, formData.t2_efw, formData.gestationalAge, isFt, isTwins,
+    formData.t2_ofd, formData.t2_efw, formData.t2_tcd, formData.gestationalAge, isFt, isTwins,
   ]);
 
   useEffect(() => {
@@ -761,7 +785,7 @@ export function useExaminationForm({
       const derivedManualFields = [
         'bpdPercentile', 'hcPercentile', 'acPercentile', 'flPercentile',
         'ofdPercentile', 'efwPercentile', 'bpdGa', 'hcGa',
-        'acGa', 'flGa', 'ofdGa', 'efwGa',
+        'acGa', 'flGa', 'ofdGa', 'efwGa', 'tcdPercentile', 'tcdGa',
         'gestationalAgeFromBiometry',
       ];
       const measurementManualDependencies: Record<string, string[]> = {
@@ -770,9 +794,10 @@ export function useExaminationForm({
         ac: ['efw', 'gestationalAgeFromBiometry', 'acPercentile', 'acGa', 'efwPercentile', 'efwGa'],
         fl: ['efw', 'gestationalAgeFromBiometry', 'flPercentile', 'flGa', 'efwPercentile', 'efwGa'],
         ofd: ['ofdPercentile', 'ofdGa'],
-        gestationalAge: ['bpdPercentile', 'hcPercentile', 'acPercentile', 'flPercentile', 'ofdPercentile', 'efwPercentile'],
-        last_menstrual_period: ['gestationalAge', 'bpdPercentile', 'hcPercentile', 'acPercentile', 'flPercentile', 'ofdPercentile', 'efwPercentile'],
-        examDate: ['gestationalAge', 'bpdPercentile', 'hcPercentile', 'acPercentile', 'flPercentile', 'ofdPercentile', 'efwPercentile'],
+        tcd: ['tcdPercentile', 'tcdGa'],
+        gestationalAge: ['bpdPercentile', 'hcPercentile', 'acPercentile', 'flPercentile', 'ofdPercentile', 'efwPercentile', 'tcdPercentile'],
+        last_menstrual_period: ['gestationalAge', 'bpdPercentile', 'hcPercentile', 'acPercentile', 'flPercentile', 'ofdPercentile', 'efwPercentile', 'tcdPercentile'],
+        examDate: ['gestationalAge', 'bpdPercentile', 'hcPercentile', 'acPercentile', 'flPercentile', 'ofdPercentile', 'efwPercentile', 'tcdPercentile'],
       };
       const measurementField = field.startsWith('t2_') ? field.slice(3) : field;
       const prefix = field.startsWith('t2_') ? 't2_' : '';
@@ -794,6 +819,7 @@ export function useExaminationForm({
         next.t2_flPercentileIsManual = false;
         next.t2_ofdPercentileIsManual = false;
         next.t2_efwPercentileIsManual = false;
+        next.t2_tcdPercentileIsManual = false;
         return next;
       }
 
@@ -1092,6 +1118,7 @@ export function useExaminationForm({
     { formKey: 'acGa',   payloadPath: 'biometry.acGa',   outType: 'trim' },
     { formKey: 'flGa',   payloadPath: 'biometry.flGa',   outType: 'trim' },
     { formKey: 'efwGa',  payloadPath: 'biometry.efwGa',  outType: 'trim' },
+    { formKey: 'tcdGa',  payloadPath: 'biometry.tcdGa',  outType: 'trim' },
     // KI-009: T1 persisted percentile fields (integer)
     { formKey: 'bpdPercentile',  payloadPath: 'biometry.bpdPercentile',  outType: 'integer' },
     { formKey: 'hcPercentile',   payloadPath: 'biometry.hcPercentile',   outType: 'integer' },
@@ -1101,6 +1128,7 @@ export function useExaminationForm({
     { formKey: 'tadPercentile',  payloadPath: 'biometry.tadPercentile',  outType: 'integer' },
     { formKey: 'apadPercentile', payloadPath: 'biometry.apadPercentile', outType: 'integer' },
     { formKey: 'efwPercentile',  payloadPath: 'biometry.efwPercentile',  outType: 'integer' },
+    { formKey: 'tcdPercentile',  payloadPath: 'biometry.tcdPercentile',  outType: 'integer' },
     // ── T1 doppler ────────────────────────────────────────────────────────────
     { formKey: 'pi',       payloadPath: 'doppler.pi',       outType: 'float' },
     { formKey: 'ri',       payloadPath: 'doppler.ri',       outType: 'float' },
@@ -1139,6 +1167,7 @@ export function useExaminationForm({
     { formKey: 't2_acGa',   payloadPath: 'biometry2.acGa',   outType: 'trim', onlyWhen: () => isTwins },
     { formKey: 't2_flGa',   payloadPath: 'biometry2.flGa',   outType: 'trim', onlyWhen: () => isTwins },
     { formKey: 't2_efwGa',  payloadPath: 'biometry2.efwGa',  outType: 'trim', onlyWhen: () => isTwins },
+    { formKey: 't2_tcdGa',  payloadPath: 'biometry2.tcdGa',  outType: 'trim', onlyWhen: () => isTwins },
     // KI-009: T2 persisted percentile fields (integer)
     { formKey: 't2_bpdPercentile',  payloadPath: 'biometry2.bpdPercentile',  outType: 'integer', onlyWhen: () => isTwins },
     { formKey: 't2_hcPercentile',   payloadPath: 'biometry2.hcPercentile',   outType: 'integer', onlyWhen: () => isTwins },
@@ -1148,6 +1177,7 @@ export function useExaminationForm({
     { formKey: 't2_tadPercentile',  payloadPath: 'biometry2.tadPercentile',  outType: 'integer', onlyWhen: () => isTwins },
     { formKey: 't2_apadPercentile', payloadPath: 'biometry2.apadPercentile', outType: 'integer', onlyWhen: () => isTwins },
     { formKey: 't2_efwPercentile',  payloadPath: 'biometry2.efwPercentile',  outType: 'integer', onlyWhen: () => isTwins },
+    { formKey: 't2_tcdPercentile',  payloadPath: 'biometry2.tcdPercentile',  outType: 'integer', onlyWhen: () => isTwins },
     // ── T2 doppler ────────────────────────────────────────────────────────────
     { formKey: 't2_pi',       payloadPath: 'doppler2.pi',       outType: 'float',   onlyWhen: () => isTwins },
     { formKey: 't2_ri',       payloadPath: 'doppler2.ri',       outType: 'float',   onlyWhen: () => isTwins },
@@ -1226,8 +1256,9 @@ export function useExaminationForm({
       const bioIsManualFields = [
         'bpdPercentileIsManual', 'hcPercentileIsManual', 'acPercentileIsManual', 'flPercentileIsManual',
         'ofdPercentileIsManual', 'tadPercentileIsManual', 'apadPercentileIsManual', 'efwPercentileIsManual',
+        'tcdPercentileIsManual',
         'bpdGaIsManual', 'hcGaIsManual', 'acGaIsManual', 'flGaIsManual',
-        'ofdGaIsManual', 'tadGaIsManual', 'apadGaIsManual', 'efwGaIsManual', 'efwIsManual',
+        'ofdGaIsManual', 'tadGaIsManual', 'apadGaIsManual', 'efwGaIsManual', 'tcdGaIsManual', 'efwIsManual',
         'gestationalAgeFromBiometryIsManual',
       ];
       // gestationalAgeFromBiometryIsManual must travel with the biometry object.

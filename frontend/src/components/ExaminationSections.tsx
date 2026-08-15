@@ -300,11 +300,11 @@ export default function ExaminationSections({
               <div style={bioValueRightStyle}>{fmtVal(bio?.efw, 'g')}</div>
               <div style={bioValueStyle}>{valueWithManualDot(fmtPct(bio?.efwPercentile ?? efwPct), bio?.efwPercentileIsManual)}</div>
               <div style={bioValueStyle}>{valueWithManualDot(bio?.efwGa ?? '—', bio?.efwGaIsManual)}</div>
-              {/* TCD–LC rows — no GA formula, col 4 shows '—' */}
+              {/* TCD row — with GA and percentile */}
               <div style={bioLabelStyle}>TCD (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.tcd, 'mm')}</div>
-              <div style={bioValueStyle}>{fmtPct(undefined)}</div>
-              <div style={bioValueStyle}>{'—'}</div>
+              <div style={bioValueStyle}>{valueWithManualDot(fmtPct(bio?.tcdPercentile), bio?.tcdPercentileIsManual)}</div>
+              <div style={bioValueStyle}>{valueWithManualDot(bio?.tcdGa ?? '—', bio?.tcdGaIsManual)}</div>
               <div style={bioLabelStyle}>Vp</div>
               <div style={bioValueRightStyle}>{bio?.vp ?? '—'}</div>
               <div style={bioValueStyle}>{fmtPct(undefined)}</div>
@@ -332,9 +332,9 @@ export default function ExaminationSections({
               {/* Footnote row — spans all 4 columns; only shown when any derived field was manually entered */}
               {(bio?.bpdPercentileIsManual || bio?.hcPercentileIsManual || bio?.acPercentileIsManual
                 || bio?.flPercentileIsManual || bio?.ofdPercentileIsManual || bio?.efwPercentileIsManual
-                || bio?.bpdGaIsManual || bio?.hcGaIsManual || bio?.acGaIsManual
+                || bio?.tcdPercentileIsManual || bio?.bpdGaIsManual || bio?.hcGaIsManual || bio?.acGaIsManual
                 || bio?.flGaIsManual || bio?.ofdGaIsManual || bio?.efwGaIsManual
-                || bio?.efwIsManual || bio?.gestationalAgeFromBiometryIsManual) && (
+                || bio?.tcdGaIsManual || bio?.efwIsManual || bio?.gestationalAgeFromBiometryIsManual) && (
                 <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#525252', fontStyle: 'italic', marginTop: '0.25rem' }}>
                   <AutoCalcDot size={5} /> Values manually entered
                 </div>

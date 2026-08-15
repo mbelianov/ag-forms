@@ -29,6 +29,7 @@ export interface BiometryViewModel {
   ofdPct?: string;
   tadPct?: string;
   apadPct?: string;
+  tcdPct?: string;
   // Sub-Task 4: Per-measurement GA strings (all string | undefined)
   bpdGa?: string;
   ofdGa?: string;
@@ -38,6 +39,7 @@ export interface BiometryViewModel {
   acGa?: string;
   flGa?: string;
   efwGa?: string;
+  tcdGa?: string;
 }
 
 export interface DopplerViewModel {

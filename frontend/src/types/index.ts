@@ -90,6 +90,7 @@ export interface Biometry {
   acGa?:    string;   // GA derived from AC
   flGa?:    string;   // GA derived from FL
   efwGa?:   string;   // GA derived from EFW
+  tcdGa?:   string;   // GA derived from TCD
   // Sub-Task 3: Persisted percentile fields (v2 expanded set)
   bpdPercentile?:   number;   // BPD percentile
   ofdPercentile?:   number;   // OFD percentile (NEW — v2)
@@ -99,6 +100,7 @@ export interface Biometry {
   acPercentile?:    number;   // AC percentile
   flPercentile?:    number;   // FL percentile
   efwPercentile?:   number;   // EFW percentile
+  tcdPercentile?:   number;   // TCD percentile
   efwIsManual?: boolean;
   gestationalAgeFromBiometryIsManual?: boolean; // KI-009: flag for gestationalAgeFromBiometry field
   // KI-009: IsManual flags (true when user overrode the auto-calculated value)
@@ -110,6 +112,7 @@ export interface Biometry {
   tadPercentileIsManual?:   boolean;
   apadPercentileIsManual?:  boolean;
   efwPercentileIsManual?:   boolean;
+  tcdPercentileIsManual?:   boolean;
   bpdGaIsManual?:   boolean;
   hcGaIsManual?:    boolean;
   acGaIsManual?:    boolean;
@@ -118,6 +121,7 @@ export interface Biometry {
   tadGaIsManual?:   boolean;
   apadGaIsManual?:  boolean;
   efwGaIsManual?:   boolean;
+  tcdGaIsManual?:   boolean;
 }
 
 export interface Doppler {

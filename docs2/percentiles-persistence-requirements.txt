@@ -1,6 +1,6 @@
 ================================================================================
 REQUIREMENTS: Biometry Percentile & GA-from-Measurement Persistence
-Version: 1.9
+Version: 1.10
 Scope: Prenatal ultrasound exams (ultrasound_prenatal, ultrasound_prenatal_twins)
        AND First-Trimester exams (ultrasound_first_trimester,
        ultrasound_first_trimester_twins) where explicitly noted.
@@ -96,7 +96,7 @@ SECTION 1 — PRENATAL BIOMETRY: FIELD DEFINITIONS
 
 REQ-1  Per-measurement percentile fields
   For each of the following quantitative prenatal biometry measurements —
-  BPD, HC, AC, FL, OFD, TAD, APAD, EFW — a dedicated percentile storage field
+  BPD, HC, AC, FL, OFD, TAD, APAD, EFW, TCD — a dedicated percentile storage field
   must exist in the Biometry entity: {field}Percentile (e.g. bpdPercentile).
 
   Field type:  integer, range 1–99 (inclusive), optional.
@@ -105,7 +105,7 @@ REQ-1  Per-measurement percentile fields
 
 REQ-2  Per-measurement GA-from-measurement fields
   For each of the following quantitative prenatal biometry measurements —
-  BPD, HC, AC, FL, OFD, TAD, APAD, EFW — a dedicated GA storage field must
+  BPD, HC, AC, FL, OFD, TAD, APAD, EFW, TCD — a dedicated GA storage field must
   exist in the Biometry entity: {field}Ga (e.g. bpdGa).
 
   Field type:  string, format "Xw Yd" (e.g. "28w 3d"), optional.
@@ -133,16 +133,23 @@ REQ-4  Auto-calculation of percentile fields
   Hadlock 1984 formula in calculations.ts (calcBiometryPercentiles).
   The EFW percentile is auto-calculated using the existing Combs 1993 formula
   (calcEFWPercentile).
+  The OFD percentile is auto-calculated using the Hadlock 1984 formula
+  (calcOFDPercentile) — see FORM-8b.
+  The TCD percentile is auto-calculated using the Chang 2000 formula
+  (calcTCDPercentile) — see FORM-15b.
 
   Auto-calculation formulas and fields in scope:
     - bpdPercentile, hcPercentile, acPercentile, flPercentile:
-        via calcBiometryPercentiles (requires BPD, HC, AC, FL, and GA from LMP)
+        via calcBiometryPercentiles (requires BPD, HC, AC, FL, and GA from LMP)  [IMPLEMENTED]
     - efwPercentile:
-        via calcEFWPercentile (requires EFW_observed and GA from LMP)
+        via calcEFWPercentile (requires EFW_observed and GA from LMP)  [IMPLEMENTED]
+    - ofdPercentile:
+        via calcOFDPercentile (requires OFD_observed and GA from LMP) — see FORM-8b  [IMPLEMENTED]
+    - tcdPercentile:
+        via calcTCDPercentile (requires TCD_observed and GA from LMP) — see FORM-15b  [PLANNED]
 
-  OFD, TAD, and APAD percentiles have no accepted auto-calculation formula in
-  scope for this release; they support manual entry only (REQ-8) and are never
-  auto-calculated.
+  TAD and APAD percentiles have no accepted auto-calculation formula in scope;
+  they support manual entry only (REQ-8) and are never auto-calculated.
 
   Auto-calculation fires when ALL of the following conditions are met:
     a) The measurement field itself is non-empty and passes field validation.
@@ -165,14 +172,15 @@ REQ-5  Auto-calculation of GA-from-measurement fields
   is entered and a formula for that measurement exists in calculations.ts.
 
   Auto-calculation formulas and fields in scope:
-    - bpdGa:   Hadlock Radiology 1984 (direct BPD quadratic, 14–40 wk)  — see FORM-4a
-    - hcGa:    Hadlock Radiology 1984 (direct HC cubic, 14–40 wk)       — see FORM-5a
-    - acGa:    Hadlock Radiology 1984 (direct AC quadratic, 14–40 wk)   — see FORM-6a
-    - flGa:    Hadlock Radiology 1984 (direct FL quadratic, 14–40 wk)   — see FORM-7a
-    - ofdGa:   Hadlock Obstet Gynecol 1984 (inverse OFD cubic, 14–40 wk) — see FORM-8a
+    - bpdGa:   Hadlock Radiology 1984 (direct BPD quadratic, 14–40 wk)  — see FORM-4a  [IMPLEMENTED]
+    - hcGa:    Hadlock Radiology 1984 (direct HC cubic, 14–40 wk)       — see FORM-5a  [IMPLEMENTED]
+    - acGa:    Hadlock Radiology 1984 (direct AC quadratic, 14–40 wk)   — see FORM-6a  [IMPLEMENTED]
+    - flGa:    Hadlock Radiology 1984 (direct FL quadratic, 14–40 wk)   — see FORM-7a  [IMPLEMENTED]
+    - ofdGa:   Hadlock Obstet Gynecol 1984 (inverse OFD cubic, 14–40 wk) — see FORM-8a  [IMPLEMENTED]
     - tadGa:   No formula in scope — manual entry only         — see FORM-9
     - apadGa:  No formula in scope — manual entry only         — see FORM-10
-    - efwGa:   Inverse of Combs 1993 quadratic (16–40 wk)     — see FORM-11b
+    - efwGa:   Inverse of Combs 1993 quadratic (16–40 wk)     — see FORM-11b  [IMPLEMENTED]
+    - tcdGa:   Chang 2000 (algebraic inverse of linear, 14–40 wk)       — see FORM-15a  [PLANNED]
 
   The trigger and suppression rules are the same as REQ-4 (reactive, no buttons),
   using the {field}GaIsManual indicator.
@@ -310,6 +318,7 @@ SECTION 7 — FORMULA REFERENCE
     FORM-12  CRL (FT) — GA from measurement, percentile
     FORM-13  NT  (FT) — percentile
     FORM-14  NB  (FT) — assessment
+    FORM-15  TCD — GA from measurement, percentile
 
 ────────────────────────────────────────────────────────────────────────────────
 FORM-1  GA from LMP  [IMPLEMENTED — calcGAFromLMP]
@@ -351,7 +360,7 @@ FORM-3  Composite GA from biometry  [IMPLEMENTED — calcGAFromBiometry]
 ════════════════════════════════════════════════════════════════════════════════
 
 ────────────────────────────────────────────────────────────────────────────────
-FORM-4a  BPD — GA from measurement  [PLANNED — calcGAFromBPD]
+FORM-4a  BPD — GA from measurement  [IMPLEMENTED — calcGAFromBPD]
 ────────────────────────────────────────────────────────────────────────────────
   Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
           Radiology. 1984;152(2):497–501.  PMID 6739822  (Table 1, BPD equation)
@@ -396,7 +405,7 @@ FORM-4b  BPD — percentile  [IMPLEMENTED — calcBiometryPercentiles (bpd field
 ════════════════════════════════════════════════════════════════════════════════
 
 ────────────────────────────────────────────────────────────────────────────────
-FORM-5a  HC — GA from measurement  [PLANNED — calcGAFromHC]
+FORM-5a  HC — GA from measurement  [IMPLEMENTED — calcGAFromHC]
 ────────────────────────────────────────────────────────────────────────────────
   Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
           Radiology. 1984;152(2):497–501.  PMID 6739822  (Table 1, HC equation)
@@ -440,7 +449,7 @@ FORM-5b  HC — percentile  [IMPLEMENTED — calcBiometryPercentiles (hc field)]
 ════════════════════════════════════════════════════════════════════════════════
 
 ────────────────────────────────────────────────────────────────────────────────
-FORM-6a  AC — GA from measurement  [PLANNED — calcGAFromAC]
+FORM-6a  AC — GA from measurement  [IMPLEMENTED — calcGAFromAC]
 ────────────────────────────────────────────────────────────────────────────────
   Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
           Radiology. 1984;152(2):497–501.  PMID 6739822  (Table 1, AC equation)
@@ -482,7 +491,7 @@ FORM-6b  AC — percentile  [IMPLEMENTED — calcBiometryPercentiles (ac field)]
 ════════════════════════════════════════════════════════════════════════════════
 
 ────────────────────────────────────────────────────────────────────────────────
-FORM-7a  FL — GA from measurement  [PLANNED — calcGAFromFL]
+FORM-7a  FL — GA from measurement  [IMPLEMENTED — calcGAFromFL]
 ────────────────────────────────────────────────────────────────────────────────
   Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
           Radiology. 1984;152(2):497–501.  PMID 6739822  (Table 1, FL equation)
@@ -524,7 +533,7 @@ FORM-7b  FL — percentile  [IMPLEMENTED — calcBiometryPercentiles (fl field)]
 ════════════════════════════════════════════════════════════════════════════════
 
 ────────────────────────────────────────────────────────────────────────────────
-FORM-8a  OFD — GA from measurement  [PLANNED — calcGAFromOFD]
+FORM-8a  OFD — GA from measurement  [IMPLEMENTED — calcGAFromOFD]
 ────────────────────────────────────────────────────────────────────────────────
   Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
           Obstet Gynecol. 1984;63(4):457–65.  (Table 3, OFD equation)
@@ -575,7 +584,7 @@ FORM-8a  OFD — GA from measurement  [PLANNED — calcGAFromOFD]
   Valid range: 14–40 weeks
 
 ────────────────────────────────────────────────────────────────────────────────
-FORM-8b  OFD — percentile  [PLANNED — calcOFDPercentile]
+FORM-8b  OFD — percentile  [IMPLEMENTED — calcOFDPercentile]
 ────────────────────────────────────────────────────────────────────────────────
   Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
           Obstet Gynecol. 1984;63(4):457–65.
@@ -634,7 +643,7 @@ FORM-11a  EFW — calculation from biometry  [IMPLEMENTED — calcEFW]
   Valid range: 14–40 weeks
 
 ────────────────────────────────────────────────────────────────────────────────
-FORM-11b  EFW — GA from measurement  [PLANNED — calcGAFromEFW]
+FORM-11b  EFW — GA from measurement  [IMPLEMENTED — calcGAFromEFW]
 ────────────────────────────────────────────────────────────────────────────────
   Source: Inverse of Combs 1993 log-normal reference (FORM-11c).
   Approach: The EFW_mean from the Combs 1993 model (FORM-11c) defines the
@@ -738,20 +747,89 @@ FORM-14  NB — assessment  [FUTURE — not in current sprint]
   Priority: LOW — implement a qualitative present/absent field before a
     continuous percentile. Continuous percentile deferred.
 
+════════════════════════════════════════════════════════════════════════════════
+  TCD (Transverse Cerebellar Diameter)
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-15a  TCD — GA from measurement  [PLANNED — calcGAFromTCD]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Chang CH, Yu CH, Chang FM, Ko HC, Chen HY.
+          "Three-dimensional ultrasound in the assessment of fetal cerebellar
+          transverse and antero-posterior diameters."
+          Ultrasound Med Biol. 2000 Feb;26(2):175–82.  PMID 10722905
+
+  NOTE ON FORMULA DIRECTION (see SECTION 0 for general policy)
+  ──────────────────────────────────────────────────────────────
+  The Chang 2000 paper provides a single linear forward model:
+    TCD_mean_mm = −10.632 + 1.5486 × ga
+  This is a forward model (GA as the independent variable), not a direct-
+  regression GA equation. However, because the relationship is strictly linear
+  in GA, the algebraic inversion is exact — there is no bias from inverting a
+  linear regression beyond the ordinary regression-dilution effect, which here
+  is symmetric.  Newton–Raphson iteration is not required.
+
+  No direct-regression GA equation (GA as dependent variable) exists for TCD
+  in the Chang 2000 paper. The algebraic inversion of the linear forward model
+  is therefore the closest clinically defensible approach, consistent with the
+  same forced-choice rationale applied to OFD (see FORM-8a).
+
+  Forward formula (TCD_mean_mm from GA):
+    TCD_mean_mm = −10.632 + 1.5486 × ga
+  Inverse (GA from TCD_observed): exact algebraic inversion of the linear model:
+    ga = (TCD_observed_mm + 10.632) ÷ 1.5486
+  Input:  TCD_observed in mm (no unit conversion required; formula uses mm)
+  Output: string "Xw Yd" → stored as tcdGa
+  Valid range: 14–40 weeks (TCD ≈ 10.0 mm at 14w, ≈ 51.3 mm at 40w)
+  SEE: ±2.96 mm at any GA (reported SD from source paper — see FORM-15b)
+
+  Validation reference values (from linear formula):
+    ga=20w → TCD_mean ≈ 20.3 mm   (published norms: ~19–21 mm; ✓)
+    ga=28w → TCD_mean ≈ 32.7 mm   (published norms: ~31–34 mm; ✓)
+    ga=32w → TCD_mean ≈ 38.9 mm   (published norms: ~37–40 mm; ✓)
+    ga=36w → TCD_mean ≈ 45.1 mm   (published norms: ~43–47 mm; ✓)
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-15b  TCD — percentile  [PLANNED — calcTCDPercentile]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Chang CH, Yu CH, Chang FM, Ko HC, Chen HY.
+          "Three-dimensional ultrasound in the assessment of fetal cerebellar
+          transverse and antero-posterior diameters."
+          Ultrasound Med Biol. 2000 Feb;26(2):175–82.  PMID 10722905
+  Formula:
+    TCD_mean_mm = −10.632 + 1.5486 × ga
+    SD_TCD      = 2.96  (absolute constant, mm — as reported in source paper)
+    z           = (TCD_observed_mm − TCD_mean_mm) ÷ SD_TCD
+    percentile  = clamp(Φ(z) × 100)
+  Inputs: TCD_observed (mm, no conversion needed), GA from LMP string
+  Output: integer 1–99 → stored as tcdPercentile
+  Valid range: 14–40 weeks
+
+  NOTE ON SD MODELLING
+  ─────────────────────
+  The Chang 2000 paper reports a single constant SD = 2.96 mm across the study
+  range. This is an absolute SD (not a coefficient of variation). Unlike the
+  Hadlock formulas for BPD, HC, AC, FL, and FL which model SD as a fraction of
+  the mean (proportional CV), TCD uses a fixed absolute SD, reflecting that
+  cerebellar measurement variability is roughly constant in mm rather than
+  proportional to the measured value. Applying a CV model here would be
+  clinically incorrect and must not be done.
+
 ────────────────────────────────────────────────────────────────────────────────
 SECTION 8 — DEFERRED / FUTURE SCOPE NOTES
 ────────────────────────────────────────────────────────────────────────────────
 
   The following items are documented for future planning only and must NOT
-  be implemented in the current sprint.
+  be implemented in the current sprint. Items already completed are marked
+  [IMPLEMENTED] and retained for traceability.
 
-REQ-13  OFD auto-calculation sprint
-  When the OFD formula sprint is scheduled, implement calcGAFromOFD and
-  calcOFDPercentile in calculations.ts per FORM-8a and FORM-8b, then wire them
-  into BiometrySection.tsx and the form-state / persistence layer following the
-  same patterns used for BPD, HC, AC, FL.
+REQ-13  OFD auto-calculation sprint  [IMPLEMENTED]
+  calcGAFromOFD and calcOFDPercentile are implemented in calculations.ts and
+  wired into the biometry auto-calc hook (useBiometryAutoCalc.ts) and the
+  form-state / persistence layer, following the same patterns used for BPD, HC,
+  AC, FL. See FORM-8a and FORM-8b (both now marked [IMPLEMENTED]).
 
-REQ-14  First-Trimester percentile sprint
+REQ-14  First-Trimester percentile sprint  [PENDING]
   When the FT percentile sprint is scheduled:
     - NT percentile: implement per FORM-13 (high priority).
     - CRL percentile: implement per FORM-12b (medium priority).

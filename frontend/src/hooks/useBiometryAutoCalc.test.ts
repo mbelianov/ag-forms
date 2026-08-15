@@ -4,22 +4,26 @@ import type { BiometryAutoCalcInput } from './useBiometryAutoCalc';
 
 /** Minimal valid input with all flags false and all measurements populated */
 const BASE_INPUT: BiometryAutoCalcInput = {
-  bpd: '70', hc: '260', ac: '220', fl: '45', ofd: '90',
+  bpd: '70', hc: '260', ac: '220', fl: '45', ofd: '90', tcd: '32.7',
   tad: '', apad: '', efw: '',
   gestationalAge: '28w 0d',
   gestationalAgeFromBiometry: '',
   bpdPercentile: '', hcPercentile: '', acPercentile: '', flPercentile: '',
   ofdPercentile: '', tadPercentile: '', apadPercentile: '', efwPercentile: '',
+  tcdPercentile: '',
   bpdGa: '', hcGa: '', acGa: '', flGa: '',
   ofdGa: '', tadGa: '', apadGa: '', efwGa: '',
+  tcdGa: '',
   bpdPercentileIsManual: false, hcPercentileIsManual: false,
   acPercentileIsManual: false, flPercentileIsManual: false,
   ofdPercentileIsManual: false, tadPercentileIsManual: false,
   apadPercentileIsManual: false, efwPercentileIsManual: false,
+  tcdPercentileIsManual: false,
   bpdGaIsManual: false, hcGaIsManual: false,
   acGaIsManual: false, flGaIsManual: false,
   ofdGaIsManual: false, tadGaIsManual: false,
   apadGaIsManual: false, efwGaIsManual: false,
+  tcdGaIsManual: false,
   efwIsManual: false,
   gestationalAgeFromBiometryIsManual: false,
 };
@@ -36,6 +40,7 @@ describe('computeBiometryDerivedFields', () => {
     expect('flPercentile' in diff).toBe(true);
     expect('ofdPercentile' in diff).toBe(true);
     expect('efwPercentile' in diff).toBe(true);
+    expect('tcdPercentile' in diff).toBe(true);
     expect('efw' in diff).toBe(true);
     expect('gestationalAgeFromBiometry' in diff).toBe(true);
     expect('gestationalAgeFromBiometryIsManual' in diff).toBe(true);
@@ -46,6 +51,7 @@ describe('computeBiometryDerivedFields', () => {
     expect('flGa' in diff).toBe(true);
     expect('ofdGa' in diff).toBe(true);
     expect(diff.ofdGa).toBe('27w 4d');
+    expect('tcdGa' in diff).toBe(true);
     expect('efwGa' in diff).toBe(true);
     expect(diff.ofdPercentile).toBe('37');
   });
@@ -93,6 +99,38 @@ describe('computeBiometryDerivedFields', () => {
     expect('hcGa' in diff).toBe(true);
     expect('acGa' in diff).toBe(true);
     expect('flGa' in diff).toBe(true);
+  });
+
+  it('omits tcdPercentile and tcdPercentileIsManual when tcdPercentileIsManual is true', () => {
+    const diff = computeBiometryDerivedFields({
+      ...BASE_INPUT,
+      tcdPercentileIsManual: true,
+    });
+    expect('tcdPercentile' in diff).toBe(false);
+    expect('tcdPercentileIsManual' in diff).toBe(false);
+    // Other fields are not affected
+    expect('hcPercentile' in diff).toBe(true);
+  });
+
+  it('omits tcdGa and tcdGaIsManual when tcdGaIsManual is true', () => {
+    const diff = computeBiometryDerivedFields({
+      ...BASE_INPUT,
+      tcdGaIsManual: true,
+    });
+    expect('tcdGa' in diff).toBe(false);
+    expect('tcdGaIsManual' in diff).toBe(false);
+    // Other GA fields still calculated
+    expect('hcGa' in diff).toBe(true);
+  });
+
+  it('calculates expected TCD percentile and GA from TCD for known values', () => {
+    const diff = computeBiometryDerivedFields({
+      ...BASE_INPUT,
+      tcd: '32.7',
+      gestationalAge: '28w 0d',
+    });
+    expect(diff.tcdGa).toBe('28w 0d');
+    expect(diff.tcdPercentile).toBe('50');
   });
 
   it('does not include tad/apad fields in the diff (no formula — R-9)', () => {
