@@ -12,6 +12,7 @@ import {
   DatePickerInput,
 } from '@carbon/react';
 import { EXAM_TYPES, getExamTypeLabel } from '../constants/examinationTypes';
+import { autoCalcLabel } from './AutoCalcHelpers';
 import BiometrySection from './sections/BiometrySection';
 import DopplerSection from './sections/DopplerSection';
 import UltrasoundFindingsSection from './sections/UltrasoundFindingsSection';
@@ -52,11 +53,10 @@ export default function ExaminationForm(props: ExaminationFormProps) {
     isTwins,
     isFt,
     isFtTwinsMode,
-    canCalcGAFromLMP,
     edd,
-    handleCalcGAFromLMP,
     handleChange,
     handleChangeT1,
+    handleGaFromBioTwinsChange,
     handleSubmit,
     visibility,
     patientAge,
@@ -65,16 +65,10 @@ export default function ExaminationForm(props: ExaminationFormProps) {
   const { examination, patients, preselectedPatientId, onCancel, isEdit = false } = props;
 
   // ── Layout helpers ────────────────────────────────────────────────────────
-  const row2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' };
+  // row2 removed (KI-009: Notes field removed, Comments expanded to full width)
   const row3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' };
   const row4: React.CSSProperties = { display: 'grid', gridTemplateColumns: '5fr 3fr 2fr 2fr', gap: '0.75rem' };
   const row6: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.75rem' };
-
-  const calcButtonWrap: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'flex-end',
-  };
 
   return (
     <Form onSubmit={handleSubmit} autoComplete="off">
@@ -205,7 +199,7 @@ export default function ExaminationForm(props: ExaminationFormProps) {
             <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Pregnancy Data</h4>
             <Stack gap={3}>
 
-              {/* LMP | Calc | GA from LMP — single row */}
+              {/* LMP | GA from LMP | GA from Bio — single row */}
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'nowrap' }}>
                 <div style={{ flex: '0 0 auto', minWidth: '200px' }}>
                   <DatePicker
@@ -228,27 +222,65 @@ export default function ExaminationForm(props: ExaminationFormProps) {
                   </DatePicker>
                 </div>
 
-                <div style={calcButtonWrap}>
-                  <Button
-                    kind="tertiary"
-                    size="md"
-                    onClick={handleCalcGAFromLMP}
-                    disabled={!canCalcGAFromLMP || isSubmitting}
-                    title={canCalcGAFromLMP ? 'Calculate GA from LMP and Exam Date' : 'Enter LMP to enable calculation'}
-                  >
-                    Calc
-                  </Button>
-                </div>
-
                 <div style={{ flex: 1, minWidth: '180px' }}>
                   <TextInput
                     id="gestationalAge"
-                    labelText="Gestational Age from LMP"
-                    placeholder="e.g., 28w 3d"
+                    labelText={autoCalcLabel('Gestational Age from LMP', formData.gestationalAgeIsManual)}
+                    placeholder="auto"
                     value={formData.gestationalAge}
                     onChange={(e) => handleChange('gestationalAge', e.target.value)}
                     invalid={!!errors.gestationalAge}
                     invalidText={errors.gestationalAge}
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                <div style={{ flex: 1, minWidth: '180px' }}>
+                  <TextInput
+                    id="gestationalAgeFromBiometry"
+                    labelText={autoCalcLabel('GA from Bio',
+                      isFt && !isFtTwinsMode
+                        ? !!formData.t1_ft_gaFromBioIsManual
+                        : isFtTwinsMode
+                          ? (!!formData.t1_ft_gaFromBioIsManual || !!formData.t2_ft_gaFromBioIsManual)
+                          : isTwins
+                            ? (!!formData.gestationalAgeFromBiometryIsManual || !!formData.t2_gestationalAgeFromBiometryIsManual)
+                            : !!formData.gestationalAgeFromBiometryIsManual
+                    )}
+                    placeholder="auto"
+                    value={
+                      isFt && !isFtTwinsMode
+                        ? formData.t1_ft_gaFromBio
+                        : isFtTwinsMode
+                          ? `${formData.t1_ft_gaFromBio} / ${formData.t2_ft_gaFromBio}`
+                          : isTwins
+                            ? `${formData.gestationalAgeFromBiometry || '—'} / ${formData.t2_gestationalAgeFromBiometry || '—'}`
+                            : formData.gestationalAgeFromBiometry
+                    }
+                    onChange={
+                      isFt && !isFtTwinsMode
+                        ? (e) => handleChange('t1_ft_gaFromBio', e.target.value)
+                        : isFtTwinsMode
+                          ? (e) => handleGaFromBioTwinsChange('ft_', e.target.value)
+                          : isTwins
+                            ? (e) => handleGaFromBioTwinsChange('', e.target.value)
+                            : (e) => handleChange('gestationalAgeFromBiometry', e.target.value)
+                    }
+                    invalid={
+                      (isFt && !isFtTwinsMode && !!errors.t1_ft_gaFromBio) ||
+                      (isFtTwinsMode && (!!errors.t1_ft_gaFromBio || !!errors.t2_ft_gaFromBio)) ||
+                      (isTwins && (!!errors.gestationalAgeFromBiometry || !!errors.t2_gestationalAgeFromBiometry)) ||
+                      (!isFt && !isFtTwinsMode && !isTwins && !!errors.gestationalAgeFromBiometry)
+                    }
+                    invalidText={
+                      isFt && !isFtTwinsMode
+                        ? errors.t1_ft_gaFromBio
+                        : isFtTwinsMode
+                          ? (errors.t1_ft_gaFromBio || errors.t2_ft_gaFromBio)
+                          : isTwins
+                            ? (errors.gestationalAgeFromBiometry || errors.t2_gestationalAgeFromBiometry)
+                            : errors.gestationalAgeFromBiometry
+                    }
                     disabled={isSubmitting}
                   />
                 </div>
@@ -328,8 +360,33 @@ export default function ExaminationForm(props: ExaminationFormProps) {
               efw: formData.efw, ofd: formData.ofd, vp: formData.vp, tcd: formData.tcd,
               cm: formData.cm, nuchalFold: formData.nuchalFold, nb: formData.nb,
               apad: formData.apad, tad: formData.tad, la: formData.la, lc: formData.lc,
-              gestationalAgeFromBiometry: formData.gestationalAgeFromBiometry,
               gestationalAge: formData.gestationalAge,
+              // KI-009: Persisted percentile and GA fields
+              bpdPercentile: formData.bpdPercentile, hcPercentile: formData.hcPercentile,
+              acPercentile: formData.acPercentile, flPercentile: formData.flPercentile,
+              ofdPercentile: formData.ofdPercentile, tadPercentile: formData.tadPercentile,
+              apadPercentile: formData.apadPercentile, efwPercentile: formData.efwPercentile,
+              tcdPercentile: formData.tcdPercentile,
+              bpdGa: formData.bpdGa, hcGa: formData.hcGa, acGa: formData.acGa,
+              flGa: formData.flGa, ofdGa: formData.ofdGa, tadGa: formData.tadGa,
+              apadGa: formData.apadGa, efwGa: formData.efwGa,
+              tcdGa: formData.tcdGa,
+              // KI-009: IsManual flags
+              bpdPercentileIsManual: formData.bpdPercentileIsManual,
+              hcPercentileIsManual: formData.hcPercentileIsManual,
+              acPercentileIsManual: formData.acPercentileIsManual,
+              flPercentileIsManual: formData.flPercentileIsManual,
+              ofdPercentileIsManual: formData.ofdPercentileIsManual,
+              tadPercentileIsManual: formData.tadPercentileIsManual,
+              apadPercentileIsManual: formData.apadPercentileIsManual,
+              efwPercentileIsManual: formData.efwPercentileIsManual,
+              tcdPercentileIsManual: formData.tcdPercentileIsManual,
+              bpdGaIsManual: formData.bpdGaIsManual, hcGaIsManual: formData.hcGaIsManual,
+              acGaIsManual: formData.acGaIsManual, flGaIsManual: formData.flGaIsManual,
+              ofdGaIsManual: formData.ofdGaIsManual, tadGaIsManual: formData.tadGaIsManual,
+              apadGaIsManual: formData.apadGaIsManual, efwGaIsManual: formData.efwGaIsManual,
+              tcdGaIsManual: formData.tcdGaIsManual,
+              efwIsManual: formData.efwIsManual,
             }}
             errors={errors}
             onChange={handleChangeT1}
@@ -473,19 +530,42 @@ export default function ExaminationForm(props: ExaminationFormProps) {
                 <div>
                   <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Biometry</h5>
                   <BiometrySection
-                    prefix="t1"
-                    data={{
-                      bpd: formData.bpd, hc: formData.hc, ac: formData.ac, fl: formData.fl,
-                      efw: formData.efw, ofd: formData.ofd, vp: formData.vp, tcd: formData.tcd,
-                      cm: formData.cm, nuchalFold: formData.nuchalFold, nb: formData.nb,
-                      apad: formData.apad, tad: formData.tad, la: formData.la, lc: formData.lc,
-                      gestationalAgeFromBiometry: formData.gestationalAgeFromBiometry,
-                      gestationalAge: formData.gestationalAge,
-                    }}
-                    errors={errors}
-                    onChange={handleChangeT1}
-                    isSubmitting={isSubmitting}
-                  />
+                   prefix="t1"
+                   data={{
+                     bpd: formData.bpd, hc: formData.hc, ac: formData.ac, fl: formData.fl,
+                     efw: formData.efw, ofd: formData.ofd, vp: formData.vp, tcd: formData.tcd,
+                     cm: formData.cm, nuchalFold: formData.nuchalFold, nb: formData.nb,
+                     apad: formData.apad, tad: formData.tad, la: formData.la, lc: formData.lc,
+                     gestationalAge: formData.gestationalAge,
+                     bpdPercentile: formData.bpdPercentile, hcPercentile: formData.hcPercentile,
+                     acPercentile: formData.acPercentile, flPercentile: formData.flPercentile,
+                     ofdPercentile: formData.ofdPercentile, tadPercentile: formData.tadPercentile,
+                     apadPercentile: formData.apadPercentile, efwPercentile: formData.efwPercentile,
+                     tcdPercentile: formData.tcdPercentile,
+                     bpdGa: formData.bpdGa, hcGa: formData.hcGa, acGa: formData.acGa,
+                     flGa: formData.flGa, ofdGa: formData.ofdGa, tadGa: formData.tadGa,
+                     apadGa: formData.apadGa, efwGa: formData.efwGa,
+                     tcdGa: formData.tcdGa,
+                     bpdPercentileIsManual: formData.bpdPercentileIsManual,
+                     hcPercentileIsManual: formData.hcPercentileIsManual,
+                     acPercentileIsManual: formData.acPercentileIsManual,
+                     flPercentileIsManual: formData.flPercentileIsManual,
+                     ofdPercentileIsManual: formData.ofdPercentileIsManual,
+                     tadPercentileIsManual: formData.tadPercentileIsManual,
+                     apadPercentileIsManual: formData.apadPercentileIsManual,
+                     efwPercentileIsManual: formData.efwPercentileIsManual,
+                     tcdPercentileIsManual: formData.tcdPercentileIsManual,
+                     bpdGaIsManual: formData.bpdGaIsManual, hcGaIsManual: formData.hcGaIsManual,
+                     acGaIsManual: formData.acGaIsManual, flGaIsManual: formData.flGaIsManual,
+                     ofdGaIsManual: formData.ofdGaIsManual, tadGaIsManual: formData.tadGaIsManual,
+                     apadGaIsManual: formData.apadGaIsManual, efwGaIsManual: formData.efwGaIsManual,
+                     tcdGaIsManual: formData.tcdGaIsManual,
+                     efwIsManual: formData.efwIsManual,
+                   }}
+                   errors={errors}
+                   onChange={handleChangeT1}
+                   isSubmitting={isSubmitting}
+                 />
                 </div>
                 <div>
                   <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Biometry</h5>
@@ -496,8 +576,31 @@ export default function ExaminationForm(props: ExaminationFormProps) {
                       efw: formData.t2_efw, ofd: formData.t2_ofd, vp: formData.t2_vp, tcd: formData.t2_tcd,
                       cm: formData.t2_cm, nuchalFold: formData.t2_nuchalFold, nb: formData.t2_nb,
                       apad: formData.t2_apad, tad: formData.t2_tad, la: formData.t2_la, lc: formData.t2_lc,
-                      gestationalAgeFromBiometry: formData.t2_gestationalAgeFromBiometry,
                       gestationalAge: formData.gestationalAge,
+                      bpdPercentile: formData.t2_bpdPercentile, hcPercentile: formData.t2_hcPercentile,
+                      acPercentile: formData.t2_acPercentile, flPercentile: formData.t2_flPercentile,
+                      ofdPercentile: formData.t2_ofdPercentile, tadPercentile: formData.t2_tadPercentile,
+                      apadPercentile: formData.t2_apadPercentile, efwPercentile: formData.t2_efwPercentile,
+                      tcdPercentile: formData.t2_tcdPercentile,
+                      bpdGa: formData.t2_bpdGa, hcGa: formData.t2_hcGa, acGa: formData.t2_acGa,
+                      flGa: formData.t2_flGa, ofdGa: formData.t2_ofdGa, tadGa: formData.t2_tadGa,
+                      apadGa: formData.t2_apadGa, efwGa: formData.t2_efwGa,
+                      tcdGa: formData.t2_tcdGa,
+                      bpdPercentileIsManual: formData.t2_bpdPercentileIsManual,
+                      hcPercentileIsManual: formData.t2_hcPercentileIsManual,
+                      acPercentileIsManual: formData.t2_acPercentileIsManual,
+                      flPercentileIsManual: formData.t2_flPercentileIsManual,
+                      ofdPercentileIsManual: formData.t2_ofdPercentileIsManual,
+                      tadPercentileIsManual: formData.t2_tadPercentileIsManual,
+                      apadPercentileIsManual: formData.t2_apadPercentileIsManual,
+                      efwPercentileIsManual: formData.t2_efwPercentileIsManual,
+                      tcdPercentileIsManual: formData.t2_tcdPercentileIsManual,
+                      bpdGaIsManual: formData.t2_bpdGaIsManual, hcGaIsManual: formData.t2_hcGaIsManual,
+                      acGaIsManual: formData.t2_acGaIsManual, flGaIsManual: formData.t2_flGaIsManual,
+                      ofdGaIsManual: formData.t2_ofdGaIsManual, tadGaIsManual: formData.t2_tadGaIsManual,
+                      apadGaIsManual: formData.t2_apadGaIsManual, efwGaIsManual: formData.t2_efwGaIsManual,
+                      tcdGaIsManual: formData.t2_tcdGaIsManual,
+                      efwIsManual: formData.t2_efwIsManual,
                     }}
                     errors={errors}
                     onChange={handleChange}
@@ -596,28 +699,16 @@ export default function ExaminationForm(props: ExaminationFormProps) {
           disabled={isSubmitting}
         />
 
-        {/* Notes | Comments side by side */}
-        <div style={row2}>
-          <TextArea
-            id="notes"
-            labelText="Notes (optional)"
-            placeholder="Enter additional notes"
-            value={formData.notes}
-            onChange={(e) => handleChange('notes', e.target.value)}
-            rows={3}
-            disabled={isSubmitting}
-          />
-
-          <TextArea
-            id="comments"
-            labelText="Comments (optional)"
-            placeholder="Enter general comments"
-            value={formData.comments}
-            onChange={(e) => handleChange('comments', e.target.value)}
-            rows={3}
-            disabled={isSubmitting}
-          />
-        </div>
+        {/* KI-009: Notes removed; Comments expanded to full width */}
+        <TextArea
+          id="comments"
+          labelText="Comments (optional)"
+          placeholder="Enter general comments"
+          value={formData.comments}
+          onChange={(e) => handleChange('comments', e.target.value)}
+          rows={4}
+          disabled={isSubmitting}
+        />
 
         <ButtonSet style={{ justifyContent: 'flex-end' }}>
           <Button kind="secondary" onClick={onCancel} disabled={isSubmitting}>

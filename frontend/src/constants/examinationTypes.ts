@@ -4,10 +4,10 @@
  */
 
 export const EXAM_TYPES: ReadonlyArray<{ key: string; label: string }> = [
-  { key: 'ultrasound_prenatal', label: 'Ultrasound Prenatal Exam' },
-  { key: 'ultrasound_prenatal_twins', label: 'Ultrasound Prenatal Exam for Twins' },
-  { key: 'ultrasound_first_trimester', label: 'Ultrasound Exam First Trimester' },
-  { key: 'ultrasound_first_trimester_twins', label: 'Ultrasound Exam First Trimester for Twins' },
+  { key: 'ultrasound_prenatal', label: 'Ultrasound Prenatal' },
+  { key: 'ultrasound_prenatal_twins', label: 'Ultrasound Prenatal for Twins' },
+  { key: 'ultrasound_first_trimester', label: 'Ultrasound First Trimester' },
+  { key: 'ultrasound_first_trimester_twins', label: 'Ultrasound First Trimester for Twins' },
 ];
 
 /** Returns the human-readable label for a type key; falls back to the key itself. */

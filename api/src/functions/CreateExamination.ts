@@ -29,6 +29,7 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             patientId?: string;
             examDate?: string;
             gestationalAge?: string;
+            gestationalAgeIsManual?: boolean;
             gestationalAgeFromBiometry?: string;
             biometry?: any;
             doppler?: any;
@@ -44,12 +45,13 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             patientAgeAtExam?: number;
         }
         const body = await request.json() as ExaminationCreateBody;
-        const { patientId, examDate, gestationalAge, gestationalAgeFromBiometry, biometry, doppler, biometry2, doppler2, gestationalAgeFromBiometry2, findings, notes, status, data, examinationType, patientAgeAtExam } = body;
+        const { patientId, examDate, gestationalAge, gestationalAgeIsManual, gestationalAgeFromBiometry, biometry, doppler, biometry2, doppler2, gestationalAgeFromBiometry2, findings, notes, status, data, examinationType, patientAgeAtExam } = body;
 
         const validation = validateExamination({
             patientId,
             examDate,
             gestationalAge,
+            gestationalAgeIsManual,
             gestationalAgeFromBiometry,
             biometry,
             doppler,
@@ -117,6 +119,7 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             patientNameLower: patient.name.toLowerCase(), // Shadow field for case-insensitive search
             examDate,
             gestationalAge: gestationalAge || undefined,
+            gestationalAgeIsManual: gestationalAgeIsManual || undefined,
             gestationalAgeFromBiometry: gestationalAgeFromBiometry || undefined,
             status: status as 'completed' | 'draft' | 'reviewed',
             examinationType: examinationType || undefined,
@@ -149,6 +152,7 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             patientNameLower: patient.name.toLowerCase(), // Shadow field for case-insensitive search
             examDate,
             gestationalAge: gestationalAge || undefined,
+            gestationalAgeIsManual: gestationalAgeIsManual || undefined,
             gestationalAgeFromBiometry: gestationalAgeFromBiometry || undefined,
             status: status as 'completed' | 'draft' | 'reviewed',
             examinationType: examinationType || undefined,

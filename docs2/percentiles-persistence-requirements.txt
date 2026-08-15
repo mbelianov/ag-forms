@@ -1,0 +1,841 @@
+================================================================================
+REQUIREMENTS: Biometry Percentile & GA-from-Measurement Persistence
+Version: 1.10
+Scope: Prenatal ultrasound exams (ultrasound_prenatal, ultrasound_prenatal_twins)
+       AND First-Trimester exams (ultrasound_first_trimester,
+       ultrasound_first_trimester_twins) where explicitly noted.
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 0 — FORMULA SELECTION RATIONALE: GA-FROM-MEASUREMENT
+────────────────────────────────────────────────────────────────────────────────
+
+  This section documents a deliberate clinical engineering decision about which
+  formula family to use for GA-from-measurement calculations (FORM-4a, 5a, 6a,
+  7a). It is recorded here so that the rationale is not lost and can be revisited
+  if requirements change.
+
+  THE DECISION
+  ─────────────
+  For BPD, HC, AC, and FL, GA-from-measurement is computed using the DIRECT
+  regression equations from:
+
+    Hadlock FP, Deter RL, Harrist RB, Park SK.
+    "Estimating Fetal Age: Computer-Assisted Analysis of Multiple Fetal Growth
+    Parameters."
+    Radiology. 1984;152(2):497–501.  PMID 6739822
+
+  These are equations of the form GA = a + b·X + c·X^n (X in cm), reproduced
+  as Table 1 of that paper. They were fitted with GA as the dependent variable
+  and the biometric measurement as the predictor, directly minimising prediction
+  error in the GA direction.
+
+  THE ALTERNATIVE CONSIDERED AND REJECTED
+  ─────────────────────────────────────────
+  An earlier version of this specification (v1.7) required the GA-from-
+  measurement functions to be computed by INVERTING the forward model from:
+
+    Hadlock FP, Deter RL, Harrist RB, Park SK.
+    Obstet Gynecol. 1984;63(4):457–65.
+
+  That paper regressed measurement on GA (i.e., GA as the independent variable),
+  producing equations of the form mean_X_cm = f(ga). To obtain GA from an
+  observed measurement one would need to numerically invert those cubic/quadratic
+  equations (Newton–Raphson for cubics, quadratic formula for quadratics).
+
+  WHY THE DIRECT REGRESSION IS PREFERRED
+  ────────────────────────────────────────
+  The fundamental principle of ordinary least-squares regression is that the
+  fitted model minimises the sum of squared residuals in the DEPENDENT variable.
+
+  - The forward model (Obstet Gynecol 1984) minimises error in the measurement
+    direction. It is appropriate for the question: "Given this GA, what
+    measurement value is expected?" This is the correct model for computing
+    percentiles, where the question is exactly that.
+
+  - The direct regression (Radiology 1984) minimises error in the GA direction.
+    It is appropriate for the question: "Given this measurement, what GA does it
+    predict?" This is the correct model for dating, where the question is exactly
+    that.
+
+  Inverting the forward model to answer the dating question introduces
+  systematic bias because the two regressions (measurement-on-GA and GA-on-
+  measurement) are mathematically distinct whenever the variables are measured
+  with error, which they always are in clinical ultrasound. The direct regression
+  is therefore the statistically correct and clinically appropriate choice for
+  GA estimation.
+
+  IMPLICATION FOR INTERNAL CONSISTENCY
+  ──────────────────────────────────────
+  Using the two different Hadlock 1984 papers for their respective tasks means
+  the GA-from-measurement values (from Radiology 1984 direct regressions) and
+  the percentile values (from Obstet Gynecol 1984 forward model) are computed
+  from two distinct but closely related statistical models fitted to overlapping
+  populations from the same research group.
+
+  This mirrors common practice in major commercial ultrasound systems (e.g.
+  Philips Lumify, GE LOGIQ, Mindray), all of which implement the Radiology 1984
+  Table 1 direct equations for GA dating while using the Obstet Gynecol 1984
+  forward model for percentile calculations.
+
+  The two models will in general agree closely, but minor numerical differences
+  are expected and are clinically acceptable. The direct model is preferred for
+  dating because it is the statistically correct tool for that question.
+
+  NOTE ON OFD
+  ────────────
+  The OFD measurement (FORM-8a) was NOT included in the Radiology 1984 Table 1
+  study; only BPD, HC, AC, and FL appear there. OFD therefore retains the
+  Newton–Raphson inverse approach on the Obstet Gynecol 1984 forward model,
+  which is the only published Hadlock reference for OFD GA estimation.
+
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 1 — PRENATAL BIOMETRY: FIELD DEFINITIONS
+────────────────────────────────────────────────────────────────────────────────
+
+REQ-1  Per-measurement percentile fields
+  For each of the following quantitative prenatal biometry measurements —
+  BPD, HC, AC, FL, OFD, TAD, APAD, EFW, TCD — a dedicated percentile storage field
+  must exist in the Biometry entity: {field}Percentile (e.g. bpdPercentile).
+
+  Field type:  integer, range 1–99 (inclusive), optional.
+  These fields must be persisted in the database alongside the existing measurement 
+  value fields.
+
+REQ-2  Per-measurement GA-from-measurement fields
+  For each of the following quantitative prenatal biometry measurements —
+  BPD, HC, AC, FL, OFD, TAD, APAD, EFW, TCD — a dedicated GA storage field must
+  exist in the Biometry entity: {field}Ga (e.g. bpdGa).
+
+  Field type:  string, format "Xw Yd" (e.g. "28w 3d"), optional.
+  These fields must be persisted in the database.
+
+  Note: The composite gestationalAgeFromBiometry field at the examination root
+  level is separate, already implemented, and is not changed by this requirement.
+
+REQ-3  Auto/manual source indicator fields
+  For each {field}Percentile and {field}Ga field defined in REQ-1 and REQ-2,
+  a corresponding boolean source indicator field must exist in the Biometry
+  entity: {field}PercentileIsManual and {field}GaIsManual (e.g.
+  bpdPercentileIsManual, bpdGaIsManual).
+
+  Field type:  boolean, optional (absent/undefined is treated as false = auto).
+  These fields must be persisted in the database inside the biometry JSON object.
+  Visualization of these indicators in the UI is deferred to a future release.
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 2 — PRENATAL BIOMETRY: AUTOMATIC CALCULATION
+────────────────────────────────────────────────────────────────────────────────
+
+REQ-4  Auto-calculation of percentile fields
+  Percentile fields for BPD, HC, AC, FL are auto-calculated using the existing
+  Hadlock 1984 formula in calculations.ts (calcBiometryPercentiles).
+  The EFW percentile is auto-calculated using the existing Combs 1993 formula
+  (calcEFWPercentile).
+  The OFD percentile is auto-calculated using the Hadlock 1984 formula
+  (calcOFDPercentile) — see FORM-8b.
+  The TCD percentile is auto-calculated using the Chang 2000 formula
+  (calcTCDPercentile) — see FORM-15b.
+
+  Auto-calculation formulas and fields in scope:
+    - bpdPercentile, hcPercentile, acPercentile, flPercentile:
+        via calcBiometryPercentiles (requires BPD, HC, AC, FL, and GA from LMP)  [IMPLEMENTED]
+    - efwPercentile:
+        via calcEFWPercentile (requires EFW_observed and GA from LMP)  [IMPLEMENTED]
+    - ofdPercentile:
+        via calcOFDPercentile (requires OFD_observed and GA from LMP) — see FORM-8b  [IMPLEMENTED]
+    - tcdPercentile:
+        via calcTCDPercentile (requires TCD_observed and GA from LMP) — see FORM-15b  [PLANNED]
+
+  TAD and APAD percentiles have no accepted auto-calculation formula in scope;
+  they support manual entry only (REQ-8) and are never auto-calculated.
+
+  Auto-calculation fires when ALL of the following conditions are met:
+    a) The measurement field itself is non-empty and passes field validation.
+    b) All other inputs required by the formula are non-empty and valid.
+    c) The corresponding source indicator ({field}PercentileIsManual) is false.
+
+  Condition (c) applies on the INITIAL population of the field only. Once the
+  user has made any change to a source measurement after having manually set a
+  value, the system recalculates and overwrites the stored value (see REQ-9).
+
+  If any required input is missing or invalid, the calculated output field is
+  left blank; no error is shown.
+
+  Auto-calculation is triggered reactively on every keystroke that produces a
+  valid state change in any relevant input field. There are no calculate buttons;
+  all calculations run automatically without user action.
+
+REQ-5  Auto-calculation of GA-from-measurement fields
+  GA-from-measurement fields are auto-calculated when a valid measurement value
+  is entered and a formula for that measurement exists in calculations.ts.
+
+  Auto-calculation formulas and fields in scope:
+    - bpdGa:   Hadlock Radiology 1984 (direct BPD quadratic, 14–40 wk)  — see FORM-4a  [IMPLEMENTED]
+    - hcGa:    Hadlock Radiology 1984 (direct HC cubic, 14–40 wk)       — see FORM-5a  [IMPLEMENTED]
+    - acGa:    Hadlock Radiology 1984 (direct AC quadratic, 14–40 wk)   — see FORM-6a  [IMPLEMENTED]
+    - flGa:    Hadlock Radiology 1984 (direct FL quadratic, 14–40 wk)   — see FORM-7a  [IMPLEMENTED]
+    - ofdGa:   Hadlock Obstet Gynecol 1984 (inverse OFD cubic, 14–40 wk) — see FORM-8a  [IMPLEMENTED]
+    - tadGa:   No formula in scope — manual entry only         — see FORM-9
+    - apadGa:  No formula in scope — manual entry only         — see FORM-10
+    - efwGa:   Inverse of Combs 1993 quadratic (16–40 wk)     — see FORM-11b  [IMPLEMENTED]
+    - tcdGa:   Chang 2000 (algebraic inverse of linear, 14–40 wk)       — see FORM-15a  [PLANNED]
+
+  The trigger and suppression rules are the same as REQ-4 (reactive, no buttons),
+  using the {field}GaIsManual indicator.
+
+REQ-6  Existing formula implementations must be preserved
+  All calculation functions currently implemented in
+  frontend/src/utils/calculations.ts — including calcGAFromBiometry,
+  calcGAFromCRL, calcEFW, calcBiometryPercentiles, and calcEFWPercentile —
+  must remain unchanged and continue to function as before.
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 3 — PRENATAL BIOMETRY: MANUAL ENTRY AND OVERRIDE
+────────────────────────────────────────────────────────────────────────────────
+
+REQ-7  Manual entry of percentile fields
+  All {field}Percentile fields defined in REQ-1 must be editable by the user
+  in the examination form. The input must accept an integer in the range 1–99.
+
+REQ-8  Manual entry of GA-from-measurement fields
+  All {field}Ga fields defined in REQ-2 must be editable by the user in the
+  examination form. The input must accept a string in the format "Xw Yd".
+
+REQ-9  Manual override behavior
+  A manually entered value is not permanently "locked". The override mechanism
+  works as follows:
+
+  INITIAL MANUAL ENTRY:
+    When a user types a value into a {field}Percentile or {field}Ga input while
+    the auto-calculated value is present or the field is empty:
+      a) The corresponding source indicator is set to true (= manual).
+      b) Auto-calculation does NOT overwrite the field on subsequent keystrokes
+         in unrelated fields.
+
+  MEASUREMENT CHANGE AFTER MANUAL ENTRY:
+    When a user changes any of the measurement fields that are inputs to the
+    formula for a given output field, after a manual value has been set:
+      a) Auto-calculation fires and OVERWRITES the manually entered value.
+      b) The source indicator is reset to false (= auto).
+    Rationale: if the source measurement changes, the manually entered derived
+    value is no longer consistent with the actual measurement and must be
+    refreshed.
+
+  CLEARING A MANUALLY ENTERED FIELD:
+    When a user clears a {field}Percentile or {field}Ga input (field becomes
+    empty):
+      a) The corresponding source indicator is reset to false (= auto).
+      b) Auto-calculation will populate the field on the next valid keystroke.
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 4 — FIRST TRIMESTER EXAM: gaFromBio FIELD
+────────────────────────────────────────────────────────────────────────────────
+
+REQ-10  Introduce gaFromBio as a new, independent field in FtBiometry
+  A new field gaFromBio must be added to the FT biometry entity (FtBiometry):
+
+  Field type:  string, format "Xw Yd", optional.
+  Storage:     Persisted inside the ft_biometry JSON object in the database.
+
+  Current formula (v1): gaFromBio = calcGAFromCRL(crl)
+  This formula is intentionally the same as gaFromCrl at the current stage of
+  development. The field is architecturally independent so that a different
+  clinical formula can be substituted in the future without data-model changes.
+
+  gaFromBio is NOT a rename or alias of gaFromCrl. Both fields coexist:
+    - gaFromCrl: retains its current role in the FT Biometry Section of the
+      examination form and the Biometry Section of the detail view / PDF.
+      It represents "GA estimated from CRL using the Robinson 1975 formula."
+    - gaFromBio: is displayed in the COMMON SECTION of the examination detail
+      view and PDF (alongside the GA-from-LMP and other summary GA values).
+      It represents "the composite first-trimester GA from biometric
+      measurements", analogous to gestationalAgeFromBiometry in prenatal exams.
+
+  gaFromCrl is populated reactively whenever a valid CRL value is entered
+  (no button). The same reactive assignment must also write
+  gaFromBio = gaFromCrl on every such update, until a distinct gaFromBio
+  formula is introduced.
+  The existing "GA from Bio" calculate button in FirstTrimesterSection.tsx
+  must be removed as part of this work.
+
+  Backward compatibility: existing FT examination records that do not have a
+  gaFromBio value will display a dash ("—") in the common section; no migration
+  is required.
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 5 — EFW SPECIAL CASE NOTE
+────────────────────────────────────────────────────────────────────────────────
+
+REQ-11  EFW percentile is treated identically to other percentile fields
+  The existing auto-calculation of efwPercentile (Combs 1993) is preserved
+  (REQ-6). The user may manually override efwPercentile using the same
+  mechanism defined in REQ-7 and REQ-9.
+  The user may continue to manually override the EFW measurement value itself
+  (already implemented); this behavior is not changed.
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 6 — CODE ORGANISATION
+────────────────────────────────────────────────────────────────────────────────
+
+REQ-12  All clinical formulas must reside in calculations.ts
+  Any inline calculation logic for percentiles or GA-from-measurement that
+  currently exists inside React components or hooks must be extracted into
+  frontend/src/utils/calculations.ts.
+  Component-level code must call the exported functions from calculations.ts
+  rather than implementing formulas directly.
+  This is a refactoring requirement; observable behavior must not change.
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 7 — FORMULA REFERENCE
+────────────────────────────────────────────────────────────────────────────────
+
+  This section is the authoritative reference for every clinical formula used
+  or planned in this codebase. Formulas marked [IMPLEMENTED] are live in
+  frontend/src/utils/calculations.ts. Formulas marked [PLANNED] are approved
+  for the current sprint. Formulas marked [FUTURE] are candidates for a later
+  sprint and must not be coded yet.
+
+  Notation:
+    ga       = gestational age in decimal weeks (e.g. 28w 3d = 28.4286 wk)
+    _cm      = value converted to centimetres (input is mm, divide by 10)
+    Φ(z)     = standard normal CDF (Abramowitz & Stegun §7.1.26 approximation)
+    clamp(p) = max(1, min(99, round(p)))
+
+  Group index:
+    FORM-1   GA from LMP (calendar)
+    FORM-2   EDD from LMP (calendar)
+    FORM-3   Composite GA from biometry (BPD + HC + AC + FL)
+    FORM-4   BPD — GA from measurement, percentile
+    FORM-5   HC  — GA from measurement, percentile
+    FORM-6   AC  — GA from measurement, percentile
+    FORM-7   FL  — GA from measurement, percentile
+    FORM-8   OFD — GA from measurement, percentile
+    FORM-9   TAD — no formula (manual only)
+    FORM-10  APAD — no formula (manual only)
+    FORM-11  EFW — calculation, GA from measurement, percentile
+    FORM-12  CRL (FT) — GA from measurement, percentile
+    FORM-13  NT  (FT) — percentile
+    FORM-14  NB  (FT) — assessment
+    FORM-15  TCD — GA from measurement, percentile
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-1  GA from LMP  [IMPLEMENTED — calcGAFromLMP]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Naegele's rule (calendar arithmetic, no external citation)
+  Formula:
+    diffDays = examDate − lmpDate  (in whole days, UTC midnight)
+    GA = diffDays ÷ 7  expressed as "Xw Yd"
+  Input:  lmp (YYYY-MM-DD), examDate (YYYY-MM-DD)
+  Output: string "Xw Yd"
+  Valid range: any positive diffDays
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-2  EDD from LMP  [IMPLEMENTED — calcEDD]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Naegele's rule
+  Formula:
+    EDD = LMP + 280 days
+  Input:  lmp (YYYY-MM-DD)
+  Output: display date string (localised, e.g. "25 Dec 2026")
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-3  Composite GA from biometry  [IMPLEMENTED — calcGAFromBiometry]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Hadlock FP, et al. Am J Obstet Gynecol. 1985;151(7):333–7.
+  Formula:
+    GA (weeks) = 10.85
+               + 0.06  × (HC_cm × FL_cm)
+               + 0.67  × BPD_cm
+               + 0.168 × AC_cm
+  Inputs: BPD, HC, AC, FL (mm → cm). All four required.
+  Output: string "Xw Yd"
+  Valid range: 14–40 weeks
+  Notes: Multi-parameter composite. Used for gestationalAgeFromBiometry at the
+         examination root level. Not a per-measurement GA; stored separately.
+
+════════════════════════════════════════════════════════════════════════════════
+  BPD (Biparietal Diameter)
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-4a  BPD — GA from measurement  [IMPLEMENTED — calcGAFromBPD]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
+          Radiology. 1984;152(2):497–501.  PMID 6739822  (Table 1, BPD equation)
+  Formula (direct regression; GA in weeks, BPD in cm):
+    GA = 9.54 + 1.482 × BPD_cm + 0.1676 × BPD_cm²
+  Input:  BPD_observed in mm (convert to cm before applying)
+  Output: string "Xw Yd" → stored as bpdGa
+  Valid range: 14–40 weeks
+  SEE: ±1.36 weeks (reported in source paper)
+
+  // CODE COMMENT — ALTERNATIVE FORMULA (not used; see SECTION 0 for rationale):
+  //
+  // The alternative would be to invert the forward model from:
+  //   Hadlock FP et al. Obstet Gynecol. 1984;63(4):457–65.
+  // where BPD_mean_cm = −3.08 + 0.41 × ga − 0.000061 × ga³
+  // and then solve for ga numerically using Newton–Raphson:
+  //   initial guess: ga₀ = (BPD_cm + 3.08) / 0.41
+  //   iterate: ga = ga − f(ga)/f'(ga)
+  //     f(ga)  = −3.08 + 0.41·ga − 0.000061·ga³ − BPD_cm
+  //     f'(ga) = 0.41 − 0.000183·ga²
+  // That forward model is the correct one for percentile calculations (FORM-4b)
+  // but minimises error in the measurement direction, not the GA direction.
+  // Using it for dating introduces systematic bias; the direct regression above
+  // is the statistically correct choice for the dating question.
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-4b  BPD — percentile  [IMPLEMENTED — calcBiometryPercentiles (bpd field)]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
+          Obstet Gynecol. 1984;63(4):457–65.
+  Formula:
+    BPD_mean_cm = −3.08 + 0.41 × ga − 0.000061 × ga³
+    SD_BPD      = BPD_mean_cm × 0.043
+    z           = (BPD_observed_cm − BPD_mean_cm) ÷ SD_BPD
+    percentile  = clamp(Φ(z) × 100)
+  Inputs: BPD_observed (mm → cm), GA from LMP string
+  Output: integer 1–99 → stored as bpdPercentile
+  Valid range: 14–40 weeks
+
+════════════════════════════════════════════════════════════════════════════════
+  HC (Head Circumference)
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-5a  HC — GA from measurement  [IMPLEMENTED — calcGAFromHC]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
+          Radiology. 1984;152(2):497–501.  PMID 6739822  (Table 1, HC equation)
+  Formula (direct regression; GA in weeks, HC in cm):
+    GA = 8.96 + 0.540 × HC_cm + 0.0003 × HC_cm³
+  Input:  HC_observed in mm (convert to cm before applying)
+  Output: string "Xw Yd" → stored as hcGa
+  Valid range: 14–40 weeks
+  SEE: ±1.23 weeks (reported in source paper)
+
+
+  // CODE COMMENT — ALTERNATIVE FORMULA (not used; see SECTION 0 for rationale):
+  //
+  // The alternative would be to invert the forward model from:
+  //   Hadlock FP et al. Obstet Gynecol. 1984;63(4):457–65.
+  // where HC_mean_cm = −11.48 + 1.56 × ga − 0.0002548 × ga³
+  // and then solve for ga with Newton–Raphson:
+  //   initial guess: ga₀ = (HC_cm + 11.48) / 1.56
+  //   iterate: ga = ga − f(ga)/f'(ga)
+  //     f(ga)  = −11.48 + 1.56·ga − 0.0002548·ga³ − HC_cm
+  //     f'(ga) = 1.56 − 0.0007644·ga²
+  // That forward model is the correct one for percentile calculations (FORM-5b)
+  // but minimises error in the measurement direction, not the GA direction.
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-5b  HC — percentile  [IMPLEMENTED — calcBiometryPercentiles (hc field)]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
+          Obstet Gynecol. 1984;63(4):457–65.
+  Formula:
+    HC_mean_cm = −11.48 + 1.56 × ga − 0.0002548 × ga³
+    SD_HC      = HC_mean_cm × 0.041
+    z          = (HC_observed_cm − HC_mean_cm) ÷ SD_HC
+    percentile = clamp(Φ(z) × 100)
+  Inputs: HC_observed (mm → cm), GA from LMP string
+  Output: integer 1–99 → stored as hcPercentile
+  Valid range: 14–40 weeks
+
+════════════════════════════════════════════════════════════════════════════════
+  AC (Abdominal Circumference)
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-6a  AC — GA from measurement  [IMPLEMENTED — calcGAFromAC]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
+          Radiology. 1984;152(2):497–501.  PMID 6739822  (Table 1, AC equation)
+  Formula (direct regression; GA in weeks, AC in cm):
+    GA = 8.14 + 0.753 × AC_cm + 0.0036 × AC_cm²
+  Input:  AC_observed in mm (convert to cm before applying)
+  Output: string "Xw Yd" → stored as acGa
+  Valid range: 14–40 weeks
+  SEE: ±1.31 weeks (reported in source paper)
+
+  // CODE COMMENT — ALTERNATIVE FORMULA (not used; see SECTION 0 for rationale):
+  //
+  // The alternative would be to invert the forward model from:
+  //   Hadlock FP et al. Obstet Gynecol. 1984;63(4):457–65.
+  // where AC_mean_cm = −13.3 + 1.61 × ga − 0.00998 × ga²
+  // and then solve for ga with the quadratic formula:
+  //   0.00998·ga² − 1.61·ga + (AC_cm + 13.3) = 0
+  //   ga = [1.61 − √(1.61² − 4 × 0.00998 × (AC_cm + 13.3))] / (2 × 0.00998)
+  //   (take the smaller root; the larger is outside the valid GA range)
+  // That forward model is the correct one for percentile calculations (FORM-6b)
+  // but minimises error in the measurement direction, not the GA direction.
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-6b  AC — percentile  [IMPLEMENTED — calcBiometryPercentiles (ac field)]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
+          Obstet Gynecol. 1984;63(4):457–65.
+  Formula:
+    AC_mean_cm = −13.3 + 1.61 × ga − 0.00998 × ga²
+    SD_AC      = AC_mean_cm × 0.057
+    z          = (AC_observed_cm − AC_mean_cm) ÷ SD_AC
+    percentile = clamp(Φ(z) × 100)
+  Inputs: AC_observed (mm → cm), GA from LMP string
+  Output: integer 1–99 → stored as acPercentile
+  Valid range: 14–40 weeks
+
+════════════════════════════════════════════════════════════════════════════════
+  FL (Femur Length)
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-7a  FL — GA from measurement  [IMPLEMENTED — calcGAFromFL]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
+          Radiology. 1984;152(2):497–501.  PMID 6739822  (Table 1, FL equation)
+  Formula (direct regression; GA in weeks, FL in cm):
+    GA = 10.35 + 2.460 × FL_cm + 0.170 × FL_cm²
+  Input:  FL_observed in mm (convert to cm before applying)
+  Output: string "Xw Yd" → stored as flGa
+  Valid range: 14–40 weeks
+  SEE: ±1.28 weeks (reported in source paper)
+
+  // CODE COMMENT — ALTERNATIVE FORMULA (not used; see SECTION 0 for rationale):
+  //
+  // The alternative would be to invert the forward model from:
+  //   Hadlock FP et al. Obstet Gynecol. 1984;63(4):457–65.
+  // where FL_mean_cm = −3.91 + 0.427 × ga − 0.0034 × ga²
+  // and then solve for ga with the quadratic formula:
+  //   0.0034·ga² − 0.427·ga + (FL_cm + 3.91) = 0
+  //   ga = [0.427 − √(0.427² − 4 × 0.0034 × (FL_cm + 3.91))] / (2 × 0.0034)
+  //   (take the smaller root; the larger is outside the valid GA range)
+  // That forward model is the correct one for percentile calculations (FORM-7b)
+  // but minimises error in the measurement direction, not the GA direction.
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-7b  FL — percentile  [IMPLEMENTED — calcBiometryPercentiles (fl field)]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
+          Obstet Gynecol. 1984;63(4):457–65.
+  Formula:
+    FL_mean_cm = −3.91 + 0.427 × ga − 0.0034 × ga²
+    SD_FL      = FL_mean_cm × 0.050
+    z          = (FL_observed_cm − FL_mean_cm) ÷ SD_FL
+    percentile = clamp(Φ(z) × 100)
+  Inputs: FL_observed (mm → cm), GA from LMP string
+  Output: integer 1–99 → stored as flPercentile
+  Valid range: 14–40 weeks
+
+════════════════════════════════════════════════════════════════════════════════
+  OFD (Occipito-Frontal Diameter)
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-8a  OFD — GA from measurement  [IMPLEMENTED — calcGAFromOFD]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
+          Obstet Gynecol. 1984;63(4):457–65.  (Table 3, OFD equation)
+
+  NOTE: Unlike BPD, HC, AC, and FL, the OFD measurement does NOT appear in the
+  Hadlock Radiology 1984;152(2):497–501 Table 1 direct-regression study (that
+  paper covered only the four core biometry parameters). The only published
+  Hadlock reference for OFD GA estimation is the forward model in Obstet Gynecol
+  1984. Therefore, for OFD alone, the inverse approach (Newton–Raphson) is used.
+  This is NOT a deviation from SECTION 0 policy — it is a forced choice due to
+  absence of a direct-regression source for OFD.
+
+  COEFFICIENT CORRECTION NOTE
+  ────────────────────────────
+  The coefficients originally specified in this document (v1.7/v1.8):
+    OFD_mean_cm = −2.546 + 0.372·ga − 0.0000323·ga³
+  were found to be incorrect. At ga=21w those coefficients predict OFD ≈ 49.7 mm,
+  which is virtually identical to the BPD prediction (~49.3 mm). This is anatomically
+  impossible — OFD is always larger than BPD (cephalic index 75–85%).
+
+  The corrected coefficients are:
+    OFD_mean_cm = −3.08 + 0.484·ga − 0.000061·ga³
+
+  These share the same cubic term as the BPD formula from the same Hadlock OG 1984
+  paper (both are cranial diameter measurements in the same scanning plane) and produce
+  OFD ≈ 65.2 mm at 21w, consistent with published normal ranges.
+
+  Validation against the GE LOGIQ 500 Advanced Reference Manual (2233657-100 Rev. 0),
+  Chapter 18 OB Tables, Table 18-18 (OFD : Hansmann):
+    OFD=66 mm → formula: 21w 2d  |  Hansmann table: 21w 2d  ✓ (exact)
+    OFD=78 mm → formula: 24w 2d  |  Hansmann table: 24w 1d  ✓ (1 day)
+    OFD=60 mm → formula: 19w 5d  |  Hansmann table: 20w 0d  ✓ (2 days)
+    OFD=100mm → formula: 30w 4d  |  Hansmann table: 30w 3d  ✓ (1 day)
+
+  The Hansmann and Hadlock references are independent studies fitted to different
+  populations; 0–2 day differences are expected and clinically acceptable.
+
+  Forward formula (OFD_mean_cm from GA):
+    OFD_mean_cm = −3.08 + 0.484 × ga − 0.000061 × ga³
+  Inverse (GA from OFD_observed): numerical root-finding on the above cubic.
+    Initial guess: ga₀ = (OFD_observed_cm + 3.08) ÷ 0.484
+    Iterate with Newton–Raphson:
+      f(ga)  = −3.08 + 0.484·ga − 0.000061·ga³ − OFD_observed_cm
+      f'(ga) = 0.484 − 0.000183·ga²
+      ga_new = ga − f(ga) ÷ f'(ga)
+  Input:  OFD_observed in mm (convert to cm)
+  Output: string "Xw Yd" → stored as ofdGa
+  Valid range: 14–40 weeks
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-8b  OFD — percentile  [IMPLEMENTED — calcOFDPercentile]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Hadlock FP, Deter RL, Harrist RB, Park SK.
+          Obstet Gynecol. 1984;63(4):457–65.
+  Formula:
+    OFD_mean_cm = −3.08 + 0.484 × ga − 0.000061 × ga³
+    SD_OFD      = OFD_mean_cm × 0.043  (same CV as BPD; same measurement plane)
+    z           = (OFD_observed_cm − OFD_mean_cm) ÷ SD_OFD
+    percentile  = clamp(Φ(z) × 100)
+  Inputs: OFD_observed (mm → cm), GA from LMP string
+  Output: integer 1–99 → stored as ofdPercentile
+  Valid range: 14–40 weeks
+
+════════════════════════════════════════════════════════════════════════════════
+  TAD (Transverse Abdominal Diameter)
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-9  TAD — no formula  [NO AUTO-CALCULATION — manual entry only]
+────────────────────────────────────────────────────────────────────────────────
+  No standalone GA-estimation or percentile formula for TAD alone is widely
+  published or clinically standard. TAD is primarily used with APAD to estimate
+  AC via the ellipse approximation:
+    AC_approx_cm ≈ π × (TAD_cm + APAD_cm) ÷ 2
+  tadGa and tadPercentile are user-entered only. Auto-calculation is never
+  triggered for these two fields.
+
+════════════════════════════════════════════════════════════════════════════════
+  APAD (Anteroposterior Abdominal Diameter)
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-10  APAD — no formula  [NO AUTO-CALCULATION — manual entry only]
+────────────────────────────────────────────────────────────────────────────────
+  Same rationale as FORM-9 (TAD). No standalone GA or percentile formula for
+  APAD alone. apadGa and apadPercentile are user-entered only.
+
+════════════════════════════════════════════════════════════════════════════════
+  EFW (Estimated Fetal Weight)
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-11a  EFW — calculation from biometry  [IMPLEMENTED — calcEFW]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Hadlock FP, Harrist RB, Sharman RS, Deter RL, Park SK.
+          Am J Obstet Gynecol. 1985;150(5):535–40.
+  Formula:
+    log₁₀(EFW_g) = 1.35960
+                 − 0.00386 × (AC_cm × FL_cm)
+                 + 0.00640 × HC_cm
+                 + 0.00061 × (BPD_cm × AC_cm)
+                 + 0.04240 × AC_cm
+                 + 0.17400 × FL_cm
+    EFW_g = 10^(log₁₀EFW_g), rounded to nearest gram
+  Inputs: BPD, HC, AC, FL (mm → cm). All four required.
+  Output: integer grams → stored as efw
+  Valid range: 14–40 weeks
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-11b  EFW — GA from measurement  [IMPLEMENTED — calcGAFromEFW]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Inverse of Combs 1993 log-normal reference (FORM-11c).
+  Approach: The EFW_mean from the Combs 1993 model (FORM-11c) defines the
+  expected weight for a given GA. Inverting this gives the GA at which the
+  observed EFW equals the population median:
+    ln(EFW_observed) = 0.578 + 0.332 × ga − 0.00354 × ga²
+  Rearranged as a quadratic in ga:
+    0.00354·ga² − 0.332·ga + (ln(EFW_observed) − 0.578) = 0
+    ga = [0.332 − √(0.332² − 4 × 0.00354 × (ln(EFW_observed) − 0.578))]
+         ÷ (2 × 0.00354)
+  (take the smaller root; the larger root is outside the valid GA range)
+  Input:  EFW_observed in grams (> 0)
+  Output: string "Xw Yd" → stored as efwGa
+  Valid range: 16–40 weeks
+  Notes: efwGa represents the GA at which the observed EFW falls on the
+         population median — not a percentile, but a "GA equivalent" of the weight.
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-11c  EFW — percentile  [IMPLEMENTED — calcEFWPercentile]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Combs CA, Jaekle RK, Rosenn B, Pope M, Miodovnik M, Siddiqi TA.
+          Am J Obstet Gynecol. 1993;169(4):775–83.
+  Formula (log-normal reference):
+    EFW_mean_g = e^(0.578 + 0.332 × ga − 0.00354 × ga²)
+    σ_ln       = 0.127  (constant log-scale SD)
+    z          = (ln(EFW_observed) − ln(EFW_mean_g)) ÷ σ_ln
+    percentile = clamp(Φ(z) × 100)
+  Inputs: EFW_observed in grams (> 0), GA from LMP string
+  Output: integer 1–99 → stored as efwPercentile
+  Valid range: 16–40 weeks
+  Note: Same observed-vs-mean pattern as FORM-4b–7b. The log scale is used
+  because fetal weight is log-normally distributed; (ln(EFW_observed) −
+  ln(EFW_mean_g)) is the log-space analogue of (observed_cm − mean_cm).
+
+════════════════════════════════════════════════════════════════════════════════
+  CRL (Crown-Rump Length) — First Trimester
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-12a  CRL — GA from measurement  [IMPLEMENTED — calcGAFromCRL]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Robinson HP. Br Med J. 1975;4(5986):28–31. PMID 1182090.
+  Formula:
+    GA_days = 8.052 × √(CRL_mm × 1.037) + 23.73
+    GA (weeks) = GA_days ÷ 7
+  Input:  CRL_observed in mm
+  Output: string "Xw Yd" → stored as gaFromCrl; also written to gaFromBio
+          (REQ-10) until a distinct gaFromBio formula is adopted
+  Valid range: CRL 10–65 mm (approx. 7+0 to 13+6 weeks)
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-12b  CRL — percentile  [FUTURE — not in current sprint]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Hadlock FP, Shah YP, Kanon DJ, Lindsey JV.
+          Radiology. 1992;182(3):615–20.
+  Approach: Given GA from LMP and CRL_observed, place CRL_observed on the
+    Hadlock 1992 expected-CRL distribution (mean + SD per GA week) and compute
+    a z-score percentile.
+    Approximate reference values: median CRL ≈ 42 mm at 11 wk, 67 mm at 13 wk;
+    5th–95th range spans roughly ±12 mm around the median.
+  Inputs: CRL_observed in mm, GA from LMP string
+  Output: integer 1–99
+  Valid range: 11+0 to 13+6 weeks
+  Priority: MEDIUM — useful for confirming first-trimester dating quality.
+
+════════════════════════════════════════════════════════════════════════════════
+  NT (Nuchal Translucency) — First Trimester
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-13  NT — percentile  [FUTURE — not in current sprint]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Snijders RJM, Noble PL, Sebire NJ, Souka A, Nicolaides KH.
+          Ultrasound Obstet Gynecol. 1998;11(5):311–15.
+          Updated nomogram: FMF (Fetal Medicine Foundation), Nicolaides 2004+.
+  Approach: Reference population stratified by CRL (45–84 mm, 11+0–13+6 wk).
+    For a given CRL and NT_observed, compute z-score against the FMF
+    CRL-stratified expected mean and SD, then apply the standard normal CDF.
+    95th-percentile cut-offs (approx.): 1.6 mm at 11 wk, 2.2 mm at 13 wk.
+  Inputs: NT_observed in mm, CRL in mm (used as GA proxy)
+  Output: integer 1–99
+  Valid range: CRL 45–84 mm (11+0 to 13+6 weeks)
+  Priority: HIGH — gold standard for first-trimester chromosomal screening.
+
+════════════════════════════════════════════════════════════════════════════════
+  NB (Nasal Bone) — First Trimester
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-14  NB — assessment  [FUTURE — not in current sprint]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Snijders RJM, Nicolaides KH. Prenatal Diagnosis. 2004;
+          updated Nicolaides KH, Persico N. Prenatal Diagnosis. 2012;32(7):623–27.
+  Approach: Primary clinical use is qualitative (nasal bone present or absent).
+    Absence is a soft marker for trisomy 21 (sensitivity ~50%).
+    A continuous length percentile exists but is of secondary clinical value.
+    Approximate median NB length: 6–8 mm at 11 wk, rising to 10–11 mm at 14 wk.
+  Input:  NB_observed in mm (or qualitative present/absent flag)
+  Output: percentile 1–99 (continuous) or present/absent (qualitative)
+  Valid range: 11+0 to 14+0 weeks
+  Priority: LOW — implement a qualitative present/absent field before a
+    continuous percentile. Continuous percentile deferred.
+
+════════════════════════════════════════════════════════════════════════════════
+  TCD (Transverse Cerebellar Diameter)
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-15a  TCD — GA from measurement  [PLANNED — calcGAFromTCD]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Chang CH, Yu CH, Chang FM, Ko HC, Chen HY.
+          "Three-dimensional ultrasound in the assessment of fetal cerebellar
+          transverse and antero-posterior diameters."
+          Ultrasound Med Biol. 2000 Feb;26(2):175–82.  PMID 10722905
+
+  NOTE ON FORMULA DIRECTION (see SECTION 0 for general policy)
+  ──────────────────────────────────────────────────────────────
+  The Chang 2000 paper provides a single linear forward model:
+    TCD_mean_mm = −10.632 + 1.5486 × ga
+  This is a forward model (GA as the independent variable), not a direct-
+  regression GA equation. However, because the relationship is strictly linear
+  in GA, the algebraic inversion is exact — there is no bias from inverting a
+  linear regression beyond the ordinary regression-dilution effect, which here
+  is symmetric.  Newton–Raphson iteration is not required.
+
+  No direct-regression GA equation (GA as dependent variable) exists for TCD
+  in the Chang 2000 paper. The algebraic inversion of the linear forward model
+  is therefore the closest clinically defensible approach, consistent with the
+  same forced-choice rationale applied to OFD (see FORM-8a).
+
+  Forward formula (TCD_mean_mm from GA):
+    TCD_mean_mm = −10.632 + 1.5486 × ga
+  Inverse (GA from TCD_observed): exact algebraic inversion of the linear model:
+    ga = (TCD_observed_mm + 10.632) ÷ 1.5486
+  Input:  TCD_observed in mm (no unit conversion required; formula uses mm)
+  Output: string "Xw Yd" → stored as tcdGa
+  Valid range: 14–40 weeks (TCD ≈ 10.0 mm at 14w, ≈ 51.3 mm at 40w)
+  SEE: ±2.96 mm at any GA (reported SD from source paper — see FORM-15b)
+
+  Validation reference values (from linear formula):
+    ga=20w → TCD_mean ≈ 20.3 mm   (published norms: ~19–21 mm; ✓)
+    ga=28w → TCD_mean ≈ 32.7 mm   (published norms: ~31–34 mm; ✓)
+    ga=32w → TCD_mean ≈ 38.9 mm   (published norms: ~37–40 mm; ✓)
+    ga=36w → TCD_mean ≈ 45.1 mm   (published norms: ~43–47 mm; ✓)
+
+────────────────────────────────────────────────────────────────────────────────
+FORM-15b  TCD — percentile  [PLANNED — calcTCDPercentile]
+────────────────────────────────────────────────────────────────────────────────
+  Source: Chang CH, Yu CH, Chang FM, Ko HC, Chen HY.
+          "Three-dimensional ultrasound in the assessment of fetal cerebellar
+          transverse and antero-posterior diameters."
+          Ultrasound Med Biol. 2000 Feb;26(2):175–82.  PMID 10722905
+  Formula:
+    TCD_mean_mm = −10.632 + 1.5486 × ga
+    SD_TCD      = 2.96  (absolute constant, mm — as reported in source paper)
+    z           = (TCD_observed_mm − TCD_mean_mm) ÷ SD_TCD
+    percentile  = clamp(Φ(z) × 100)
+  Inputs: TCD_observed (mm, no conversion needed), GA from LMP string
+  Output: integer 1–99 → stored as tcdPercentile
+  Valid range: 14–40 weeks
+
+  NOTE ON SD MODELLING
+  ─────────────────────
+  The Chang 2000 paper reports a single constant SD = 2.96 mm across the study
+  range. This is an absolute SD (not a coefficient of variation). Unlike the
+  Hadlock formulas for BPD, HC, AC, FL, and FL which model SD as a fraction of
+  the mean (proportional CV), TCD uses a fixed absolute SD, reflecting that
+  cerebellar measurement variability is roughly constant in mm rather than
+  proportional to the measured value. Applying a CV model here would be
+  clinically incorrect and must not be done.
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 8 — DEFERRED / FUTURE SCOPE NOTES
+────────────────────────────────────────────────────────────────────────────────
+
+  The following items are documented for future planning only and must NOT
+  be implemented in the current sprint. Items already completed are marked
+  [IMPLEMENTED] and retained for traceability.
+
+REQ-13  OFD auto-calculation sprint  [IMPLEMENTED]
+  calcGAFromOFD and calcOFDPercentile are implemented in calculations.ts and
+  wired into the biometry auto-calc hook (useBiometryAutoCalc.ts) and the
+  form-state / persistence layer, following the same patterns used for BPD, HC,
+  AC, FL. See FORM-8a and FORM-8b (both now marked [IMPLEMENTED]).
+
+REQ-14  First-Trimester percentile sprint  [PENDING]
+  When the FT percentile sprint is scheduled:
+    - NT percentile: implement per FORM-13 (high priority).
+    - CRL percentile: implement per FORM-12b (medium priority).
+    - NB qualitative field: add present/absent toggle before implementing
+      continuous percentile per FORM-14 (low priority).
+
+================================================================================
+END OF REQUIREMENTS
+================================================================================

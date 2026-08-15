@@ -5,6 +5,7 @@
  */
 import { Fragment } from 'react';
 import { Tile } from '@carbon/react';
+import { AutoCalcDot } from './AutoCalcDot';
 import { fmtBiometry } from '../utils/calculations';
 import { getSectionVisibility, isFirstTrimester, isFtTwins } from '../constants/examinationTypes';
 import type { Examination } from '../types';
@@ -27,9 +28,12 @@ const tileTitleStyle: React.CSSProperties = {
   marginBottom: '1rem',
 };
 
-const fieldBlock = (label: string, value: React.ReactNode) => (
+const fieldBlock = (label: string, value: React.ReactNode, labelAdornment?: React.ReactNode) => (
   <div>
-    <div style={{ fontSize: '0.75rem', color: '#525252', marginBottom: '0.25rem' }}>{label}</div>
+    <div style={{ fontSize: '0.75rem', color: '#525252', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+      <span>{label}</span>
+      {labelAdornment}
+    </div>
     <div style={{ fontSize: '0.875rem', color: '#161616', fontWeight: 600 }}>{value}</div>
   </div>
 );
@@ -78,6 +82,13 @@ export default function ExaminationSections({
     gap: '0.3rem 1.25rem',
     alignItems: 'baseline',
   };
+
+  const valueWithManualDot = (value: React.ReactNode, isManual?: boolean) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+      <span>{value}</span>
+      {isManual ? <AutoCalcDot size={5} /> : null}
+    </div>
+  );
 
   /** Render a single biometry row as two cells */
   const bioRow = (label: string, value: string) => (
@@ -146,7 +157,7 @@ export default function ExaminationSections({
           {/* Row 1: CRL — GA from CRL value in col 3 */}
           <div style={bioLabelStyle}>CRL (mm)</div>
           <div style={bioValueRightStyle}>{ftB?.crl !== undefined ? `${ftB.crl} mm` : '—'}</div>
-          <div style={bioValueStyle}>{ftB?.gaFromCrl || '—'}</div>
+          <div style={bioValueStyle}>{valueWithManualDot(ftB?.gaFromCrl || '—', ftB?.gaFromCrlIsManual)}</div>
           {/* NT row — Sub-Task 3: col 3 shows ntGa (placeholder until calculation wired) */}
           <div style={bioLabelStyle}>NT (mm)</div>
           <div style={bioValueRightStyle}>{ftB?.nt !== undefined ? `${ftB.nt} mm` : '—'}</div>
@@ -159,6 +170,12 @@ export default function ExaminationSections({
           <div style={bioValueRightStyle}>{ftB?.puls !== undefined ? `${ftB.puls} bpm` : '—'}</div>
           <div style={bioValueStyle}>{'—'}</div>
         </div>
+        {/* Footnote row — only shown when GA from CRL was manually entered */}
+        {ftB?.gaFromCrlIsManual && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#525252', fontStyle: 'italic', marginTop: '0.25rem' }}>
+            <AutoCalcDot size={5} /> Value manually entered
+          </div>
+        )}
       </div>
     );
   };
@@ -249,17 +266,17 @@ export default function ExaminationSections({
               {/* Row 1: BPD — Sub-Task 3: col 4 shows bpdGa (placeholder until calculation wired) */}
               <div style={bioLabelStyle}>BPD (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.bpd, 'mm')}</div>
-              <div style={bioValueStyle}>{fmtPct(bio?.bpdPercentile ?? bpct?.bpd)}</div>
-              <div style={bioValueStyle}>{bio?.bpdGa ?? '—'}</div>
+              <div style={bioValueStyle}>{valueWithManualDot(fmtPct(bio?.bpdPercentile ?? bpct?.bpd), bio?.bpdPercentileIsManual)}</div>
+              <div style={bioValueStyle}>{valueWithManualDot(bio?.bpdGa ?? '—', bio?.bpdGaIsManual)}</div>
               {/* OFD row — Sub-Task 3: expanded percentile; col 4 ofdGa placeholder */}
               <div style={bioLabelStyle}>OFD (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.ofd, 'mm')}</div>
-              <div style={bioValueStyle}>{fmtPct(bio?.ofdPercentile)}</div>
-              <div style={bioValueStyle}>{bio?.ofdGa ?? '—'}</div>
+              <div style={bioValueStyle}>{valueWithManualDot(fmtPct(bio?.ofdPercentile), bio?.ofdPercentileIsManual)}</div>
+              <div style={bioValueStyle}>{valueWithManualDot(bio?.ofdGa ?? '—', bio?.ofdGaIsManual)}</div>
               <div style={bioLabelStyle}>HC (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.hc, 'mm')}</div>
-              <div style={bioValueStyle}>{fmtPct(bio?.hcPercentile ?? bpct?.hc)}</div>
-              <div style={bioValueStyle}>{bio?.hcGa ?? '—'}</div>
+              <div style={bioValueStyle}>{valueWithManualDot(fmtPct(bio?.hcPercentile ?? bpct?.hc), bio?.hcPercentileIsManual)}</div>
+              <div style={bioValueStyle}>{valueWithManualDot(bio?.hcGa ?? '—', bio?.hcGaIsManual)}</div>
               {/* TAD row — Sub-Task 3: expanded percentile; col 4 tadGa placeholder */}
               <div style={bioLabelStyle}>TAD (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.tad, 'mm')}</div>
@@ -272,22 +289,22 @@ export default function ExaminationSections({
               <div style={bioValueStyle}>{bio?.apadGa ?? '—'}</div>
               <div style={bioLabelStyle}>AC (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.ac, 'mm')}</div>
-              <div style={bioValueStyle}>{fmtPct(bio?.acPercentile ?? bpct?.ac)}</div>
-              <div style={bioValueStyle}>{bio?.acGa ?? '—'}</div>
+              <div style={bioValueStyle}>{valueWithManualDot(fmtPct(bio?.acPercentile ?? bpct?.ac), bio?.acPercentileIsManual)}</div>
+              <div style={bioValueStyle}>{valueWithManualDot(bio?.acGa ?? '—', bio?.acGaIsManual)}</div>
               <div style={bioLabelStyle}>FL (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.fl, 'mm')}</div>
-              <div style={bioValueStyle}>{fmtPct(bio?.flPercentile ?? bpct?.fl)}</div>
-              <div style={bioValueStyle}>{bio?.flGa ?? '—'}</div>
+              <div style={bioValueStyle}>{valueWithManualDot(fmtPct(bio?.flPercentile ?? bpct?.fl), bio?.flPercentileIsManual)}</div>
+              <div style={bioValueStyle}>{valueWithManualDot(bio?.flGa ?? '—', bio?.flGaIsManual)}</div>
               {/* EFW row — Sub-Task 1: EFW now at position 8 (after FL) in the detail view */}
               <div style={bioLabelStyle}>EFW (grams)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.efw, 'g')}</div>
-              <div style={bioValueStyle}>{fmtPct(bio?.efwPercentile ?? efwPct)}</div>
-              <div style={bioValueStyle}>{bio?.efwGa ?? '—'}</div>
-              {/* TCD–LC rows — no GA formula, col 4 shows '—' */}
+              <div style={bioValueStyle}>{valueWithManualDot(fmtPct(bio?.efwPercentile ?? efwPct), bio?.efwPercentileIsManual)}</div>
+              <div style={bioValueStyle}>{valueWithManualDot(bio?.efwGa ?? '—', bio?.efwGaIsManual)}</div>
+              {/* TCD row — with GA and percentile */}
               <div style={bioLabelStyle}>TCD (mm)</div>
               <div style={bioValueRightStyle}>{fmtVal(bio?.tcd, 'mm')}</div>
-              <div style={bioValueStyle}>{fmtPct(undefined)}</div>
-              <div style={bioValueStyle}>{'—'}</div>
+              <div style={bioValueStyle}>{valueWithManualDot(fmtPct(bio?.tcdPercentile), bio?.tcdPercentileIsManual)}</div>
+              <div style={bioValueStyle}>{valueWithManualDot(bio?.tcdGa ?? '—', bio?.tcdGaIsManual)}</div>
               <div style={bioLabelStyle}>Vp</div>
               <div style={bioValueRightStyle}>{bio?.vp ?? '—'}</div>
               <div style={bioValueStyle}>{fmtPct(undefined)}</div>
@@ -312,6 +329,16 @@ export default function ExaminationSections({
               <div style={bioValueRightStyle}>{fmtVal(bio?.lc, 'mm')}</div>
               <div style={bioValueStyle}>{fmtPct(undefined)}</div>
               <div style={bioValueStyle}>{'—'}</div>
+              {/* Footnote row — spans all 4 columns; only shown when any derived field was manually entered */}
+              {(bio?.bpdPercentileIsManual || bio?.hcPercentileIsManual || bio?.acPercentileIsManual
+                || bio?.flPercentileIsManual || bio?.ofdPercentileIsManual || bio?.efwPercentileIsManual
+                || bio?.tcdPercentileIsManual || bio?.bpdGaIsManual || bio?.hcGaIsManual || bio?.acGaIsManual
+                || bio?.flGaIsManual || bio?.ofdGaIsManual || bio?.efwGaIsManual
+                || bio?.tcdGaIsManual || bio?.efwIsManual || bio?.gestationalAgeFromBiometryIsManual) && (
+                <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#525252', fontStyle: 'italic', marginTop: '0.25rem' }}>
+                  <AutoCalcDot size={5} /> Values manually entered
+                </div>
+              )}
             </div>
             {isTwins && (
               <div style={{ fontSize: '0.75rem', color: '#525252', marginTop: '0.25rem', marginBottom: '1rem', fontStyle: 'italic' }}>

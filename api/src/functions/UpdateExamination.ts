@@ -35,6 +35,7 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             mrn?: never;
             examDate?: string;
             gestationalAge?: string;
+            gestationalAgeIsManual?: boolean;
             gestationalAgeFromBiometry?: string;
             biometry?: any;
             doppler?: any;
@@ -52,7 +53,7 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
         }
         const body = await request.json() as ExaminationBody;
         // Strip any client-supplied mrn — MRN is immutable once assigned
-        const { mrn: _discardedMrn, examDate, gestationalAge, gestationalAgeFromBiometry, biometry, doppler, biometry2, doppler2, gestationalAgeFromBiometry2, findings, notes, status, data, etag, examinationType, patientAgeAtExam } = body;
+        const { mrn: _discardedMrn, examDate, gestationalAge, gestationalAgeIsManual, gestationalAgeFromBiometry, biometry, doppler, biometry2, doppler2, gestationalAgeFromBiometry2, findings, notes, status, data, etag, examinationType, patientAgeAtExam } = body;
 
         // Require ETag for optimistic concurrency
         if (!etag) {
@@ -63,6 +64,7 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
         const updateData: any = {};
         if (examDate !== undefined) updateData.examDate = examDate;
         if (gestationalAge !== undefined) updateData.gestationalAge = gestationalAge;
+        if (gestationalAgeIsManual !== undefined) updateData.gestationalAgeIsManual = gestationalAgeIsManual;
         if (gestationalAgeFromBiometry !== undefined) updateData.gestationalAgeFromBiometry = gestationalAgeFromBiometry;
         if (biometry !== undefined) updateData.biometry = biometry;
         if (doppler !== undefined) updateData.doppler = doppler;
@@ -111,18 +113,26 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             }
         }
 
-        // Validate with patientId from existing exam
+        // Validate with patientId from existing exam.
+        // existingExam.biometry/doppler are stored as JSON strings in Table Storage —
+        // parse them before validation so Joi receives objects, not strings.
+        const parseBioOrDoppler = (v: any) => {
+            if (!v) return undefined;
+            if (typeof v === 'string') { try { return JSON.parse(v); } catch { return undefined; } }
+            return v;
+        };
         const validationData = {
             patientId: existingExam.patientId,
             examDate: examDate || existingExam.examDate,
             status: status || existingExam.status,
             gestationalAge: gestationalAge !== undefined ? gestationalAge : existingExam.gestationalAge,
+            gestationalAgeIsManual: gestationalAgeIsManual !== undefined ? gestationalAgeIsManual : existingExam.gestationalAgeIsManual,
             gestationalAgeFromBiometry: gestationalAgeFromBiometry !== undefined ? gestationalAgeFromBiometry : existingExam.gestationalAgeFromBiometry,
-            biometry: biometry !== undefined ? biometry : existingExam.biometry,
-            doppler: doppler !== undefined ? doppler : existingExam.doppler,
+            biometry: biometry !== undefined ? biometry : parseBioOrDoppler(existingExam.biometry),
+            doppler: doppler !== undefined ? doppler : parseBioOrDoppler(existingExam.doppler),
             // uzd-twins: Twin 2 fields
-            biometry2: biometry2 !== undefined ? biometry2 : existingExam.biometry2,
-            doppler2: doppler2 !== undefined ? doppler2 : existingExam.doppler2,
+            biometry2: biometry2 !== undefined ? biometry2 : parseBioOrDoppler(existingExam.biometry2),
+            doppler2: doppler2 !== undefined ? doppler2 : parseBioOrDoppler(existingExam.doppler2),
             gestationalAgeFromBiometry2: gestationalAgeFromBiometry2 !== undefined ? gestationalAgeFromBiometry2 : existingExam.gestationalAgeFromBiometry2,
             findings: findings !== undefined ? findings : existingExam.findings,
             notes: notes !== undefined ? notes : existingExam.notes,
@@ -154,6 +164,10 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
         if (gestationalAge !== undefined && gestationalAge !== existingExam.gestationalAge) {
             updatedLookupEntity.gestationalAge = gestationalAge;
             changedFields.push('gestationalAge');
+        }
+        if (gestationalAgeIsManual !== undefined && gestationalAgeIsManual !== existingExam.gestationalAgeIsManual) {
+            updatedLookupEntity.gestationalAgeIsManual = gestationalAgeIsManual;
+            changedFields.push('gestationalAgeIsManual');
         }
         if (gestationalAgeFromBiometry !== undefined && gestationalAgeFromBiometry !== existingExam.gestationalAgeFromBiometry) {
             updatedLookupEntity.gestationalAgeFromBiometry = gestationalAgeFromBiometry;

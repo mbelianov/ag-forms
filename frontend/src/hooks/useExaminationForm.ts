@@ -4,7 +4,7 @@
  * calc handlers, validation, submit, and handleChange helpers.
  * The component file ExaminationForm.tsx becomes a thin JSX shell that calls this hook.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type {
   Examination,
   CreateExaminationRequest,
@@ -20,6 +20,8 @@ import {
   validateIntegerField,
   GA_REGEX,
 } from '../utils/validators';
+import { computeBiometryDerivedFields } from './useBiometryAutoCalc';
+import { computeFirstTrimesterDerivedFields } from './useFirstTrimesterAutoCalc';
 
 // ── Validation rule interfaces ────────────────────────────────────────────────
 
@@ -94,7 +96,10 @@ export function useExaminationForm({
     lc: examination?.biometry?.lc != null ? examination.biometry.lc.toFixed(2) : '',
     // GA fields (both stored separately)
     gestationalAge: examination?.gestationalAge || '',                         // GA from LMP
+    gestationalAgeIsManual: examination?.gestationalAgeIsManual ?? false,
     gestationalAgeFromBiometry: examination?.gestationalAgeFromBiometry || '', // GA from Biometry
+    efwIsManual: examination?.biometry?.efwIsManual ?? false,
+    gestationalAgeFromBiometryIsManual: examination?.biometry?.gestationalAgeFromBiometryIsManual ?? false,
     // Sub-Task 3: Per-measurement GA fields (T1) — string "Xw Yd", empty until calculated
     bpdGa:  examination?.biometry?.bpdGa  || '',
     ofdGa:  examination?.biometry?.ofdGa  || '',
@@ -104,6 +109,43 @@ export function useExaminationForm({
     acGa:   examination?.biometry?.acGa   || '',
     flGa:   examination?.biometry?.flGa   || '',
     efwGa:  examination?.biometry?.efwGa  || '',
+    tcdGa:  examination?.biometry?.tcdGa  || '',
+    // KI-009: Persisted percentile fields (T1) — stored as strings in formData for input binding
+    bpdPercentile:  examination?.biometry?.bpdPercentile  != null ? examination.biometry.bpdPercentile.toString() : '',
+    hcPercentile:   examination?.biometry?.hcPercentile   != null ? examination.biometry.hcPercentile.toString() : '',
+    acPercentile:   examination?.biometry?.acPercentile   != null ? examination.biometry.acPercentile.toString() : '',
+    flPercentile:   examination?.biometry?.flPercentile   != null ? examination.biometry.flPercentile.toString() : '',
+    ofdPercentile:  examination?.biometry?.ofdPercentile  != null ? examination.biometry.ofdPercentile.toString() : '',
+    tadPercentile:  examination?.biometry?.tadPercentile  != null ? examination.biometry.tadPercentile.toString() : '',
+    apadPercentile: examination?.biometry?.apadPercentile != null ? examination.biometry.apadPercentile.toString() : '',
+    efwPercentile:  examination?.biometry?.efwPercentile  != null ? examination.biometry.efwPercentile.toString() : '',
+    tcdPercentile:  examination?.biometry?.tcdPercentile  != null ? examination.biometry.tcdPercentile.toString() : '',
+    // KI-009: IsManual flags (T1)
+    bpdPercentileIsManual:  examination?.biometry?.bpdPercentileIsManual  ?? false,
+    hcPercentileIsManual:   examination?.biometry?.hcPercentileIsManual   ?? false,
+    acPercentileIsManual:   examination?.biometry?.acPercentileIsManual   ?? false,
+    flPercentileIsManual:   examination?.biometry?.flPercentileIsManual   ?? false,
+    ofdPercentileIsManual:  examination?.biometry?.ofdPercentileIsManual  ?? false,
+    tadPercentileIsManual:  examination?.biometry?.tadPercentileIsManual  ?? false,
+    apadPercentileIsManual: examination?.biometry?.apadPercentileIsManual ?? false,
+    efwPercentileIsManual:  examination?.biometry?.efwPercentileIsManual  ?? false,
+    tcdPercentileIsManual:  examination?.biometry?.tcdPercentileIsManual  ?? false,
+    bpdGaIsManual:  examination?.biometry?.bpdGaIsManual  ?? false,
+    hcGaIsManual:   examination?.biometry?.hcGaIsManual   ?? false,
+    acGaIsManual:   examination?.biometry?.acGaIsManual   ?? false,
+    flGaIsManual:   examination?.biometry?.flGaIsManual   ?? false,
+    ofdGaIsManual:  examination?.biometry?.ofdGaIsManual  ?? false,
+    tadGaIsManual:  examination?.biometry?.tadGaIsManual  ?? false,
+    apadGaIsManual: examination?.biometry?.apadGaIsManual ?? false,
+    efwGaIsManual:  examination?.biometry?.efwGaIsManual  ?? false,
+    tcdGaIsManual:  examination?.biometry?.tcdGaIsManual  ?? false,
+    // KI-009: FT gaFromBio
+    t1_ft_gaFromBio: examination?.data?.ft_biometry?.gaFromBio || '',
+    t1_ft_gaFromCrlIsManual: examination?.data?.ft_biometry?.gaFromCrlIsManual ?? false,
+    t1_ft_gaFromBioIsManual: examination?.data?.ft_biometry?.gaFromBioIsManual ?? false,
+    t2_ft_gaFromBio: examination?.data?.twin2_ft_biometry?.gaFromBio || '',
+    t2_ft_gaFromCrlIsManual: examination?.data?.twin2_ft_biometry?.gaFromCrlIsManual ?? false,
+    t2_ft_gaFromBioIsManual: examination?.data?.twin2_ft_biometry?.gaFromBioIsManual ?? false,
     // Doppler (floats allowed)
     pi: examination?.doppler?.pi?.toString() || '',
     ri: examination?.doppler?.ri?.toString() || '',
@@ -159,6 +201,8 @@ export function useExaminationForm({
     t2_la: examination?.biometry2?.la ?? '',
     t2_lc: examination?.biometry2?.lc != null ? examination.biometry2.lc.toFixed(2) : '',
     t2_gestationalAgeFromBiometry: examination?.gestationalAgeFromBiometry2 || '',
+    t2_efwIsManual: examination?.biometry2?.efwIsManual ?? false,
+    t2_gestationalAgeFromBiometryIsManual: examination?.biometry2?.gestationalAgeFromBiometryIsManual ?? false,
     // Sub-Task 3: Twin 2 per-measurement GA fields
     t2_bpdGa:  examination?.biometry2?.bpdGa  || '',
     t2_ofdGa:  examination?.biometry2?.ofdGa  || '',
@@ -168,6 +212,36 @@ export function useExaminationForm({
     t2_acGa:   examination?.biometry2?.acGa   || '',
     t2_flGa:   examination?.biometry2?.flGa   || '',
     t2_efwGa:  examination?.biometry2?.efwGa  || '',
+    t2_tcdGa:  examination?.biometry2?.tcdGa  || '',
+    // KI-009: Twin 2 persisted percentile fields
+    t2_bpdPercentile:  examination?.biometry2?.bpdPercentile  != null ? examination.biometry2.bpdPercentile.toString() : '',
+    t2_hcPercentile:   examination?.biometry2?.hcPercentile   != null ? examination.biometry2.hcPercentile.toString() : '',
+    t2_acPercentile:   examination?.biometry2?.acPercentile   != null ? examination.biometry2.acPercentile.toString() : '',
+    t2_flPercentile:   examination?.biometry2?.flPercentile   != null ? examination.biometry2.flPercentile.toString() : '',
+    t2_ofdPercentile:  examination?.biometry2?.ofdPercentile  != null ? examination.biometry2.ofdPercentile.toString() : '',
+    t2_tadPercentile:  examination?.biometry2?.tadPercentile  != null ? examination.biometry2.tadPercentile.toString() : '',
+    t2_apadPercentile: examination?.biometry2?.apadPercentile != null ? examination.biometry2.apadPercentile.toString() : '',
+    t2_efwPercentile:  examination?.biometry2?.efwPercentile  != null ? examination.biometry2.efwPercentile.toString() : '',
+    t2_tcdPercentile:  examination?.biometry2?.tcdPercentile  != null ? examination.biometry2.tcdPercentile.toString() : '',
+    // KI-009: Twin 2 IsManual flags
+    t2_bpdPercentileIsManual:  examination?.biometry2?.bpdPercentileIsManual  ?? false,
+    t2_hcPercentileIsManual:   examination?.biometry2?.hcPercentileIsManual   ?? false,
+    t2_acPercentileIsManual:   examination?.biometry2?.acPercentileIsManual   ?? false,
+    t2_flPercentileIsManual:   examination?.biometry2?.flPercentileIsManual   ?? false,
+    t2_ofdPercentileIsManual:  examination?.biometry2?.ofdPercentileIsManual  ?? false,
+    t2_tadPercentileIsManual:  examination?.biometry2?.tadPercentileIsManual  ?? false,
+    t2_apadPercentileIsManual: examination?.biometry2?.apadPercentileIsManual ?? false,
+    t2_efwPercentileIsManual:  examination?.biometry2?.efwPercentileIsManual  ?? false,
+    t2_tcdPercentileIsManual:  examination?.biometry2?.tcdPercentileIsManual  ?? false,
+    t2_bpdGaIsManual:  examination?.biometry2?.bpdGaIsManual  ?? false,
+    t2_hcGaIsManual:   examination?.biometry2?.hcGaIsManual   ?? false,
+    t2_acGaIsManual:   examination?.biometry2?.acGaIsManual   ?? false,
+    t2_flGaIsManual:   examination?.biometry2?.flGaIsManual   ?? false,
+    t2_ofdGaIsManual:  examination?.biometry2?.ofdGaIsManual  ?? false,
+    t2_tadGaIsManual:  examination?.biometry2?.tadGaIsManual  ?? false,
+    t2_apadGaIsManual: examination?.biometry2?.apadGaIsManual ?? false,
+    t2_efwGaIsManual:  examination?.biometry2?.efwGaIsManual  ?? false,
+    t2_tcdGaIsManual:  examination?.biometry2?.tcdGaIsManual  ?? false,
     // uzd-twins: Twin 2 doppler fields
     t2_pi: examination?.doppler2?.pi?.toString() || '',
     t2_ri: examination?.doppler2?.ri?.toString() || '',
@@ -262,6 +336,14 @@ export function useExaminationForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // B-3/B-4: Track previous CRL values so the FT auto-calc effects can distinguish
+  // "form loaded with existing CRL" (mount, do not overwrite manual gaFromCrl) from
+  // "CRL changed by user" (must recalculate per REQ-9).
+  // Seeded from the initial formData value so edit-load does not falsely trigger a
+  // CRL-change overwrite on first render.
+  const prevT1CrlRef = useRef<string>(formData.t1_ft_crl);
+  const prevT2CrlRef = useRef<string>(formData.t2_ft_crl);
+
   useEffect(() => {
     if (examination) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -286,7 +368,10 @@ export function useExaminationForm({
         la: examination.biometry?.la?.toString() || '',
         lc: examination.biometry?.lc != null ? examination.biometry.lc.toFixed(2) : '',
         gestationalAge: examination.gestationalAge || '',
+        gestationalAgeIsManual: examination.gestationalAgeIsManual ?? false,
         gestationalAgeFromBiometry: examination.gestationalAgeFromBiometry || '',
+        efwIsManual: examination.biometry?.efwIsManual ?? false,
+        gestationalAgeFromBiometryIsManual: examination.biometry?.gestationalAgeFromBiometryIsManual ?? false,
         // Sub-Task 3: Per-measurement GA fields (T1)
         bpdGa:  examination.biometry?.bpdGa  || '',
         ofdGa:  examination.biometry?.ofdGa  || '',
@@ -296,6 +381,43 @@ export function useExaminationForm({
         acGa:   examination.biometry?.acGa   || '',
         flGa:   examination.biometry?.flGa   || '',
         efwGa:  examination.biometry?.efwGa  || '',
+        tcdGa:  examination.biometry?.tcdGa  || '',
+        // KI-009: Persisted percentile fields (T1)
+        bpdPercentile:  examination.biometry?.bpdPercentile  != null ? examination.biometry.bpdPercentile.toString() : '',
+        hcPercentile:   examination.biometry?.hcPercentile   != null ? examination.biometry.hcPercentile.toString() : '',
+        acPercentile:   examination.biometry?.acPercentile   != null ? examination.biometry.acPercentile.toString() : '',
+        flPercentile:   examination.biometry?.flPercentile   != null ? examination.biometry.flPercentile.toString() : '',
+        ofdPercentile:  examination.biometry?.ofdPercentile  != null ? examination.biometry.ofdPercentile.toString() : '',
+        tadPercentile:  examination.biometry?.tadPercentile  != null ? examination.biometry.tadPercentile.toString() : '',
+        apadPercentile: examination.biometry?.apadPercentile != null ? examination.biometry.apadPercentile.toString() : '',
+        efwPercentile:  examination.biometry?.efwPercentile  != null ? examination.biometry.efwPercentile.toString() : '',
+        tcdPercentile:  examination.biometry?.tcdPercentile  != null ? examination.biometry.tcdPercentile.toString() : '',
+        // KI-009: IsManual flags (T1)
+        bpdPercentileIsManual:  examination.biometry?.bpdPercentileIsManual  ?? false,
+        hcPercentileIsManual:   examination.biometry?.hcPercentileIsManual   ?? false,
+        acPercentileIsManual:   examination.biometry?.acPercentileIsManual   ?? false,
+        flPercentileIsManual:   examination.biometry?.flPercentileIsManual   ?? false,
+        ofdPercentileIsManual:  examination.biometry?.ofdPercentileIsManual  ?? false,
+        tadPercentileIsManual:  examination.biometry?.tadPercentileIsManual  ?? false,
+        apadPercentileIsManual: examination.biometry?.apadPercentileIsManual ?? false,
+        efwPercentileIsManual:  examination.biometry?.efwPercentileIsManual  ?? false,
+        tcdPercentileIsManual:  examination.biometry?.tcdPercentileIsManual  ?? false,
+        bpdGaIsManual:  examination.biometry?.bpdGaIsManual  ?? false,
+        hcGaIsManual:   examination.biometry?.hcGaIsManual   ?? false,
+        acGaIsManual:   examination.biometry?.acGaIsManual   ?? false,
+        flGaIsManual:   examination.biometry?.flGaIsManual   ?? false,
+        ofdGaIsManual:  examination.biometry?.ofdGaIsManual  ?? false,
+        tadGaIsManual:  examination.biometry?.tadGaIsManual  ?? false,
+        apadGaIsManual: examination.biometry?.apadGaIsManual ?? false,
+        efwGaIsManual:  examination.biometry?.efwGaIsManual  ?? false,
+        tcdGaIsManual:  examination.biometry?.tcdGaIsManual  ?? false,
+        // KI-009: FT gaFromBio
+        t1_ft_gaFromBio: examination.data?.ft_biometry?.gaFromBio || '',
+        t1_ft_gaFromCrlIsManual: examination.data?.ft_biometry?.gaFromCrlIsManual ?? false,
+        t1_ft_gaFromBioIsManual: examination.data?.ft_biometry?.gaFromBioIsManual ?? false,
+        t2_ft_gaFromBio: examination.data?.twin2_ft_biometry?.gaFromBio || '',
+        t2_ft_gaFromCrlIsManual: examination.data?.twin2_ft_biometry?.gaFromCrlIsManual ?? false,
+        t2_ft_gaFromBioIsManual: examination.data?.twin2_ft_biometry?.gaFromBioIsManual ?? false,
         pi: examination.doppler?.pi?.toString() || '',
         ri: examination.doppler?.ri?.toString() || '',
         utADexPI: examination.doppler?.utADexPI?.toString() || '',
@@ -346,6 +468,8 @@ export function useExaminationForm({
         t2_la: examination.biometry2?.la?.toString() || '',
         t2_lc: examination.biometry2?.lc != null ? examination.biometry2.lc.toFixed(2) : '',
         t2_gestationalAgeFromBiometry: examination.gestationalAgeFromBiometry2 || '',
+        t2_efwIsManual: examination.biometry2?.efwIsManual ?? false,
+        t2_gestationalAgeFromBiometryIsManual: examination.biometry2?.gestationalAgeFromBiometryIsManual ?? false,
         // Sub-Task 3: Twin 2 per-measurement GA fields
         t2_bpdGa:  examination.biometry2?.bpdGa  || '',
         t2_ofdGa:  examination.biometry2?.ofdGa  || '',
@@ -355,6 +479,36 @@ export function useExaminationForm({
         t2_acGa:   examination.biometry2?.acGa   || '',
         t2_flGa:   examination.biometry2?.flGa   || '',
         t2_efwGa:  examination.biometry2?.efwGa  || '',
+        t2_tcdGa:  examination.biometry2?.tcdGa  || '',
+        // KI-009: Twin 2 persisted percentile fields
+        t2_bpdPercentile:  examination.biometry2?.bpdPercentile  != null ? examination.biometry2.bpdPercentile.toString() : '',
+        t2_hcPercentile:   examination.biometry2?.hcPercentile   != null ? examination.biometry2.hcPercentile.toString() : '',
+        t2_acPercentile:   examination.biometry2?.acPercentile   != null ? examination.biometry2.acPercentile.toString() : '',
+        t2_flPercentile:   examination.biometry2?.flPercentile   != null ? examination.biometry2.flPercentile.toString() : '',
+        t2_ofdPercentile:  examination.biometry2?.ofdPercentile  != null ? examination.biometry2.ofdPercentile.toString() : '',
+        t2_tadPercentile:  examination.biometry2?.tadPercentile  != null ? examination.biometry2.tadPercentile.toString() : '',
+        t2_apadPercentile: examination.biometry2?.apadPercentile != null ? examination.biometry2.apadPercentile.toString() : '',
+        t2_efwPercentile:  examination.biometry2?.efwPercentile  != null ? examination.biometry2.efwPercentile.toString() : '',
+        t2_tcdPercentile:  examination.biometry2?.tcdPercentile  != null ? examination.biometry2.tcdPercentile.toString() : '',
+        // KI-009: Twin 2 IsManual flags
+        t2_bpdPercentileIsManual:  examination.biometry2?.bpdPercentileIsManual  ?? false,
+        t2_hcPercentileIsManual:   examination.biometry2?.hcPercentileIsManual   ?? false,
+        t2_acPercentileIsManual:   examination.biometry2?.acPercentileIsManual   ?? false,
+        t2_flPercentileIsManual:   examination.biometry2?.flPercentileIsManual   ?? false,
+        t2_ofdPercentileIsManual:  examination.biometry2?.ofdPercentileIsManual  ?? false,
+        t2_tadPercentileIsManual:  examination.biometry2?.tadPercentileIsManual  ?? false,
+        t2_apadPercentileIsManual: examination.biometry2?.apadPercentileIsManual ?? false,
+        t2_efwPercentileIsManual:  examination.biometry2?.efwPercentileIsManual  ?? false,
+        t2_tcdPercentileIsManual:  examination.biometry2?.tcdPercentileIsManual  ?? false,
+        t2_bpdGaIsManual:  examination.biometry2?.bpdGaIsManual  ?? false,
+        t2_hcGaIsManual:   examination.biometry2?.hcGaIsManual   ?? false,
+        t2_acGaIsManual:   examination.biometry2?.acGaIsManual   ?? false,
+        t2_flGaIsManual:   examination.biometry2?.flGaIsManual   ?? false,
+        t2_ofdGaIsManual:  examination.biometry2?.ofdGaIsManual  ?? false,
+        t2_tadGaIsManual:  examination.biometry2?.tadGaIsManual  ?? false,
+        t2_apadGaIsManual: examination.biometry2?.apadGaIsManual ?? false,
+        t2_efwGaIsManual:  examination.biometry2?.efwGaIsManual  ?? false,
+        t2_tcdGaIsManual:  examination.biometry2?.tcdGaIsManual  ?? false,
         // uzd-twins: Twin 2 doppler
         t2_pi: examination.doppler2?.pi?.toString() || '',
         t2_ri: examination.doppler2?.ri?.toString() || '',
@@ -451,22 +605,295 @@ export function useExaminationForm({
   const isTwins = formData.examinationType === 'ultrasound_prenatal_twins';
   const isFt = isFirstTrimester(formData.examinationType);
   const isFtTwinsMode = isFtTwins(formData.examinationType);
-  const canCalcGAFromLMP = !!(formData.last_menstrual_period && formData.examDate);
   const edd = calcEDD(formData.last_menstrual_period);
 
   const visibility = getSectionVisibility(formData.examinationType);
   const selectedPatient = patients.find((p) => p.patientId === formData.patientId);
   const patientAge = calculateAgeAtDate(selectedPatient?.birthDate ?? '', formData.examDate);
 
-  // ── Calc handlers ──────────────────────────────────────────────────────────
-  const handleCalcGAFromLMP = () => {
-    const result = calcGAFromLMP(formData.last_menstrual_period, formData.examDate);
-    if (result) handleChange('gestationalAge', result);
-  };
+  // ── KI-009: Reactive biometry auto-calc ────────────────────────────────────
+  // Run on every render when biometry measurements or GA from LMP changes.
+  // Only applies to prenatal exam types (not FT — FT has no biometry percentiles).
+  useEffect(() => {
+    if (isFt) return;
+    const fd = formData as unknown as Record<string, string | boolean>;
+    const diff = computeBiometryDerivedFields({
+      bpd: fd.bpd as string, hc: fd.hc as string, ac: fd.ac as string,
+      fl: fd.fl as string, ofd: fd.ofd as string, tad: fd.tad as string,
+      apad: fd.apad as string, efw: fd.efw as string, tcd: fd.tcd as string,
+      gestationalAge: fd.gestationalAge as string,
+      gestationalAgeFromBiometry: fd.gestationalAgeFromBiometry as string,
+      bpdPercentile: fd.bpdPercentile as string, hcPercentile: fd.hcPercentile as string,
+      acPercentile: fd.acPercentile as string, flPercentile: fd.flPercentile as string,
+      ofdPercentile: fd.ofdPercentile as string, tadPercentile: fd.tadPercentile as string,
+      apadPercentile: fd.apadPercentile as string, efwPercentile: fd.efwPercentile as string,
+      tcdPercentile: fd.tcdPercentile as string,
+      bpdGa: fd.bpdGa as string, hcGa: fd.hcGa as string, acGa: fd.acGa as string,
+      flGa: fd.flGa as string, ofdGa: fd.ofdGa as string, tadGa: fd.tadGa as string,
+      apadGa: fd.apadGa as string, efwGa: fd.efwGa as string,
+      tcdGa: fd.tcdGa as string,
+      bpdPercentileIsManual: fd.bpdPercentileIsManual as boolean,
+      hcPercentileIsManual: fd.hcPercentileIsManual as boolean,
+      acPercentileIsManual: fd.acPercentileIsManual as boolean,
+      flPercentileIsManual: fd.flPercentileIsManual as boolean,
+      ofdPercentileIsManual: fd.ofdPercentileIsManual as boolean,
+      tadPercentileIsManual: fd.tadPercentileIsManual as boolean,
+      apadPercentileIsManual: fd.apadPercentileIsManual as boolean,
+      efwPercentileIsManual: fd.efwPercentileIsManual as boolean,
+      tcdPercentileIsManual: fd.tcdPercentileIsManual as boolean,
+      bpdGaIsManual: fd.bpdGaIsManual as boolean, hcGaIsManual: fd.hcGaIsManual as boolean,
+      acGaIsManual: fd.acGaIsManual as boolean, flGaIsManual: fd.flGaIsManual as boolean,
+      ofdGaIsManual: fd.ofdGaIsManual as boolean, tadGaIsManual: fd.tadGaIsManual as boolean,
+      apadGaIsManual: fd.apadGaIsManual as boolean, efwGaIsManual: fd.efwGaIsManual as boolean,
+      tcdGaIsManual: fd.tcdGaIsManual as boolean,
+      efwIsManual: fd.efwIsManual as boolean,
+      gestationalAgeFromBiometryIsManual: fd.gestationalAgeFromBiometryIsManual as boolean,
+    });
+    if (Object.keys(diff).length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFormData((prev) => ({ ...prev, ...diff }));
+    }
+  // Deliberately only track measurement + GA changes (not IsManual flags) to avoid loops
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    formData.bpd, formData.hc, formData.ac, formData.fl, formData.ofd, formData.efw, formData.tcd,
+    formData.gestationalAge, isFt,
+  ]);
+
+  useEffect(() => {
+    if (isFt || !isTwins) return;
+    const fd = formData as unknown as Record<string, string | boolean>;
+    const diff = computeBiometryDerivedFields({
+      bpd: fd.t2_bpd as string, hc: fd.t2_hc as string, ac: fd.t2_ac as string,
+      fl: fd.t2_fl as string, ofd: fd.t2_ofd as string, tad: fd.t2_tad as string,
+      apad: fd.t2_apad as string, efw: fd.t2_efw as string, tcd: fd.t2_tcd as string,
+      gestationalAge: fd.gestationalAge as string,
+      gestationalAgeFromBiometry: fd.t2_gestationalAgeFromBiometry as string,
+      bpdPercentile: fd.t2_bpdPercentile as string, hcPercentile: fd.t2_hcPercentile as string,
+      acPercentile: fd.t2_acPercentile as string, flPercentile: fd.t2_flPercentile as string,
+      ofdPercentile: fd.t2_ofdPercentile as string, tadPercentile: fd.t2_tadPercentile as string,
+      apadPercentile: fd.t2_apadPercentile as string, efwPercentile: fd.t2_efwPercentile as string,
+      tcdPercentile: fd.t2_tcdPercentile as string,
+      bpdGa: fd.t2_bpdGa as string, hcGa: fd.t2_hcGa as string, acGa: fd.t2_acGa as string,
+      flGa: fd.t2_flGa as string, ofdGa: fd.t2_ofdGa as string, tadGa: fd.t2_tadGa as string,
+      apadGa: fd.t2_apadGa as string, efwGa: fd.t2_efwGa as string,
+      tcdGa: fd.t2_tcdGa as string,
+      bpdPercentileIsManual: fd.t2_bpdPercentileIsManual as boolean,
+      hcPercentileIsManual: fd.t2_hcPercentileIsManual as boolean,
+      acPercentileIsManual: fd.t2_acPercentileIsManual as boolean,
+      flPercentileIsManual: fd.t2_flPercentileIsManual as boolean,
+      ofdPercentileIsManual: fd.t2_ofdPercentileIsManual as boolean,
+      tadPercentileIsManual: fd.t2_tadPercentileIsManual as boolean,
+      apadPercentileIsManual: fd.t2_apadPercentileIsManual as boolean,
+      efwPercentileIsManual: fd.t2_efwPercentileIsManual as boolean,
+      tcdPercentileIsManual: fd.t2_tcdPercentileIsManual as boolean,
+      bpdGaIsManual: fd.t2_bpdGaIsManual as boolean, hcGaIsManual: fd.t2_hcGaIsManual as boolean,
+      acGaIsManual: fd.t2_acGaIsManual as boolean, flGaIsManual: fd.t2_flGaIsManual as boolean,
+      ofdGaIsManual: fd.t2_ofdGaIsManual as boolean, tadGaIsManual: fd.t2_tadGaIsManual as boolean,
+      apadGaIsManual: fd.t2_apadGaIsManual as boolean, efwGaIsManual: fd.t2_efwGaIsManual as boolean,
+      tcdGaIsManual: fd.t2_tcdGaIsManual as boolean,
+      efwIsManual: fd.t2_efwIsManual as boolean,
+      gestationalAgeFromBiometryIsManual: fd.t2_gestationalAgeFromBiometryIsManual as boolean,
+    });
+    if (Object.keys(diff).length > 0) {
+      const t2Diff = Object.fromEntries(Object.entries(diff).map(([key, diffValue]) => [`t2_${key}`, diffValue]));
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFormData((prev) => ({ ...prev, ...t2Diff }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    formData.t2_bpd, formData.t2_hc, formData.t2_ac, formData.t2_fl,
+    formData.t2_ofd, formData.t2_efw, formData.t2_tcd, formData.gestationalAge, isFt, isTwins,
+  ]);
+
+  useEffect(() => {
+    if (!isFt) return;
+    const crlChanged = formData.t1_ft_crl !== prevT1CrlRef.current;
+    prevT1CrlRef.current = formData.t1_ft_crl;
+
+    // B-3: If CRL did not change (mount or flag-change re-run) and gaFromCrl is manual,
+    // preserve the stored value — do not overwrite (REQ-10).
+    if (!crlChanged && formData.t1_ft_gaFromCrlIsManual) return;
+
+    const diff = computeFirstTrimesterDerivedFields({
+      crl: formData.t1_ft_crl,
+    });
+
+    // gaFromBio: only overwrite if not manually set (Sub-Task 1: gaFromBioIsManual guard)
+    const nextGaFromBio = formData.t1_ft_gaFromBioIsManual ? formData.t1_ft_gaFromBio : diff.gaFromBio;
+
+    if (
+      diff.gaFromCrl !== formData.t1_ft_gaFromCrl ||
+      nextGaFromBio !== formData.t1_ft_gaFromBio ||
+      diff.gaFromCrlIsManual !== formData.t1_ft_gaFromCrlIsManual
+    ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFormData((prev) => ({
+        ...prev,
+        t1_ft_gaFromCrl: diff.gaFromCrl,
+        t1_ft_gaFromBio: nextGaFromBio,
+        t1_ft_gaFromCrlIsManual: diff.gaFromCrlIsManual,
+      }));
+    }
+  }, [formData.t1_ft_crl, formData.t1_ft_gaFromCrl, formData.t1_ft_gaFromBio, formData.t1_ft_gaFromCrlIsManual, formData.t1_ft_gaFromBioIsManual, isFt]);
+
+  useEffect(() => {
+    if (!isFtTwinsMode) return;
+    const crlChanged = formData.t2_ft_crl !== prevT2CrlRef.current;
+    prevT2CrlRef.current = formData.t2_ft_crl;
+
+    // B-4: If CRL did not change (mount or flag-change re-run) and gaFromCrl is manual,
+    // preserve the stored value — do not overwrite (REQ-10).
+    if (!crlChanged && formData.t2_ft_gaFromCrlIsManual) return;
+
+    const diff = computeFirstTrimesterDerivedFields({
+      crl: formData.t2_ft_crl,
+    });
+
+    // gaFromBio: only overwrite if not manually set (Sub-Task 1: gaFromBioIsManual guard)
+    const nextGaFromBio = formData.t2_ft_gaFromBioIsManual ? formData.t2_ft_gaFromBio : diff.gaFromBio;
+
+    if (
+      diff.gaFromCrl !== formData.t2_ft_gaFromCrl ||
+      nextGaFromBio !== formData.t2_ft_gaFromBio ||
+      diff.gaFromCrlIsManual !== formData.t2_ft_gaFromCrlIsManual
+    ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFormData((prev) => ({
+        ...prev,
+        t2_ft_gaFromCrl: diff.gaFromCrl,
+        t2_ft_gaFromBio: nextGaFromBio,
+        t2_ft_gaFromCrlIsManual: diff.gaFromCrlIsManual,
+      }));
+    }
+  }, [formData.t2_ft_crl, formData.t2_ft_gaFromCrl, formData.t2_ft_gaFromBio, formData.t2_ft_gaFromCrlIsManual, formData.t2_ft_gaFromBioIsManual, isFtTwinsMode]);
+
+  useEffect(() => {
+    if (formData.gestationalAgeIsManual) return;
+    if (!formData.last_menstrual_period || !formData.examDate) return;
+
+    const result = calcGAFromLMP(formData.last_menstrual_period, formData.examDate) ?? '';
+    if (result !== formData.gestationalAge) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFormData((prev) => ({ ...prev, gestationalAge: result }));
+    }
+  }, [formData.last_menstrual_period, formData.examDate, formData.gestationalAge, formData.gestationalAgeIsManual]);
 
   // ── handleChange / handleChangeT1 ─────────────────────────────────────────
   const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const derivedManualFields = [
+        'bpdPercentile', 'hcPercentile', 'acPercentile', 'flPercentile',
+        'ofdPercentile', 'efwPercentile', 'bpdGa', 'hcGa',
+        'acGa', 'flGa', 'ofdGa', 'efwGa', 'tcdPercentile', 'tcdGa',
+        'gestationalAgeFromBiometry',
+      ];
+      const measurementManualDependencies: Record<string, string[]> = {
+        bpd: ['efw', 'gestationalAgeFromBiometry', 'bpdPercentile', 'bpdGa', 'efwPercentile', 'efwGa'],
+        hc: ['efw', 'gestationalAgeFromBiometry', 'hcPercentile', 'hcGa', 'efwPercentile', 'efwGa'],
+        ac: ['efw', 'gestationalAgeFromBiometry', 'acPercentile', 'acGa', 'efwPercentile', 'efwGa'],
+        fl: ['efw', 'gestationalAgeFromBiometry', 'flPercentile', 'flGa', 'efwPercentile', 'efwGa'],
+        ofd: ['ofdPercentile', 'ofdGa'],
+        tcd: ['tcdPercentile', 'tcdGa'],
+        gestationalAge: ['bpdPercentile', 'hcPercentile', 'acPercentile', 'flPercentile', 'ofdPercentile', 'efwPercentile', 'tcdPercentile'],
+        last_menstrual_period: ['gestationalAge', 'bpdPercentile', 'hcPercentile', 'acPercentile', 'flPercentile', 'ofdPercentile', 'efwPercentile', 'tcdPercentile'],
+        examDate: ['gestationalAge', 'bpdPercentile', 'hcPercentile', 'acPercentile', 'flPercentile', 'ofdPercentile', 'efwPercentile', 'tcdPercentile'],
+      };
+      const measurementField = field.startsWith('t2_') ? field.slice(3) : field;
+      const prefix = field.startsWith('t2_') ? 't2_' : '';
+
+      const resetDependentManualFlags = (next: Record<string, unknown>, dependencies: string[]) => {
+        dependencies.forEach((dependency) => {
+          next[`${prefix}${dependency}IsManual`] = false;
+        });
+      };
+
+      if (field === 'gestationalAge') {
+        const next = { ...prev, gestationalAge: value, gestationalAgeIsManual: value !== '' };
+        resetDependentManualFlags(next, measurementManualDependencies.gestationalAge);
+        // B-2: Also reset T2 percentile IsManual flags — gestationalAge has no t2_ prefix so
+        // the generic prefix-detection helper above produces '' prefix (T1), not 't2_'.
+        next.t2_bpdPercentileIsManual = false;
+        next.t2_hcPercentileIsManual = false;
+        next.t2_acPercentileIsManual = false;
+        next.t2_flPercentileIsManual = false;
+        next.t2_ofdPercentileIsManual = false;
+        next.t2_efwPercentileIsManual = false;
+        next.t2_tcdPercentileIsManual = false;
+        return next;
+      }
+
+      if (field === 'ft_gaFromCrl') {
+        return {
+          ...prev,
+          t1_ft_gaFromCrl: value,
+          t1_ft_gaFromCrlIsManual: value !== '',
+          ...(value === '' ? { t1_ft_gaFromBio: '' } : {}),
+        };
+      }
+
+      if (field === 't1_ft_gaFromCrl') {
+        return {
+          ...prev,
+          t1_ft_gaFromCrl: value,
+          t1_ft_gaFromCrlIsManual: value !== '',
+          ...(value === '' ? { t1_ft_gaFromBio: '' } : {}),
+        };
+      }
+
+      if (field === 't2_ft_gaFromCrl') {
+        return {
+          ...prev,
+          t2_ft_gaFromCrl: value,
+          t2_ft_gaFromCrlIsManual: value !== '',
+          ...(value === '' ? { t2_ft_gaFromBio: '' } : {}),
+        };
+      }
+
+      // Sub-Task 1: gaFromBio manual flag handlers for FT single and FT twins
+      if (field === 't1_ft_gaFromBio') {
+        return { ...prev, t1_ft_gaFromBio: value, t1_ft_gaFromBioIsManual: value !== '' };
+      }
+
+      if (field === 't2_ft_gaFromBio') {
+        return { ...prev, t2_ft_gaFromBio: value, t2_ft_gaFromBioIsManual: value !== '' };
+      }
+
+      // B-5: When ft_crl changes, reset the T1 FT gaFromCrl IsManual flag so the reactive
+      // effect unconditionally recalculates (REQ-9). Arrives as 'ft_crl' via handleChangeT1
+      // (which strips the 't1_' prefix) or as 't1_ft_crl' when handleChange is wired directly.
+      // Sub-Task 1: also reset gaFromBioIsManual so auto-calc overwrites a stale manual value.
+      if (field === 'ft_crl' || field === 't1_ft_crl') {
+        return { ...prev, t1_ft_crl: value, t1_ft_gaFromCrlIsManual: false, t1_ft_gaFromBioIsManual: false };
+      }
+
+      // B-5: When t2_ft_crl changes, reset the T2 FT gaFromCrl IsManual flag (REQ-9).
+      // Sub-Task 1: also reset gaFromBioIsManual.
+      if (field === 't2_ft_crl') {
+        return { ...prev, t2_ft_crl: value, t2_ft_gaFromCrlIsManual: false, t2_ft_gaFromBioIsManual: false };
+      }
+
+      if (field === 'efw' || field === 't2_efw') {
+        const manualKey = field === 'efw' ? 'efwIsManual' : 't2_efwIsManual';
+        return { ...prev, [field]: value, [manualKey]: value !== '' };
+      }
+
+      if (measurementManualDependencies[measurementField]) {
+        const next = { ...prev, [field]: value };
+        resetDependentManualFlags(next, measurementManualDependencies[measurementField]);
+        return next;
+      }
+
+      const normalizedField = field.startsWith('t2_') ? field.slice(3) : field;
+      if (derivedManualFields.includes(normalizedField)) {
+        const manualKey = field.startsWith('t2_')
+          ? `t2_${normalizedField}IsManual`
+          : `${normalizedField}IsManual`;
+        return { ...prev, [field]: value, [manualKey]: value !== '' };
+      }
+
+      return { ...prev, [field]: value };
+    });
     if (errors[field]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -481,6 +908,44 @@ export function useExaminationForm({
   const handleChangeT1 = (field: string, value: string) => {
     const stripped = field.startsWith('t1_') ? field.slice(3) : field;
     handleChange(stripped, value);
+  };
+
+  // Sub-Task 3 & 4: Batch handler for the twins composite "T1 / T2" GA from Bio field.
+  // Splits raw input on '/' and writes both values + both IsManual flags in one setState call.
+  // prefix: '' for prenatal twins, 'ft_' for FT twins.
+  const handleGaFromBioTwinsChange = (prefix: '' | 'ft_', rawValue: string) => {
+    const [rawT1, rawT2 = ''] = rawValue.split('/');
+    const t1Val = rawT1.trim();
+    const t2Val = rawT2.trim();
+    if (prefix === 'ft_') {
+      setFormData((prev) => ({
+        ...prev,
+        t1_ft_gaFromBio: t1Val,
+        t1_ft_gaFromBioIsManual: t1Val !== '',
+        t2_ft_gaFromBio: t2Val,
+        t2_ft_gaFromBioIsManual: t2Val !== '',
+      }));
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next['t1_ft_gaFromBio'];
+        delete next['t2_ft_gaFromBio'];
+        return next;
+      });
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        gestationalAgeFromBiometry: t1Val,
+        gestationalAgeFromBiometryIsManual: t1Val !== '',
+        t2_gestationalAgeFromBiometry: t2Val,
+        t2_gestationalAgeFromBiometryIsManual: t2Val !== '',
+      }));
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next['gestationalAgeFromBiometry'];
+        delete next['t2_gestationalAgeFromBiometry'];
+        return next;
+      });
+    }
   };
 
   // ── Validation ─────────────────────────────────────────────────────────────
@@ -556,6 +1021,8 @@ export function useExaminationForm({
     { errorKey: 't1_ft_nb',  formKey: 't1_ft_nb',  validate: (r) => validatePositiveFloat(r, 'NB'),  onlyWhen: () => isFt },
     // ── FT T1 GA from CRL ─────────────────────────────────────────────────────
     { errorKey: 't1_ft_gaFromCrl', formKey: 't1_ft_gaFromCrl', validate: validateGA, onlyWhen: () => isFt },
+    // ── FT T1 GA from Bio (Sub-Task 2) ───────────────────────────────────────
+    { errorKey: 't1_ft_gaFromBio', formKey: 't1_ft_gaFromBio', validate: validateGA, onlyWhen: () => isFt && !isFtTwinsMode },
     // ── FT T1 integer fields ─────────────────────────────────────────────────
     { errorKey: 't1_ft_puls',      formKey: 't1_ft_puls',      validate: (r) => validateIntegerField(r, 'Pulse'),      onlyWhen: () => isFt },
     { errorKey: 't1_ft_heartRate', formKey: 't1_ft_heartRate', validate: (r) => validateIntegerField(r, 'Heart rate'), onlyWhen: () => isFt },
@@ -570,6 +1037,8 @@ export function useExaminationForm({
     { errorKey: 't2_ft_nb',  formKey: 't2_ft_nb',  validate: (r) => validatePositiveFloat(r, 'NB (T2)'),  onlyWhen: () => isFtTwinsMode },
     // ── FT T2 GA from CRL ─────────────────────────────────────────────────────
     { errorKey: 't2_ft_gaFromCrl', formKey: 't2_ft_gaFromCrl', validate: validateGA, onlyWhen: () => isFtTwinsMode },
+    // ── FT T2 GA from Bio (Sub-Task 4) ───────────────────────────────────────
+    { errorKey: 't2_ft_gaFromBio', formKey: 't2_ft_gaFromBio', validate: validateGA, onlyWhen: () => isFtTwinsMode },
     // ── FT T2 integer fields ─────────────────────────────────────────────────
     { errorKey: 't2_ft_puls',      formKey: 't2_ft_puls',      validate: (r) => validateIntegerField(r, 'Pulse (T2)'),      onlyWhen: () => isFtTwinsMode },
     { errorKey: 't2_ft_heartRate', formKey: 't2_ft_heartRate', validate: (r) => validateIntegerField(r, 'Heart rate (T2)'), onlyWhen: () => isFtTwinsMode },
@@ -608,7 +1077,7 @@ export function useExaminationForm({
       newErrors.gestationalAge = 'Format must be "28w 3d" or "28с 3д"';
 
     // ── Declarative table runner (ST-2) ────────────────────────────────────
-    const fd = formData as Record<string, string>;
+    const fd = formData as unknown as Record<string, string>;
     for (const rule of VALIDATION_RULES) {
       if (rule.onlyWhen && !rule.onlyWhen()) continue;
       const err = rule.validate(fd[rule.formKey] ?? '');
@@ -649,6 +1118,17 @@ export function useExaminationForm({
     { formKey: 'acGa',   payloadPath: 'biometry.acGa',   outType: 'trim' },
     { formKey: 'flGa',   payloadPath: 'biometry.flGa',   outType: 'trim' },
     { formKey: 'efwGa',  payloadPath: 'biometry.efwGa',  outType: 'trim' },
+    { formKey: 'tcdGa',  payloadPath: 'biometry.tcdGa',  outType: 'trim' },
+    // KI-009: T1 persisted percentile fields (integer)
+    { formKey: 'bpdPercentile',  payloadPath: 'biometry.bpdPercentile',  outType: 'integer' },
+    { formKey: 'hcPercentile',   payloadPath: 'biometry.hcPercentile',   outType: 'integer' },
+    { formKey: 'acPercentile',   payloadPath: 'biometry.acPercentile',   outType: 'integer' },
+    { formKey: 'flPercentile',   payloadPath: 'biometry.flPercentile',   outType: 'integer' },
+    { formKey: 'ofdPercentile',  payloadPath: 'biometry.ofdPercentile',  outType: 'integer' },
+    { formKey: 'tadPercentile',  payloadPath: 'biometry.tadPercentile',  outType: 'integer' },
+    { formKey: 'apadPercentile', payloadPath: 'biometry.apadPercentile', outType: 'integer' },
+    { formKey: 'efwPercentile',  payloadPath: 'biometry.efwPercentile',  outType: 'integer' },
+    { formKey: 'tcdPercentile',  payloadPath: 'biometry.tcdPercentile',  outType: 'integer' },
     // ── T1 doppler ────────────────────────────────────────────────────────────
     { formKey: 'pi',       payloadPath: 'doppler.pi',       outType: 'float' },
     { formKey: 'ri',       payloadPath: 'doppler.ri',       outType: 'float' },
@@ -687,6 +1167,17 @@ export function useExaminationForm({
     { formKey: 't2_acGa',   payloadPath: 'biometry2.acGa',   outType: 'trim', onlyWhen: () => isTwins },
     { formKey: 't2_flGa',   payloadPath: 'biometry2.flGa',   outType: 'trim', onlyWhen: () => isTwins },
     { formKey: 't2_efwGa',  payloadPath: 'biometry2.efwGa',  outType: 'trim', onlyWhen: () => isTwins },
+    { formKey: 't2_tcdGa',  payloadPath: 'biometry2.tcdGa',  outType: 'trim', onlyWhen: () => isTwins },
+    // KI-009: T2 persisted percentile fields (integer)
+    { formKey: 't2_bpdPercentile',  payloadPath: 'biometry2.bpdPercentile',  outType: 'integer', onlyWhen: () => isTwins },
+    { formKey: 't2_hcPercentile',   payloadPath: 'biometry2.hcPercentile',   outType: 'integer', onlyWhen: () => isTwins },
+    { formKey: 't2_acPercentile',   payloadPath: 'biometry2.acPercentile',   outType: 'integer', onlyWhen: () => isTwins },
+    { formKey: 't2_flPercentile',   payloadPath: 'biometry2.flPercentile',   outType: 'integer', onlyWhen: () => isTwins },
+    { formKey: 't2_ofdPercentile',  payloadPath: 'biometry2.ofdPercentile',  outType: 'integer', onlyWhen: () => isTwins },
+    { formKey: 't2_tadPercentile',  payloadPath: 'biometry2.tadPercentile',  outType: 'integer', onlyWhen: () => isTwins },
+    { formKey: 't2_apadPercentile', payloadPath: 'biometry2.apadPercentile', outType: 'integer', onlyWhen: () => isTwins },
+    { formKey: 't2_efwPercentile',  payloadPath: 'biometry2.efwPercentile',  outType: 'integer', onlyWhen: () => isTwins },
+    { formKey: 't2_tcdPercentile',  payloadPath: 'biometry2.tcdPercentile',  outType: 'integer', onlyWhen: () => isTwins },
     // ── T2 doppler ────────────────────────────────────────────────────────────
     { formKey: 't2_pi',       payloadPath: 'doppler2.pi',       outType: 'float',   onlyWhen: () => isTwins },
     { formKey: 't2_ri',       payloadPath: 'doppler2.ri',       outType: 'float',   onlyWhen: () => isTwins },
@@ -733,7 +1224,7 @@ export function useExaminationForm({
     if (!validateForm()) return;
     setIsSubmitting(true);
     try {
-      const fd = formData as Record<string, string>;
+      const fd = formData as unknown as Record<string, string>;
 
       // ── Generic assembler (ST-3) ──────────────────────────────────────────
       // Walks FIELD_REGISTRY, applies outType transform, writes into nested output.
@@ -757,6 +1248,40 @@ export function useExaminationForm({
         const [group, key] = entry.payloadPath.split('.');
         if (!assembled[group]) assembled[group] = {};
         assembled[group][key] = value;
+      }
+
+      // KI-009: Merge IsManual boolean flags into assembled biometry objects
+      // (booleans are not handled by FIELD_REGISTRY which operates on string formData)
+      const fmBool = formData as unknown as Record<string, boolean>;
+      const bioIsManualFields = [
+        'bpdPercentileIsManual', 'hcPercentileIsManual', 'acPercentileIsManual', 'flPercentileIsManual',
+        'ofdPercentileIsManual', 'tadPercentileIsManual', 'apadPercentileIsManual', 'efwPercentileIsManual',
+        'tcdPercentileIsManual',
+        'bpdGaIsManual', 'hcGaIsManual', 'acGaIsManual', 'flGaIsManual',
+        'ofdGaIsManual', 'tadGaIsManual', 'apadGaIsManual', 'efwGaIsManual', 'tcdGaIsManual', 'efwIsManual',
+        'gestationalAgeFromBiometryIsManual',
+      ];
+      // gestationalAgeFromBiometryIsManual must travel with the biometry object.
+      // If no biometry measurements were entered, assembled.biometry may not exist yet —
+      // create it so the flag can be persisted alongside gestationalAgeFromBiometry.
+      if (fmBool.gestationalAgeFromBiometryIsManual && !assembled.biometry) {
+        assembled.biometry = {};
+      }
+      if (assembled.biometry) {
+        for (const key of bioIsManualFields) {
+          if (fmBool[key]) assembled.biometry[key] = true;
+        }
+      }
+      if (isTwins) {
+        if (fmBool.t2_gestationalAgeFromBiometryIsManual && !assembled.biometry2) {
+          assembled.biometry2 = {};
+        }
+        if (assembled.biometry2) {
+          for (const key of bioIsManualFields) {
+            const t2Key = `t2_${key}`;
+            if (fmBool[t2Key]) assembled.biometry2[key] = true;
+          }
+        }
       }
 
       // ── Build structured payload from assembled groups ────────────────────
@@ -861,12 +1386,17 @@ export function useExaminationForm({
           heartRate: ftUltraAssembled?.heartRate as number | undefined,
           umbilicalCord: fd.t1_ft_umbilicalCord.trim() || undefined,
         } : undefined;
-        ft_biometry = (fd.t1_ft_crl || fd.t1_ft_nt || fd.t1_ft_nb || fd.t1_ft_puls || fd.t1_ft_gaFromCrl) ? {
+        ft_biometry = (fd.t1_ft_crl || fd.t1_ft_nt || fd.t1_ft_nb || fd.t1_ft_puls || fd.t1_ft_gaFromCrl || fd.t1_ft_gaFromBio) ? {
           crl: ftBiomAssembled?.crl as number | undefined,
           gaFromCrl: fd.t1_ft_gaFromCrl.trim() || undefined,
+          gaFromCrlIsManual: fd.t1_ft_gaFromCrlIsManual ? true : undefined,
           nt: ftBiomAssembled?.nt as number | undefined,
           nb: ftBiomAssembled?.nb as number | undefined,
           puls: ftBiomAssembled?.puls as number | undefined,
+          // KI-009: gaFromBio persisted in ft_biometry
+          gaFromBio: fd.t1_ft_gaFromBio?.trim() || undefined,
+          // Sub-Task 1: persist gaFromBioIsManual flag
+          gaFromBioIsManual: fd.t1_ft_gaFromBioIsManual ? true : undefined,
         } : undefined;
         ft_markers = (fd.t1_ft_arrhythmia || fd.t1_ft_tricuspidRegurgitation || fd.t1_ft_abnormalDvFlow || fd.t1_ft_echogenicCardiacFocus || fd.t1_ft_singleUmbilicalArtery || fd.t1_ft_choroidPlexusCysts || fd.t1_ft_exomphalos || fd.t1_ft_megacystis || fd.t1_ft_markerPlacenta || fd.t1_ft_cordInsertion) ? {
           arrhythmia: fd.t1_ft_arrhythmia || undefined,
@@ -897,12 +1427,17 @@ export function useExaminationForm({
             heartRate: t2FtUltraAssembled?.heartRate as number | undefined,
             umbilicalCord: fd.t2_ft_umbilicalCord.trim() || undefined,
           } : undefined;
-          twin2_ft_biometry = (fd.t2_ft_crl || fd.t2_ft_nt || fd.t2_ft_nb || fd.t2_ft_puls || fd.t2_ft_gaFromCrl) ? {
+          twin2_ft_biometry = (fd.t2_ft_crl || fd.t2_ft_nt || fd.t2_ft_nb || fd.t2_ft_puls || fd.t2_ft_gaFromCrl || fd.t2_ft_gaFromBio) ? {
             crl: t2FtBiomAssembled?.crl as number | undefined,
             gaFromCrl: fd.t2_ft_gaFromCrl.trim() || undefined,
+            gaFromCrlIsManual: fd.t2_ft_gaFromCrlIsManual ? true : undefined,
             nt: t2FtBiomAssembled?.nt as number | undefined,
             nb: t2FtBiomAssembled?.nb as number | undefined,
             puls: t2FtBiomAssembled?.puls as number | undefined,
+            // KI-009: gaFromBio persisted in twin2_ft_biometry
+            gaFromBio: fd.t2_ft_gaFromBio?.trim() || undefined,
+            // Sub-Task 1: persist gaFromBioIsManual flag
+            gaFromBioIsManual: fd.t2_ft_gaFromBioIsManual ? true : undefined,
           } : undefined;
           twin2_ft_markers = (fd.t2_ft_arrhythmia || fd.t2_ft_tricuspidRegurgitation || fd.t2_ft_abnormalDvFlow || fd.t2_ft_echogenicCardiacFocus || fd.t2_ft_singleUmbilicalArtery || fd.t2_ft_choroidPlexusCysts || fd.t2_ft_exomphalos || fd.t2_ft_megacystis || fd.t2_ft_markerPlacenta || fd.t2_ft_cordInsertion) ? {
             arrhythmia: fd.t2_ft_arrhythmia || undefined,
@@ -947,9 +1482,14 @@ export function useExaminationForm({
         ...(isEdit ? {} : { patientId: formData.patientId }),
         examDate: formData.examDate,
         gestationalAge: formData.gestationalAge.trim() || undefined,
+        gestationalAgeIsManual: formData.gestationalAgeIsManual || undefined,
         // For FT types, biometry/doppler/gestationalAgeFromBiometry are not emitted
         ...(!isFt ? {
-          gestationalAgeFromBiometry: formData.gestationalAgeFromBiometry.trim() || undefined,
+          // On edit, send '' explicitly when empty so the backend clears the stored value.
+          // On create, omit entirely (undefined) to avoid storing an empty string.
+          gestationalAgeFromBiometry: isEdit
+            ? formData.gestationalAgeFromBiometry.trim()
+            : formData.gestationalAgeFromBiometry.trim() || undefined,
           biometry,
           doppler,
         } : {}),
@@ -958,7 +1498,9 @@ export function useExaminationForm({
         ...(isTwins ? {
           biometry2,
           doppler2,
-          gestationalAgeFromBiometry2: formData.t2_gestationalAgeFromBiometry.trim() || undefined,
+          gestationalAgeFromBiometry2: isEdit
+            ? formData.t2_gestationalAgeFromBiometry.trim()
+            : formData.t2_gestationalAgeFromBiometry.trim() || undefined,
         } : {}),
         notes: formData.notes.trim() || undefined,
         findings: formData.findings.trim() || undefined,
@@ -983,11 +1525,10 @@ export function useExaminationForm({
     isTwins,
     isFt,
     isFtTwinsMode,
-    canCalcGAFromLMP,
     edd,
-    handleCalcGAFromLMP,
     handleChange,
     handleChangeT1,
+    handleGaFromBioTwinsChange,
     handleSubmit,
     visibility,
     patientAge,

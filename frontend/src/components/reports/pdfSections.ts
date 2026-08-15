@@ -119,6 +119,8 @@ function renderFtBiometryBlock(
     y += PITCH;
   }
 
+  y -= PITCH/2;
+
   return y;
 }
 
@@ -166,6 +168,7 @@ function renderFtMarkersBlock(
     doc.text(value || '—', xValue, y);
     y += PITCH;
   }
+  y -= PITCH/2;
   return y;
 }
 
@@ -216,6 +219,7 @@ function renderFtDopplerBlock(
     doc.text(row.ri || '—', xRI, y);
     y += PITCH;
   }
+  y -= PITCH/2;
   return y;
 }
 
@@ -274,7 +278,7 @@ function renderBiometryBlock(
     { label: 'AC (mm)',     value: b.ac,         pct: b.acPct,   gaAppend: b.acGa },
     { label: 'FL (mm)',     value: b.fl,         pct: b.flPct,   gaAppend: b.flGa },
     { label: 'EFW (grams)', value: b.efw,        pct: b.efwPct,  gaAppend: b.efwGa },
-    { label: 'TCD (mm)',    value: b.tcd },
+    { label: 'TCD (mm)',    value: b.tcd,        pct: b.tcdPct,  gaAppend: b.tcdGa },
     { label: 'Vp',          value: b.vp },
     { label: 'CM (mm)',     value: b.cm },
     { label: 'NF (mm)',     value: b.nuchalFold },
@@ -310,6 +314,7 @@ function renderBiometryBlock(
     y += PITCH;
   }
 
+  y -= PITCH/2;
   return y;
 }
 
@@ -371,6 +376,7 @@ function renderDopplerBlock(
 
     y += PITCH;
   }
+  y -= PITCH/2;
 
   // ── Sub-grid B: header row — "Measurement | Value" ───────────────────────────
   const xValue = xStart + labelW;
@@ -400,7 +406,9 @@ function renderDopplerBlock(
 
     y += PITCH;
   }
-
+  
+  y -= PITCH/2;
+  
   return y;
 }
 
@@ -517,7 +525,7 @@ export function renderClinicalSections(
 
     rule(doc, y); y += 4;
     y = sectionHeading(doc, 'Biometry', y);
-    y = renderFtBiometryBlock(doc, vm.ftBiometry ?? emptyB, y, 14, 182, FONT_ID);
+    y = renderFtBiometryBlock(doc, vm.ftBiometry ?? emptyB, y, T1_X, TWIN_COL_W, FONT_ID);
     y += 1;
 
     rule(doc, y); y += 4;
@@ -532,7 +540,7 @@ export function renderClinicalSections(
 
     rule(doc, y); y += 4;
     y = sectionHeading(doc, 'Doppler', y);
-    y = renderFtDopplerBlock(doc, vm.ftDoppler ?? emptyD, y, 14, 182, FONT_ID);
+    y = renderFtDopplerBlock(doc, vm.ftDoppler ?? emptyD, y, T1_X, TWIN_COL_W, FONT_ID);
     y += 1;
 
     return y;
@@ -542,14 +550,6 @@ export function renderClinicalSections(
   if (isFtTwins) {
     const T1_XEND = T1_X + TWIN_COL_W;
     const T2_XEND = T2_X + TWIN_COL_W;
-
-    rule(doc, y); y += 3;
-    doc.setFont(FONT_ID, 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(22, 22, 22);
-    doc.text('TWIN 1', T1_X, y);
-    doc.text('TWIN 2', T2_X, y);
-    y += 5;
 
     const emptyU: FtUltrasoundViewModel = {};
     const emptyB: FtBiometryViewModel   = {};
@@ -627,7 +627,7 @@ export function renderClinicalSections(
     if (visibility.biometry) {
       rule(doc, y); y += 4;
       y = sectionHeading(doc, 'Biometry Measurements', y);
-      y = renderBiometryBlock(doc, vm.biometry, y, 14, 182, FONT_ID);
+      y = renderBiometryBlock(doc, vm.biometry, y, T1_X, TWIN_COL_W, FONT_ID);
       y += 1;
     }
     if (visibility.anatomy) {
@@ -639,7 +639,7 @@ export function renderClinicalSections(
     if (visibility.doppler) {
       rule(doc, y); y += 4;
       y = sectionHeading(doc, 'Doppler Measurements', y);
-      y = renderDopplerBlock(doc, vm.doppler, y, 14, 182, FONT_ID);
+      y = renderDopplerBlock(doc, vm.doppler, y, T1_X, TWIN_COL_W, FONT_ID);
       y += 1;
     }
   } else {
@@ -647,18 +647,9 @@ export function renderClinicalSections(
     const T1_XEND = T1_X + TWIN_COL_W;
     const T2_XEND = T2_X + TWIN_COL_W;
 
-    // Twin 1 / Twin 2 column headings
-    rule(doc, y); y += 3;
-    doc.setFont(FONT_ID, 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(22, 22, 22); // C_DARK = '#161616'
-    doc.text('TWIN 1', T1_X, y);
-    doc.text('TWIN 2', T2_X, y);
-    y += 5;
-
     if (visibility.ultrasoundFindings && vm.ultrasound2) {
-      const yStart = y;
-      y = sectionHeadingAt(doc, 'Ultrasound', y, T1_X, T1_XEND);
+      const yStart = y+3;
+      y = sectionHeadingAt(doc, 'Ultrasound', yStart, T1_X, T1_XEND);
       const y1after = kvGridAt(doc, mkUltraPairs(vm.ultrasound), y, 2, T1_X, TWIN_COL_W, 7);
       const yH2 = sectionHeadingAt(doc, 'Ultrasound', yStart, T2_X, T2_XEND);
       const y2after = kvGridAt(doc, mkUltraPairs(vm.ultrasound2), yH2, 2, T2_X, TWIN_COL_W, 7);
@@ -666,16 +657,16 @@ export function renderClinicalSections(
     }
     if (visibility.biometry && vm.biometry2) {
       // Twin biometry: render side-by-side using renderBiometryBlock
-      const yStart = y;
-      y = sectionHeadingAt(doc, 'Biometry', y, T1_X, T1_XEND);
+      const yStart = y+3;
+      y = sectionHeadingAt(doc, 'Biometry', yStart, T1_X, T1_XEND);
       const y1after = renderBiometryBlock(doc, vm.biometry, y, T1_X, TWIN_COL_W, FONT_ID);
       const yH2 = sectionHeadingAt(doc, 'Biometry', yStart, T2_X, T2_XEND);
       const y2after = renderBiometryBlock(doc, vm.biometry2, yH2, T2_X, TWIN_COL_W, FONT_ID);
       y = Math.max(y1after, y2after) + 1;
     }
     if (visibility.anatomy && vm.anatomy2) {
-      const yStart = y;
-      y = sectionHeadingAt(doc, 'Anatomy', y, T1_X, T1_XEND);
+      const yStart = y+3;
+      y = sectionHeadingAt(doc, 'Anatomy', yStart, T1_X, T1_XEND);
       const y1after = kvGridAtStacked(doc, mkAnatomyPairs(vm.anatomy), y, 6, T1_X, TWIN_COL_W, FONT_ID);
       const yH2 = sectionHeadingAt(doc, 'Anatomy', yStart, T2_X, T2_XEND);
       const y2after = kvGridAtStacked(doc, mkAnatomyPairs(vm.anatomy2), yH2, 6, T2_X, TWIN_COL_W, FONT_ID);
@@ -684,7 +675,7 @@ export function renderClinicalSections(
     if (visibility.doppler && vm.doppler2) {
       // Twin doppler: render side-by-side using renderDopplerBlock
       const yStart = y;
-      y = sectionHeadingAt(doc, 'Doppler', y, T1_X, T1_XEND);
+      y = sectionHeadingAt(doc, 'Doppler', yStart, T1_X, T1_XEND);
       const y1after = renderDopplerBlock(doc, vm.doppler, y, T1_X, TWIN_COL_W, FONT_ID);
       const yH2 = sectionHeadingAt(doc, 'Doppler', yStart, T2_X, T2_XEND);
       const y2after = renderDopplerBlock(doc, vm.doppler2, yH2, T2_X, TWIN_COL_W, FONT_ID);

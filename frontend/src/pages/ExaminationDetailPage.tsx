@@ -15,7 +15,7 @@ import { examinationService } from '../services/examinationService';
 import PageLoader from '../components/PageLoader';
 import ErrorMessage from '../components/ErrorMessage';
 import { getStatusTag } from '../utils/statusHelpers';
-import { calcEDD, calcBiometryPercentiles, calcEFWPercentile } from '../utils/calculations';
+import { calcEDD } from '../utils/calculations';
 import PrintButton from '../components/reports/PrintButton';
 import EmailReportButton from '../components/reports/EmailReportButton';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,6 +24,7 @@ import { formatDateTime, formatPlainDate } from '../utils/formatters';
 import { getExamTypeLabel, getSectionVisibility, isFirstTrimester, isFtTwins } from '../constants/examinationTypes';
 import type { Examination } from '../types';
 import ExaminationSections from '../components/ExaminationSections';
+import { AutoCalcDot } from '../components/AutoCalcDot';
 
 // Sub-Task 1: Tile section title style — ALL CAPS, 0.875rem, weight 600, #161616
 const tileTitleStyle: React.CSSProperties = {
@@ -150,20 +151,9 @@ export default function ExaminationDetailPage() {
         : 'Examination')
     : 'Examination';
 
-  // Derived values — computed client-side from stored data (no extra API call needed)
+  // Derived values — sourced from stored data (no client-side percentile recomputation per KI-009)
   const lmp = examination.data?.pregnancy_data?.last_menstrual_period;
   const edd = lmp ? calcEDD(lmp) : undefined;
-  const gaForPercentiles = examination.gestationalAge;
-  const biometryPercentiles = calcBiometryPercentiles(
-    examination.biometry?.bpd,
-    examination.biometry?.hc,
-    examination.biometry?.ac,
-    examination.biometry?.fl,
-    gaForPercentiles ?? '',
-  );
-  const efwPercentile = (examination.biometry?.efw && gaForPercentiles)
-    ? calcEFWPercentile(examination.biometry.efw, gaForPercentiles)
-    : undefined;
 
   // Type-driven section visibility
   const isFt = isFirstTrimester(examination.examinationType);
@@ -173,22 +163,13 @@ export default function ExaminationDetailPage() {
   // uzd-twins: detect twins exam type
   const isTwins = examination.examinationType === 'ultrasound_prenatal_twins';
 
-  // uzd-twins: T2 percentiles (same Hadlock formulas, singleton reference values)
-  const biometryPercentiles2 = isTwins ? calcBiometryPercentiles(
-    examination.biometry2?.bpd,
-    examination.biometry2?.hc,
-    examination.biometry2?.ac,
-    examination.biometry2?.fl,
-    gaForPercentiles ?? '',
-  ) : undefined;
-  const efwPercentile2 = (isTwins && examination.biometry2?.efw && gaForPercentiles)
-    ? calcEFWPercentile(examination.biometry2.efw, gaForPercentiles)
-    : undefined;
 
-
-  const fieldBlock = (label: string, value: React.ReactNode) => (
+  const fieldBlock = (label: string, value: React.ReactNode, labelAdornment?: React.ReactNode) => (
     <div>
-      <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>{label}</div>
+      <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+        <span>{label}</span>
+        {labelAdornment}
+      </div>
       <div style={{ fontSize: '1rem', fontWeight: 500 }}>{value}</div>
     </div>
   );
@@ -326,28 +307,42 @@ export default function ExaminationDetailPage() {
         {visibility.pregnancyData && (
           <Tile>
             <div style={tileTitleStyle}>Pregnancy Data</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', textAlign: 'left' }}>
               {/* Row 1: LMP Date | GA from LMP */}
               {fieldBlock('LMP Date', lmp ? formatPlainDate(lmp) : '—')}
-              {fieldBlock('GA from LMP', examination.gestationalAge || '—')}
+              {fieldBlock('GA from LMP',
+                <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  {examination.gestationalAge || '—'}
+                  {examination.gestationalAgeIsManual && <AutoCalcDot size={5} />}
+                </span>
+              )}
               {/* Row 2: Expected Delivery Date (highlighted) | GA from Bio (all exam types) */}
-              <div style={{ backgroundColor: '#e8f1ff', padding: '0.5rem', borderRadius: '2px' }}>
-                <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem' }}>
+              <div style={{ backgroundColor: '#e8f1ff', padding: '0.5rem', borderRadius: '2px', textAlign: 'left' }}>
+                <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem', textAlign: 'left' }}>
                   Expected Delivery Date
                 </div>
-                <div style={{ fontSize: '1rem', fontWeight: 600, color: '#0f62fe' }}>
+                <div style={{ fontSize: '1rem', fontWeight: 600, color: '#0f62fe', textAlign: 'left' }}>
                   {edd || '—'}
                 </div>
               </div>
-              {/* Sub-Task 5: "GA from Bio" unified across all exam types.
-                  For FT exams: GA from Bio = GA from CRL at current level of development. */}
-              {fieldBlock('GA from Bio', isFt
-                ? (isFtTwinsExam
-                    ? `${examination.data?.ft_biometry?.gaFromCrl || '—'} / ${examination.data?.twin2_ft_biometry?.gaFromCrl || '—'}`
-                    : examination.data?.ft_biometry?.gaFromCrl || '—')
-                : (isTwins
-                    ? `${examination.gestationalAgeFromBiometry || '—'} / ${examination.gestationalAgeFromBiometry2 || '—'}`
-                    : examination.gestationalAgeFromBiometry || '—'))}
+              {/* KI-009: "GA from Bio" — for FT exams, prefers stored gaFromBio (fallback to gaFromCrl). */}
+              {fieldBlock(
+                'GA from Bio',
+                <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  {isFt
+                    ? (isFtTwinsExam
+                        ? `${examination.data?.ft_biometry?.gaFromBio || examination.data?.ft_biometry?.gaFromCrl || '—'} / ${examination.data?.twin2_ft_biometry?.gaFromBio || examination.data?.twin2_ft_biometry?.gaFromCrl || '—'}`
+                        : examination.data?.ft_biometry?.gaFromBio || examination.data?.ft_biometry?.gaFromCrl || '—')
+                    : (isTwins
+                        ? `${examination.gestationalAgeFromBiometry || '—'} / ${examination.gestationalAgeFromBiometry2 || '—'}`
+                        : examination.gestationalAgeFromBiometry || '—')}
+                  {/* Sub-Task 5: check correct IsManual flags for all exam types and both twins */}
+                  {((isFt
+                    ? (examination.data?.ft_biometry?.gaFromBioIsManual || examination.data?.twin2_ft_biometry?.gaFromBioIsManual)
+                    : (examination.biometry?.gestationalAgeFromBiometryIsManual || examination.biometry2?.gestationalAgeFromBiometryIsManual))
+                  ) && <AutoCalcDot size={5} />}
+                </span>
+              )}
               {/* Row 3: Obstetric History | Family History */}
               {fieldBlock('Obstetric History', examination.data?.pregnancy_data?.obstetric_history || '—')}
               {fieldBlock('Family History', examination.data?.pregnancy_data?.family_history || '—')}
@@ -356,12 +351,14 @@ export default function ExaminationDetailPage() {
         )}
 
         {/* Ultrasound Findings, Biometry, Anatomy, Doppler sections */}
+        {/* KI-009: biometryPercentiles and efwPercentile are no longer computed here;
+            ExaminationSections reads from stored examination.biometry.{field}Percentile */}
         <ExaminationSections
           examination={examination}
-          biometryPercentiles={biometryPercentiles}
-          efwPercentile={efwPercentile}
-          biometryPercentiles2={biometryPercentiles2}
-          efwPercentile2={efwPercentile2}
+          biometryPercentiles={undefined}
+          efwPercentile={undefined}
+          biometryPercentiles2={undefined}
+          efwPercentile2={undefined}
         />
 
         {/* Sub-Task 4: Tile 4 — Findings (renamed from "Clinical Information") */}
@@ -382,13 +379,7 @@ export default function ExaminationDetailPage() {
           </div>
         </Tile>
 
-        {/* Sub-Task 4: Tile 6 — Notes */}
-        <Tile>
-          <div style={tileTitleStyle}>Notes</div>
-          <div style={{ fontSize: '1rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
-            {examination.notes || '—'}
-          </div>
-        </Tile>
+        {/* KI-009: Notes tile removed */}
 
         {/* Sub-Task 4: Tile 7 — Metadata */}
         <Tile>

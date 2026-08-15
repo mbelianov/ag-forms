@@ -90,6 +90,7 @@ export interface Biometry {
   acGa?:    string;   // GA derived from AC
   flGa?:    string;   // GA derived from FL
   efwGa?:   string;   // GA derived from EFW
+  tcdGa?:   string;   // GA derived from TCD
   // Sub-Task 3: Persisted percentile fields (v2 expanded set)
   bpdPercentile?:   number;   // BPD percentile
   ofdPercentile?:   number;   // OFD percentile (NEW — v2)
@@ -99,6 +100,28 @@ export interface Biometry {
   acPercentile?:    number;   // AC percentile
   flPercentile?:    number;   // FL percentile
   efwPercentile?:   number;   // EFW percentile
+  tcdPercentile?:   number;   // TCD percentile
+  efwIsManual?: boolean;
+  gestationalAgeFromBiometryIsManual?: boolean; // KI-009: flag for gestationalAgeFromBiometry field
+  // KI-009: IsManual flags (true when user overrode the auto-calculated value)
+  bpdPercentileIsManual?:   boolean;
+  hcPercentileIsManual?:    boolean;
+  acPercentileIsManual?:    boolean;
+  flPercentileIsManual?:    boolean;
+  ofdPercentileIsManual?:   boolean;
+  tadPercentileIsManual?:   boolean;
+  apadPercentileIsManual?:  boolean;
+  efwPercentileIsManual?:   boolean;
+  tcdPercentileIsManual?:   boolean;
+  bpdGaIsManual?:   boolean;
+  hcGaIsManual?:    boolean;
+  acGaIsManual?:    boolean;
+  flGaIsManual?:    boolean;
+  ofdGaIsManual?:   boolean;
+  tadGaIsManual?:   boolean;
+  apadGaIsManual?:  boolean;
+  efwGaIsManual?:   boolean;
+  tcdGaIsManual?:   boolean;
 }
 
 export interface Doppler {
@@ -149,6 +172,7 @@ export interface AnatomyFindings {
 export interface FtBiometry {
   crl?: number;        // Crown-Rump Length, mm
   gaFromCrl?: string;  // "Xw Yd" — GA calculated from CRL (storage key; display label = "GA from Bio")
+  gaFromCrlIsManual?: boolean;
   nt?: number;         // Nuchal Translucency, mm
   nb?: number;         // Nasal Bone, mm
   puls?: number;       // Fetal heart rate (Puls), bpm
@@ -156,6 +180,10 @@ export interface FtBiometry {
   ntGa?:  string;  // GA derived from NT (placeholder; calculation deferred)
   nbGa?:  string;  // GA derived from NB (placeholder; calculation deferred)
   crlGa?: string;  // GA derived from CRL (alias; gaFromCrl is the legacy field, keep both)
+  // KI-009: GA from biometry composite field for first-trimester common section
+  gaFromBio?: string;  // "Xw Yd" — composite GA from Bio, populated reactively from CRL
+  // Sub-Task 1 (ga-from-bio-editable): manual override flag for gaFromBio
+  gaFromBioIsManual?: boolean;
 }
 
 export interface FtMarkers {
@@ -211,6 +239,7 @@ export interface Examination {
   patientName: string; // denormalized
   examDate: string; // ISO 8601
   gestationalAge?: string; // "Xw Yd" — GA from LMP
+  gestationalAgeIsManual?: boolean;
   gestationalAgeFromBiometry?: string; // "Xw Yd" — GA derived from biometry measurements
   status: 'draft' | 'completed' | 'reviewed';
   examinationType?: string; // TASK-033: e.g. "ultrasound_prenatal"
@@ -236,6 +265,7 @@ export interface CreateExaminationRequest {
   patientId: string;
   examDate: string;
   gestationalAge?: string;
+  gestationalAgeIsManual?: boolean;
   gestationalAgeFromBiometry?: string;
   status: 'draft' | 'completed' | 'reviewed';
   examinationType?: string; // TASK-033
@@ -254,6 +284,7 @@ export interface CreateExaminationRequest {
 export interface UpdateExaminationRequest {
   examDate: string;
   gestationalAge?: string;
+  gestationalAgeIsManual?: boolean;
   gestationalAgeFromBiometry?: string;
   status: 'draft' | 'completed' | 'reviewed';
   examinationType?: string; // TASK-033
