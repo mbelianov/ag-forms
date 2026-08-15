@@ -138,8 +138,10 @@ export function useExaminationForm({
     // KI-009: FT gaFromBio
     t1_ft_gaFromBio: examination?.data?.ft_biometry?.gaFromBio || '',
     t1_ft_gaFromCrlIsManual: examination?.data?.ft_biometry?.gaFromCrlIsManual ?? false,
+    t1_ft_gaFromBioIsManual: examination?.data?.ft_biometry?.gaFromBioIsManual ?? false,
     t2_ft_gaFromBio: examination?.data?.twin2_ft_biometry?.gaFromBio || '',
     t2_ft_gaFromCrlIsManual: examination?.data?.twin2_ft_biometry?.gaFromCrlIsManual ?? false,
+    t2_ft_gaFromBioIsManual: examination?.data?.twin2_ft_biometry?.gaFromBioIsManual ?? false,
     // Doppler (floats allowed)
     pi: examination?.doppler?.pi?.toString() || '',
     ri: examination?.doppler?.ri?.toString() || '',
@@ -400,8 +402,10 @@ export function useExaminationForm({
         // KI-009: FT gaFromBio
         t1_ft_gaFromBio: examination.data?.ft_biometry?.gaFromBio || '',
         t1_ft_gaFromCrlIsManual: examination.data?.ft_biometry?.gaFromCrlIsManual ?? false,
+        t1_ft_gaFromBioIsManual: examination.data?.ft_biometry?.gaFromBioIsManual ?? false,
         t2_ft_gaFromBio: examination.data?.twin2_ft_biometry?.gaFromBio || '',
         t2_ft_gaFromCrlIsManual: examination.data?.twin2_ft_biometry?.gaFromCrlIsManual ?? false,
+        t2_ft_gaFromBioIsManual: examination.data?.twin2_ft_biometry?.gaFromBioIsManual ?? false,
         pi: examination.doppler?.pi?.toString() || '',
         ri: examination.doppler?.ri?.toString() || '',
         utADexPI: examination.doppler?.utADexPI?.toString() || '',
@@ -691,20 +695,23 @@ export function useExaminationForm({
       crl: formData.t1_ft_crl,
     });
 
+    // gaFromBio: only overwrite if not manually set (Sub-Task 1: gaFromBioIsManual guard)
+    const nextGaFromBio = formData.t1_ft_gaFromBioIsManual ? formData.t1_ft_gaFromBio : diff.gaFromBio;
+
     if (
       diff.gaFromCrl !== formData.t1_ft_gaFromCrl ||
-      diff.gaFromBio !== formData.t1_ft_gaFromBio ||
+      nextGaFromBio !== formData.t1_ft_gaFromBio ||
       diff.gaFromCrlIsManual !== formData.t1_ft_gaFromCrlIsManual
     ) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData((prev) => ({
         ...prev,
         t1_ft_gaFromCrl: diff.gaFromCrl,
-        t1_ft_gaFromBio: diff.gaFromBio,
+        t1_ft_gaFromBio: nextGaFromBio,
         t1_ft_gaFromCrlIsManual: diff.gaFromCrlIsManual,
       }));
     }
-  }, [formData.t1_ft_crl, formData.t1_ft_gaFromCrl, formData.t1_ft_gaFromBio, formData.t1_ft_gaFromCrlIsManual, isFt]);
+  }, [formData.t1_ft_crl, formData.t1_ft_gaFromCrl, formData.t1_ft_gaFromBio, formData.t1_ft_gaFromCrlIsManual, formData.t1_ft_gaFromBioIsManual, isFt]);
 
   useEffect(() => {
     if (!isFtTwinsMode) return;
@@ -719,20 +726,23 @@ export function useExaminationForm({
       crl: formData.t2_ft_crl,
     });
 
+    // gaFromBio: only overwrite if not manually set (Sub-Task 1: gaFromBioIsManual guard)
+    const nextGaFromBio = formData.t2_ft_gaFromBioIsManual ? formData.t2_ft_gaFromBio : diff.gaFromBio;
+
     if (
       diff.gaFromCrl !== formData.t2_ft_gaFromCrl ||
-      diff.gaFromBio !== formData.t2_ft_gaFromBio ||
+      nextGaFromBio !== formData.t2_ft_gaFromBio ||
       diff.gaFromCrlIsManual !== formData.t2_ft_gaFromCrlIsManual
     ) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData((prev) => ({
         ...prev,
         t2_ft_gaFromCrl: diff.gaFromCrl,
-        t2_ft_gaFromBio: diff.gaFromBio,
+        t2_ft_gaFromBio: nextGaFromBio,
         t2_ft_gaFromCrlIsManual: diff.gaFromCrlIsManual,
       }));
     }
-  }, [formData.t2_ft_crl, formData.t2_ft_gaFromCrl, formData.t2_ft_gaFromBio, formData.t2_ft_gaFromCrlIsManual, isFtTwinsMode]);
+  }, [formData.t2_ft_crl, formData.t2_ft_gaFromCrl, formData.t2_ft_gaFromBio, formData.t2_ft_gaFromCrlIsManual, formData.t2_ft_gaFromBioIsManual, isFtTwinsMode]);
 
   useEffect(() => {
     if (formData.gestationalAgeIsManual) return;
@@ -814,16 +824,27 @@ export function useExaminationForm({
         };
       }
 
+      // Sub-Task 1: gaFromBio manual flag handlers for FT single and FT twins
+      if (field === 't1_ft_gaFromBio') {
+        return { ...prev, t1_ft_gaFromBio: value, t1_ft_gaFromBioIsManual: value !== '' };
+      }
+
+      if (field === 't2_ft_gaFromBio') {
+        return { ...prev, t2_ft_gaFromBio: value, t2_ft_gaFromBioIsManual: value !== '' };
+      }
+
       // B-5: When ft_crl changes, reset the T1 FT gaFromCrl IsManual flag so the reactive
-      // effect unconditionally recalculates (REQ-9). 'ft_crl' arrives here after handleChangeT1
-      // strips the 't1_' prefix; the actual formData key is 't1_ft_gaFromCrlIsManual'.
-      if (field === 'ft_crl') {
-        return { ...prev, t1_ft_crl: value, t1_ft_gaFromCrlIsManual: false };
+      // effect unconditionally recalculates (REQ-9). Arrives as 'ft_crl' via handleChangeT1
+      // (which strips the 't1_' prefix) or as 't1_ft_crl' when handleChange is wired directly.
+      // Sub-Task 1: also reset gaFromBioIsManual so auto-calc overwrites a stale manual value.
+      if (field === 'ft_crl' || field === 't1_ft_crl') {
+        return { ...prev, t1_ft_crl: value, t1_ft_gaFromCrlIsManual: false, t1_ft_gaFromBioIsManual: false };
       }
 
       // B-5: When t2_ft_crl changes, reset the T2 FT gaFromCrl IsManual flag (REQ-9).
+      // Sub-Task 1: also reset gaFromBioIsManual.
       if (field === 't2_ft_crl') {
-        return { ...prev, t2_ft_crl: value, t2_ft_gaFromCrlIsManual: false };
+        return { ...prev, t2_ft_crl: value, t2_ft_gaFromCrlIsManual: false, t2_ft_gaFromBioIsManual: false };
       }
 
       if (field === 'efw' || field === 't2_efw') {
@@ -861,6 +882,44 @@ export function useExaminationForm({
   const handleChangeT1 = (field: string, value: string) => {
     const stripped = field.startsWith('t1_') ? field.slice(3) : field;
     handleChange(stripped, value);
+  };
+
+  // Sub-Task 3 & 4: Batch handler for the twins composite "T1 / T2" GA from Bio field.
+  // Splits raw input on '/' and writes both values + both IsManual flags in one setState call.
+  // prefix: '' for prenatal twins, 'ft_' for FT twins.
+  const handleGaFromBioTwinsChange = (prefix: '' | 'ft_', rawValue: string) => {
+    const [rawT1, rawT2 = ''] = rawValue.split('/');
+    const t1Val = rawT1.trim();
+    const t2Val = rawT2.trim();
+    if (prefix === 'ft_') {
+      setFormData((prev) => ({
+        ...prev,
+        t1_ft_gaFromBio: t1Val,
+        t1_ft_gaFromBioIsManual: t1Val !== '',
+        t2_ft_gaFromBio: t2Val,
+        t2_ft_gaFromBioIsManual: t2Val !== '',
+      }));
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next['t1_ft_gaFromBio'];
+        delete next['t2_ft_gaFromBio'];
+        return next;
+      });
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        gestationalAgeFromBiometry: t1Val,
+        gestationalAgeFromBiometryIsManual: t1Val !== '',
+        t2_gestationalAgeFromBiometry: t2Val,
+        t2_gestationalAgeFromBiometryIsManual: t2Val !== '',
+      }));
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next['gestationalAgeFromBiometry'];
+        delete next['t2_gestationalAgeFromBiometry'];
+        return next;
+      });
+    }
   };
 
   // ── Validation ─────────────────────────────────────────────────────────────
@@ -936,6 +995,8 @@ export function useExaminationForm({
     { errorKey: 't1_ft_nb',  formKey: 't1_ft_nb',  validate: (r) => validatePositiveFloat(r, 'NB'),  onlyWhen: () => isFt },
     // ── FT T1 GA from CRL ─────────────────────────────────────────────────────
     { errorKey: 't1_ft_gaFromCrl', formKey: 't1_ft_gaFromCrl', validate: validateGA, onlyWhen: () => isFt },
+    // ── FT T1 GA from Bio (Sub-Task 2) ───────────────────────────────────────
+    { errorKey: 't1_ft_gaFromBio', formKey: 't1_ft_gaFromBio', validate: validateGA, onlyWhen: () => isFt && !isFtTwinsMode },
     // ── FT T1 integer fields ─────────────────────────────────────────────────
     { errorKey: 't1_ft_puls',      formKey: 't1_ft_puls',      validate: (r) => validateIntegerField(r, 'Pulse'),      onlyWhen: () => isFt },
     { errorKey: 't1_ft_heartRate', formKey: 't1_ft_heartRate', validate: (r) => validateIntegerField(r, 'Heart rate'), onlyWhen: () => isFt },
@@ -950,6 +1011,8 @@ export function useExaminationForm({
     { errorKey: 't2_ft_nb',  formKey: 't2_ft_nb',  validate: (r) => validatePositiveFloat(r, 'NB (T2)'),  onlyWhen: () => isFtTwinsMode },
     // ── FT T2 GA from CRL ─────────────────────────────────────────────────────
     { errorKey: 't2_ft_gaFromCrl', formKey: 't2_ft_gaFromCrl', validate: validateGA, onlyWhen: () => isFtTwinsMode },
+    // ── FT T2 GA from Bio (Sub-Task 4) ───────────────────────────────────────
+    { errorKey: 't2_ft_gaFromBio', formKey: 't2_ft_gaFromBio', validate: validateGA, onlyWhen: () => isFtTwinsMode },
     // ── FT T2 integer fields ─────────────────────────────────────────────────
     { errorKey: 't2_ft_puls',      formKey: 't2_ft_puls',      validate: (r) => validateIntegerField(r, 'Pulse (T2)'),      onlyWhen: () => isFtTwinsMode },
     { errorKey: 't2_ft_heartRate', formKey: 't2_ft_heartRate', validate: (r) => validateIntegerField(r, 'Heart rate (T2)'), onlyWhen: () => isFtTwinsMode },
@@ -1167,15 +1230,26 @@ export function useExaminationForm({
         'ofdGaIsManual', 'tadGaIsManual', 'apadGaIsManual', 'efwGaIsManual', 'efwIsManual',
         'gestationalAgeFromBiometryIsManual',
       ];
+      // gestationalAgeFromBiometryIsManual must travel with the biometry object.
+      // If no biometry measurements were entered, assembled.biometry may not exist yet —
+      // create it so the flag can be persisted alongside gestationalAgeFromBiometry.
+      if (fmBool.gestationalAgeFromBiometryIsManual && !assembled.biometry) {
+        assembled.biometry = {};
+      }
       if (assembled.biometry) {
         for (const key of bioIsManualFields) {
           if (fmBool[key]) assembled.biometry[key] = true;
         }
       }
-      if (isTwins && assembled.biometry2) {
-        for (const key of bioIsManualFields) {
-          const t2Key = `t2_${key}`;
-          if (fmBool[t2Key]) assembled.biometry2[key] = true;
+      if (isTwins) {
+        if (fmBool.t2_gestationalAgeFromBiometryIsManual && !assembled.biometry2) {
+          assembled.biometry2 = {};
+        }
+        if (assembled.biometry2) {
+          for (const key of bioIsManualFields) {
+            const t2Key = `t2_${key}`;
+            if (fmBool[t2Key]) assembled.biometry2[key] = true;
+          }
         }
       }
 
@@ -1290,6 +1364,8 @@ export function useExaminationForm({
           puls: ftBiomAssembled?.puls as number | undefined,
           // KI-009: gaFromBio persisted in ft_biometry
           gaFromBio: fd.t1_ft_gaFromBio?.trim() || undefined,
+          // Sub-Task 1: persist gaFromBioIsManual flag
+          gaFromBioIsManual: fd.t1_ft_gaFromBioIsManual ? true : undefined,
         } : undefined;
         ft_markers = (fd.t1_ft_arrhythmia || fd.t1_ft_tricuspidRegurgitation || fd.t1_ft_abnormalDvFlow || fd.t1_ft_echogenicCardiacFocus || fd.t1_ft_singleUmbilicalArtery || fd.t1_ft_choroidPlexusCysts || fd.t1_ft_exomphalos || fd.t1_ft_megacystis || fd.t1_ft_markerPlacenta || fd.t1_ft_cordInsertion) ? {
           arrhythmia: fd.t1_ft_arrhythmia || undefined,
@@ -1329,6 +1405,8 @@ export function useExaminationForm({
             puls: t2FtBiomAssembled?.puls as number | undefined,
             // KI-009: gaFromBio persisted in twin2_ft_biometry
             gaFromBio: fd.t2_ft_gaFromBio?.trim() || undefined,
+            // Sub-Task 1: persist gaFromBioIsManual flag
+            gaFromBioIsManual: fd.t2_ft_gaFromBioIsManual ? true : undefined,
           } : undefined;
           twin2_ft_markers = (fd.t2_ft_arrhythmia || fd.t2_ft_tricuspidRegurgitation || fd.t2_ft_abnormalDvFlow || fd.t2_ft_echogenicCardiacFocus || fd.t2_ft_singleUmbilicalArtery || fd.t2_ft_choroidPlexusCysts || fd.t2_ft_exomphalos || fd.t2_ft_megacystis || fd.t2_ft_markerPlacenta || fd.t2_ft_cordInsertion) ? {
             arrhythmia: fd.t2_ft_arrhythmia || undefined,
@@ -1376,7 +1454,11 @@ export function useExaminationForm({
         gestationalAgeIsManual: formData.gestationalAgeIsManual || undefined,
         // For FT types, biometry/doppler/gestationalAgeFromBiometry are not emitted
         ...(!isFt ? {
-          gestationalAgeFromBiometry: formData.gestationalAgeFromBiometry.trim() || undefined,
+          // On edit, send '' explicitly when empty so the backend clears the stored value.
+          // On create, omit entirely (undefined) to avoid storing an empty string.
+          gestationalAgeFromBiometry: isEdit
+            ? formData.gestationalAgeFromBiometry.trim()
+            : formData.gestationalAgeFromBiometry.trim() || undefined,
           biometry,
           doppler,
         } : {}),
@@ -1385,7 +1467,9 @@ export function useExaminationForm({
         ...(isTwins ? {
           biometry2,
           doppler2,
-          gestationalAgeFromBiometry2: formData.t2_gestationalAgeFromBiometry.trim() || undefined,
+          gestationalAgeFromBiometry2: isEdit
+            ? formData.t2_gestationalAgeFromBiometry.trim()
+            : formData.t2_gestationalAgeFromBiometry.trim() || undefined,
         } : {}),
         notes: formData.notes.trim() || undefined,
         findings: formData.findings.trim() || undefined,
@@ -1413,6 +1497,7 @@ export function useExaminationForm({
     edd,
     handleChange,
     handleChangeT1,
+    handleGaFromBioTwinsChange,
     handleSubmit,
     visibility,
     patientAge,

@@ -83,7 +83,8 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
     return {
       crl:       b.crl  != null ? `${b.crl.toFixed(2)} mm` : undefined,
       // KI-009: prefer stored gaFromBio; fallback to gaFromCrl for backward compat
-      gaFromCrl: withManualMarker(b.gaFromBio ?? b.gaFromCrl ?? undefined, b.gaFromCrlIsManual),
+      // Sub-Task 5: use gaFromBioIsManual (with fallback to gaFromCrlIsManual for older records)
+      gaFromCrl: withManualMarker(b.gaFromBio ?? b.gaFromCrl ?? undefined, b.gaFromBioIsManual ?? b.gaFromCrlIsManual),
       nt:        b.nt   != null ? `${b.nt.toFixed(2)} mm` : undefined,
       nb:        b.nb   != null ? `${b.nb.toFixed(2)} mm` : undefined,
       puls:      b.puls != null ? `${b.puls} bpm` : undefined,
@@ -238,7 +239,8 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
     gestationalAge: withManualMarker(exam.gestationalAge, exam.gestationalAgeIsManual),
     gestationalAgeFromBiometry: withManualMarker(exam.gestationalAgeFromBiometry, exam.biometry?.gestationalAgeFromBiometryIsManual),
     expectedDeliveryDate: lmp ? calcEDD(lmp) : undefined,
-    gestationalAgeFromBiometry2: exam.gestationalAgeFromBiometry2,
+    // Sub-Task 5: wrap T2 GA from biometry in withManualMarker to show dagger in PDF
+    gestationalAgeFromBiometry2: withManualMarker(exam.gestationalAgeFromBiometry2, exam.biometry2?.gestationalAgeFromBiometryIsManual),
     biometry2,
     doppler2,
     ultrasound2,

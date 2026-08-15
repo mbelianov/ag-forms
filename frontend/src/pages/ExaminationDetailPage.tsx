@@ -336,7 +336,11 @@ export default function ExaminationDetailPage() {
                     : (isTwins
                         ? `${examination.gestationalAgeFromBiometry || '—'} / ${examination.gestationalAgeFromBiometry2 || '—'}`
                         : examination.gestationalAgeFromBiometry || '—')}
-                  {isFt && examination.data?.ft_biometry?.gaFromCrlIsManual && <AutoCalcDot size={5} />}
+                  {/* Sub-Task 5: check correct IsManual flags for all exam types and both twins */}
+                  {((isFt
+                    ? (examination.data?.ft_biometry?.gaFromBioIsManual || examination.data?.twin2_ft_biometry?.gaFromBioIsManual)
+                    : (examination.biometry?.gestationalAgeFromBiometryIsManual || examination.biometry2?.gestationalAgeFromBiometryIsManual))
+                  ) && <AutoCalcDot size={5} />}
                 </span>
               )}
               {/* Row 3: Obstetric History | Family History */}

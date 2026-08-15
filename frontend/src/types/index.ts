@@ -178,6 +178,8 @@ export interface FtBiometry {
   crlGa?: string;  // GA derived from CRL (alias; gaFromCrl is the legacy field, keep both)
   // KI-009: GA from biometry composite field for first-trimester common section
   gaFromBio?: string;  // "Xw Yd" — composite GA from Bio, populated reactively from CRL
+  // Sub-Task 1 (ga-from-bio-editable): manual override flag for gaFromBio
+  gaFromBioIsManual?: boolean;
 }
 
 export interface FtMarkers {

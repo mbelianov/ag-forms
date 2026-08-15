@@ -56,6 +56,7 @@ export default function ExaminationForm(props: ExaminationFormProps) {
     edd,
     handleChange,
     handleChangeT1,
+    handleGaFromBioTwinsChange,
     handleSubmit,
     visibility,
     patientAge,
@@ -225,7 +226,7 @@ export default function ExaminationForm(props: ExaminationFormProps) {
                   <TextInput
                     id="gestationalAge"
                     labelText={autoCalcLabel('Gestational Age from LMP', formData.gestationalAgeIsManual)}
-                    placeholder="e.g., 28w 3d"
+                    placeholder="auto"
                     value={formData.gestationalAge}
                     onChange={(e) => handleChange('gestationalAge', e.target.value)}
                     invalid={!!errors.gestationalAge}
@@ -237,25 +238,49 @@ export default function ExaminationForm(props: ExaminationFormProps) {
                 <div style={{ flex: 1, minWidth: '180px' }}>
                   <TextInput
                     id="gestationalAgeFromBiometry"
-                    labelText={autoCalcLabel('GA from Bio', !isFt && !isFtTwinsMode && !isTwins && !!formData.gestationalAgeFromBiometryIsManual)}
-                    placeholder="e.g., 28w 3d"
+                    labelText={autoCalcLabel('GA from Bio',
+                      isFt && !isFtTwinsMode
+                        ? !!formData.t1_ft_gaFromBioIsManual
+                        : isFtTwinsMode
+                          ? (!!formData.t1_ft_gaFromBioIsManual || !!formData.t2_ft_gaFromBioIsManual)
+                          : isTwins
+                            ? (!!formData.gestationalAgeFromBiometryIsManual || !!formData.t2_gestationalAgeFromBiometryIsManual)
+                            : !!formData.gestationalAgeFromBiometryIsManual
+                    )}
+                    placeholder="auto"
                     value={
                       isFt && !isFtTwinsMode
                         ? formData.t1_ft_gaFromBio
                         : isFtTwinsMode
-                          ? `${formData.t1_ft_gaFromBio || '—'} / ${formData.t2_ft_gaFromBio || '—'}`
+                          ? `${formData.t1_ft_gaFromBio} / ${formData.t2_ft_gaFromBio}`
                           : isTwins
                             ? `${formData.gestationalAgeFromBiometry || '—'} / ${formData.t2_gestationalAgeFromBiometry || '—'}`
                             : formData.gestationalAgeFromBiometry
                     }
                     onChange={
-                      !isFt && !isFtTwinsMode && !isTwins
-                        ? (e) => handleChange('gestationalAgeFromBiometry', e.target.value)
-                        : undefined
+                      isFt && !isFtTwinsMode
+                        ? (e) => handleChange('t1_ft_gaFromBio', e.target.value)
+                        : isFtTwinsMode
+                          ? (e) => handleGaFromBioTwinsChange('ft_', e.target.value)
+                          : isTwins
+                            ? (e) => handleGaFromBioTwinsChange('', e.target.value)
+                            : (e) => handleChange('gestationalAgeFromBiometry', e.target.value)
                     }
-                    invalid={!isFt && !isFtTwinsMode && !isTwins && !!errors.gestationalAgeFromBiometry}
-                    invalidText={!isFt && !isFtTwinsMode && !isTwins ? errors.gestationalAgeFromBiometry : undefined}
-                    readOnly={isFt || isFtTwinsMode || isTwins}
+                    invalid={
+                      (isFt && !isFtTwinsMode && !!errors.t1_ft_gaFromBio) ||
+                      (isFtTwinsMode && (!!errors.t1_ft_gaFromBio || !!errors.t2_ft_gaFromBio)) ||
+                      (isTwins && (!!errors.gestationalAgeFromBiometry || !!errors.t2_gestationalAgeFromBiometry)) ||
+                      (!isFt && !isFtTwinsMode && !isTwins && !!errors.gestationalAgeFromBiometry)
+                    }
+                    invalidText={
+                      isFt && !isFtTwinsMode
+                        ? errors.t1_ft_gaFromBio
+                        : isFtTwinsMode
+                          ? (errors.t1_ft_gaFromBio || errors.t2_ft_gaFromBio)
+                          : isTwins
+                            ? (errors.gestationalAgeFromBiometry || errors.t2_gestationalAgeFromBiometry)
+                            : errors.gestationalAgeFromBiometry
+                    }
                     disabled={isSubmitting}
                   />
                 </div>

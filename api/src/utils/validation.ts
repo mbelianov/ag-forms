@@ -223,6 +223,8 @@ const biometrySchema = Joi.object({
     tadGaIsManual:  Joi.boolean().optional(),
     apadGaIsManual: Joi.boolean().optional(),
     efwGaIsManual:  Joi.boolean().optional(),
+    efwIsManual:    Joi.boolean().optional(),
+    gestationalAgeFromBiometryIsManual: Joi.boolean().optional(),
 }).optional();
 
 /**
@@ -308,6 +310,8 @@ const ftBiometrySchema = Joi.object({
     puls:      Joi.number().integer().min(0).max(300).optional(),
     // KI-009: GA from biometry composite field for first-trimester common section
     gaFromBio: Joi.string().pattern(GA_REGEX).optional().allow(''),
+    // Sub-Task 6 (ga-from-bio-editable): manual override flag for gaFromBio
+    gaFromBioIsManual: Joi.boolean().optional(),
 }).optional();
 
 const ftMarkersSchema = Joi.object({
