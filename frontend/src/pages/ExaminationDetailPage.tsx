@@ -347,6 +347,11 @@ export default function ExaminationDetailPage() {
               {fieldBlock('Obstetric History', examination.data?.pregnancy_data?.obstetric_history || '—')}
               {fieldBlock('Family History', examination.data?.pregnancy_data?.family_history || '—')}
             </div>
+            {examination.gestationalAgeIsManual && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#525252', fontStyle: 'italic', marginTop: '0.75rem' }}>
+                <AutoCalcDot size={5} /> Value manually entered
+              </div>
+            )}
           </Tile>
         )}
 

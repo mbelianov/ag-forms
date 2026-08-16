@@ -81,6 +81,7 @@ export interface AnatomyViewModel {
 export interface FtBiometryViewModel {
   crl?: string;
   gaFromCrl?: string;
+  gaFromBio?: string;
   nt?: string;
   nb?: string;
   puls?: string;

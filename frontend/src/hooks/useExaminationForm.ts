@@ -1482,7 +1482,7 @@ export function useExaminationForm({
         ...(isEdit ? {} : { patientId: formData.patientId }),
         examDate: formData.examDate,
         gestationalAge: formData.gestationalAge.trim() || undefined,
-        gestationalAgeIsManual: formData.gestationalAgeIsManual || undefined,
+        gestationalAgeIsManual: formData.gestationalAgeIsManual,
         // For FT types, biometry/doppler/gestationalAgeFromBiometry are not emitted
         ...(!isFt ? {
           // On edit, send '' explicitly when empty so the backend clears the stored value.
