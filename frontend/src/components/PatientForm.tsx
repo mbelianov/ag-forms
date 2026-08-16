@@ -181,6 +181,9 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
               handleChange('birthDate', toISODate(dates[0]));
             }
           }}
+          onClose={(dates: Date[]) => {
+            if (dates[0]) handleChange('birthDate', toISODate(dates[0]));
+          }}
         >
           <DatePickerInput
             id="patient-birthDate"

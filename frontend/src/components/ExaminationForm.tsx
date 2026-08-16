@@ -156,6 +156,9 @@ export default function ExaminationForm(props: ExaminationFormProps) {
                 handleChange('examDate', toISODate(dates[0]));
               }
             }}
+            onClose={(dates: Date[]) => {
+              if (dates[0]) handleChange('examDate', toISODate(dates[0]));
+            }}
             maxDate={todayDisplayDate()}
           >
             <DatePickerInput
@@ -208,6 +211,9 @@ export default function ExaminationForm(props: ExaminationFormProps) {
                     value={formData.last_menstrual_period ? toDisplayDate(formData.last_menstrual_period) : ''}
                     maxDate={todayDisplayDate()}
                     onChange={(dates: Date[]) => {
+                      if (dates[0]) handleChange('last_menstrual_period', toISODate(dates[0]));
+                    }}
+                    onClose={(dates: Date[]) => {
                       if (dates[0]) handleChange('last_menstrual_period', toISODate(dates[0]));
                     }}
                   >
