@@ -35,10 +35,13 @@ Bugs confirmed but deferred for later resolution.
 - **Formula divergence (GA from biometry):** Beyond the field mismatch, the algorithms differ entirely. The backend averages four independent per-measurement polynomials (each operating on raw mm values). The frontend uses a single 4-parameter combined regression `GA = 10.85 + 0.06(HC_cm × FL_cm) + 0.67(BPD_cm) + 0.168(AC_cm)` that requires all four inputs in cm. The two approaches will not produce the same result.
 
 - **Fix options:**
-  - **Option A (recommended):** Delete `CalculateExamination.ts`. All calculation logic already lives in the frontend; a server-side recalculation endpoint adds no value with the current architecture.
+  - **Option A (chosen):** Delete `CalculateExamination.ts`. All calculation logic already lives in the frontend; a server-side recalculation endpoint adds no value with the current architecture.
   - **Option B:** If a server-side endpoint is wanted (e.g., for batch jobs or non-UI clients), rewrite it to mirror `calculations.ts` exactly: convert mm → cm, use the identical Hadlock and combined-regression formulas, and write GA results to `gestationalAgeFromBiometry`. Then wire up `examinationService.ts` to call it.
 - **Priority:** P2 · Non-blocking (endpoint is unreachable; existing UI behaviour is unaffected)
-- **Status:** Deferred
+- **Status:** ✅ Resolved (pending) — Option A chosen. Three files to change in Agent mode:
+  1. Delete `api/src/functions/CalculateExamination.ts`.
+  2. Remove `import { calculateExamination }` and the one `calculateExamination` test from `api/src/tests/integration/examinations.test.ts`.
+  3. Remove ST-03 from `docs2/backend-test-suite-plan.md` and update the coverage gap table.
 
 ---
 

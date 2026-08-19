@@ -469,14 +469,6 @@ describe('FORM-8 OFD — GA-from-measurement and percentile self-consistency', (
   ];
 
   // P5.0 has no OFD nomogram — all null
-  const REF_P50_OFD_GA: (string | null)[] = [
-    null, null, null, null, null, null,
-    null, null, null, null, null, null,
-  ];
-  const REF_P50_OFD_PERCENTILE: (number | null)[] = [
-    null, null, null, null, null, null,
-    null, null, null, null, null, null,
-  ];
 
   it('OFD GA-from-measurement: app vs GE Table 18-18 (Hansmann)', () => {
     const rows = INPUT_OFD_MM.map((ofd, i) => {
@@ -548,9 +540,6 @@ describe('FORM-11 EFW — calculation, GA-from-EFW, and percentile', () => {
   ];
 
   // P5.0 normative expected mean at each GA (Hadlock 1991 p50 table)
-  const REF_P50_EFW_EXPECTED_MEAN_G: (number | null)[] = [
-    146, 223, 331, 478, 670, 913, 1210, 1559, 1953, 2377, 2813, 3236,
-  ];
 
   // P5.0 median-equivalent GA for each computed EFW
   const REF_P50_EFW_MEDIAN_GA: (string | null)[] = [
