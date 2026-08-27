@@ -306,12 +306,28 @@ export async function cleanupTestData(): Promise<void> {
         }
     } catch {}
 
+    // Wipe PATIENT_TOTAL and EXAM_TOTAL counter rows unconditionally
+    try { await countersTable.deleteEntity('COUNTER', 'PATIENT_TOTAL', { etag: '*' }); } catch {}
+    try { await countersTable.deleteEntity('COUNTER', 'EXAM_TOTAL', { etag: '*' }); } catch {}
+
     for (const counterRowKey of trackedCounters.splice(0)) {
         try { await countersTable.deleteEntity('COUNTER', counterRowKey, { etag: '*' }); } catch {}
     }
 
     try {
         await countersTable.deleteEntity('COUNTER', `MRN_${new Date().getFullYear()}`, { etag: '*' });
+    } catch {}
+
+    // Full sweep of AuditLogs table (all AUDIT_* partitions)
+    try {
+        const auditTable = getTableClient(AUDIT_TABLE);
+        const auditEntities: Array<{ partitionKey: string; rowKey: string }> = [];
+        for await (const entity of auditTable.listEntities()) {
+            auditEntities.push({ partitionKey: entity.partitionKey as string, rowKey: entity.rowKey as string });
+        }
+        for (const e of auditEntities) {
+            try { await auditTable.deleteEntity(e.partitionKey, e.rowKey, { etag: '*' }); } catch {}
+        }
     } catch {}
 }
 

@@ -2,7 +2,7 @@ declare const describe: any;
 declare const test: any;
 declare const expect: any;
 
-import { validateUser, validatePatient, validateExamination, validateLogin } from '../../utils/validation';
+import { validateUser, validatePatient, validateExamination, validateLogin, validateRegister } from '../../utils/validation';
 
 describe('Validation Utilities', () => {
     describe('validateUser', () => {
@@ -10,6 +10,7 @@ describe('Validation Utilities', () => {
             const result = validateUser({
                 username: 'doctor_user',
                 password: 'StrongPassword123!',
+                fullName: 'Doctor User',
                 email: 'doctor@example.com',
                 role: 'doctor'
             });
@@ -22,6 +23,7 @@ describe('Validation Utilities', () => {
             const result = validateUser({
                 username: 'doctor user',
                 password: 'StrongPassword123!',
+                fullName: 'Doctor User',
                 email: 'doctor@example.com',
                 role: 'doctor'
             });
@@ -34,6 +36,7 @@ describe('Validation Utilities', () => {
             const result = validateUser({
                 username: 'doctor_user',
                 password: 'StrongPassword123!',
+                fullName: 'Doctor User',
                 email: 'doctor@example.com',
                 role: 'superadmin'
             });
@@ -46,12 +49,99 @@ describe('Validation Utilities', () => {
             const result = validateUser({
                 username: 'doctor_user',
                 password: 'StrongPassword123!',
+                fullName: 'Doctor User',
                 email: 'not-an-email',
                 role: 'doctor'
             });
 
             expect(result.valid).toBe(false);
             expect(result.errors).toContain('Email must be a valid email address');
+        });
+    });
+
+    describe('validateUser — fullName optional', () => {
+        test('should accept missing fullName (fullName is optional in schema)', () => {
+            // The userSchema defines fullName as optional() — it is not required at the schema level.
+            // Callers that want to enforce fullName (e.g. UI) do so outside validation.
+            const result = validateUser({
+                username: 'doctor_user',
+                password: 'StrongPassword123!',
+                email: 'doctor@example.com',
+                role: 'doctor'
+            });
+
+            expect(result.valid).toBe(true);
+        });
+    });
+
+    describe('validateRegister', () => {
+        test('should accept valid registration payload', () => {
+            const result = validateRegister({
+                username: 'register_user',
+                password: 'StrongPassword123!',
+                email: 'register@example.com',
+                role: 'viewer'
+            });
+
+            expect(result.valid).toBe(true);
+            expect(result.errors).toHaveLength(0);
+        });
+
+        test('should reject missing username', () => {
+            const result = validateRegister({
+                password: 'StrongPassword123!',
+                email: 'register@example.com',
+                role: 'viewer'
+            });
+
+            expect(result.valid).toBe(false);
+            expect(result.errors).toContain('Username is required');
+        });
+
+        test('should reject missing password', () => {
+            const result = validateRegister({
+                username: 'register_user',
+                email: 'register@example.com',
+                role: 'viewer'
+            });
+
+            expect(result.valid).toBe(false);
+            expect(result.errors).toContain('Password is required');
+        });
+
+        test('should reject missing email', () => {
+            const result = validateRegister({
+                username: 'register_user',
+                password: 'StrongPassword123!',
+                role: 'viewer'
+            });
+
+            expect(result.valid).toBe(false);
+            expect(result.errors).toContain('Email is required');
+        });
+
+        test('should reject short password', () => {
+            const result = validateRegister({
+                username: 'register_user',
+                password: 'Short123!',
+                email: 'register@example.com',
+                role: 'viewer'
+            });
+
+            expect(result.valid).toBe(false);
+            expect(result.errors).toContain('Password must be at least 12 characters long');
+        });
+
+        test('should reject invalid role', () => {
+            const result = validateRegister({
+                username: 'register_user',
+                password: 'StrongPassword123!',
+                email: 'register@example.com',
+                role: 'superadmin'
+            });
+
+            expect(result.valid).toBe(false);
+            expect(result.errors).toContain('Role must be one of: admin, doctor, viewer');
         });
     });
 
@@ -267,6 +357,46 @@ describe('Validation Utilities', () => {
 
             expect(result.valid).toBe(false);
             expect(result.errors).toContain('RI must be between 0 and 1');
+        });
+
+        test('should accept RI lower boundary 0', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                doppler: {
+                    ri: 0
+                }
+            });
+
+            expect(result.valid).toBe(true);
+        });
+
+        test('should accept RI upper boundary 1', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                doppler: {
+                    ri: 1
+                }
+            });
+
+            expect(result.valid).toBe(true);
+        });
+    });
+
+    describe('validateExamination — gestationalAgeIsManual', () => {
+        test('should accept gestationalAgeIsManual when gestationalAge is provided', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                gestationalAge: '28w 3d',
+                gestationalAgeIsManual: true,
+                status: 'draft'
+            });
+
+            expect(result.valid).toBe(true);
         });
     });
 

@@ -1,8 +1,9 @@
-﻿declare const describe: any;
+declare const describe: any;
 declare const test: any;
 declare const expect: any;
 declare const beforeEach: any;
 declare const afterEach: any;
+declare const jest: any;
 
 import { register } from '../../functions/Register';
 import { login } from '../../functions/Login';
@@ -242,6 +243,94 @@ describe('Auth Integration', () => {
         if (user) {
             expect(user.failedLoginAttempts).toBeGreaterThanOrEqual(1);
         }
+    });
+
+    test('should reject current user request without token', async () => {
+        const response = await getCurrentUser(mockHttpRequest('GET'), mockInvocationContext());
+        const body = parseBody(response);
+
+        expect(response.status).toBe(401);
+        expect(body.error.message).toBe('Unauthorized');
+    });
+
+    test('should reject current user request with invalid token', async () => {
+        const response = await getCurrentUser(
+            mockHttpRequest('GET', undefined, { cookie: 'session_token=invalid-token' }),
+            mockInvocationContext()
+        );
+        const body = parseBody(response);
+
+        expect(response.status).toBe(401);
+        expect(body.error.message).toBe('Unauthorized');
+    });
+
+    test('should reject logout without token', async () => {
+        const response = await logout(mockHttpRequest('POST'), mockInvocationContext());
+        const body = parseBody(response);
+
+        expect(response.status).toBe(401);
+        expect(body.error.message).toBe('Unauthorized');
+    });
+
+    test('should reject password change when confirmation does not match', async () => {
+        const created = await createTestUser('doctor');
+        const request = mockHttpRequest('POST', {
+            currentPassword: created.password,
+            newPassword: 'NewStrongPassword123!',
+            confirmPassword: 'MismatchPassword123!'
+        }, {
+            cookie: `session_token=${created.token}`
+        });
+
+        const response = await changePassword(request, mockInvocationContext());
+        const body = parseBody(response);
+
+        expect(response.status).toBe(400);
+        expect(body.error.message).toBe('New password and confirmation do not match');
+    });
+
+    test('should reject password change with weak new password', async () => {
+        const created = await createTestUser('doctor');
+        const request = mockHttpRequest('POST', {
+            currentPassword: created.password,
+            newPassword: 'weakpass',
+            confirmPassword: 'weakpass'
+        }, {
+            cookie: `session_token=${created.token}`
+        });
+
+        const response = await changePassword(request, mockInvocationContext());
+        const body = parseBody(response);
+
+        expect(response.status).toBe(400);
+        expect(body.error.message).toContain('Password must be at least 12 characters long');
+    });
+
+    test('should reject login for username that does not exist', async () => {
+        const response = await login(mockHttpRequest('POST', {
+            username: 'missing_user',
+            password: 'StrongPassword123!'
+        }), mockInvocationContext());
+        const body = parseBody(response);
+
+        expect(response.status).toBe(401);
+        expect(body.error.message).toBe('Invalid credentials');
+    });
+
+    test('should persist at least one failed login attempt after rapid sequential bad logins', async () => {
+        const created = await createTestUser('doctor');
+        const usersTable = getTableClient('Users');
+        const context = mockInvocationContext();
+
+        await Promise.all(
+            Array.from({ length: 3 }, () => login(mockHttpRequest('POST', {
+                username: created.user.username,
+                password: 'WrongPassword123!'
+            }), context))
+        );
+
+        const persisted = await usersTable.getEntity<any>('USER', created.user.userId);
+        expect(persisted.failedLoginAttempts).toBeGreaterThanOrEqual(1);
     });
 });
 
