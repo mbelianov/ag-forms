@@ -35,10 +35,10 @@ Bugs confirmed but deferred for later resolution.
 - **Formula divergence (GA from biometry):** Beyond the field mismatch, the algorithms differ entirely. The backend averages four independent per-measurement polynomials (each operating on raw mm values). The frontend uses a single 4-parameter combined regression `GA = 10.85 + 0.06(HC_cm × FL_cm) + 0.67(BPD_cm) + 0.168(AC_cm)` that requires all four inputs in cm. The two approaches will not produce the same result.
 
 - **Fix options:**
-  - **Option A (recommended):** Delete `CalculateExamination.ts`. All calculation logic already lives in the frontend; a server-side recalculation endpoint adds no value with the current architecture.
+  - **Option A (chosen):** Delete `CalculateExamination.ts`. All calculation logic already lives in the frontend; a server-side recalculation endpoint adds no value with the current architecture.
   - **Option B:** If a server-side endpoint is wanted (e.g., for batch jobs or non-UI clients), rewrite it to mirror `calculations.ts` exactly: convert mm → cm, use the identical Hadlock and combined-regression formulas, and write GA results to `gestationalAgeFromBiometry`. Then wire up `examinationService.ts` to call it.
 - **Priority:** P2 · Non-blocking (endpoint is unreachable; existing UI behaviour is unaffected)
-- **Status:** Deferred
+- **Status:** ✅ Resolved — deleted per Option A. `api/src/functions/CalculateExamination.ts` removed; `calculateExamination` import and its test block removed from `api/src/tests/integration/examinations.test.ts`; ST-03 marked done in `docs2/backend-test-suite-plan.md`.
 
 ---
 
@@ -89,7 +89,7 @@ Bugs confirmed but deferred for later resolution.
 
 - **Recommended path:** Option C — extend the existing `Counters` table (already used by `mrnGenerator.ts`) with `PATIENT_TOTAL` and `EXAM_TOTAL` partition rows. Update create/delete functions to increment/decrement with optimistic-concurrency retries. Count endpoints become single-entity reads. This is consistent with the established pattern, adds no new infrastructure, and scales to any data volume.
 - **Priority:** P3 · Low — no current impact; becomes P1 if data volume exceeds ~20 000 combined records
-- **Status:** Deferred — document and track; implement Option C before dashboard count endpoints are added for examinations
+- **Status:** ✅ Resolved — Option C is now fully implemented. Patient and examination counters (PATIENT_TOTAL and EXAM_TOTAL) are tracked in the Counters table, decremented on deletions (including cascade-deletes), and queried in O(1) time by count endpoints.
 
 ---
 
@@ -98,7 +98,7 @@ Bugs confirmed but deferred for later resolution.
 - **File:** `api/src/functions/SearchPatients.ts` (lines 9, 53–71, 73–77)
 - **Severity:** 🟡 Medium — insider / stolen-credential threat; no unauthenticated exposure
 - **Priority:** P2 · Non-blocking at current data volumes; elevate to P1 for GDPR compliance review
-- **Status:** Deferred — document and track; implement mitigations before production deployment with real patient data
+- **Status:** 🎯 Planned — Approved for the upcoming refactoring sprint (P1 · Security compliance). Will implement Option A (Search audit logging via `logAuditEvent()`).
 
 ### Symptom
 
@@ -213,7 +213,7 @@ This goes to the Functions host trace — it is **not** written to the `AuditLog
 
   This is a one-line change to a shared field that fixes both `registerSchema` and `userSchema` simultaneously. No schema structure change, no new fields, no migration needed.
 - **Priority:** P1 · High — blocks first-user bootstrap via `manage-data.ps1` and blocks user creation via the UI for any email address with a non-public TLD
-- **Status:** Deferred — documented; fix is ready to apply
+- **Status:** 🎯 Planned — Approved for the upcoming refactoring sprint (P1 · Dev-Loop). Will disable strict Joi TLD checking by using `.email({ tlds: { allow: false } })` in `validation.ts`.
 
 ---
 
@@ -237,7 +237,7 @@ This goes to the Functions host trace — it is **not** written to the `AuditLog
 
   Remove the two standalone `<TextInput>` elements for `la` and `lc` at lines 902–903.
 - **Priority:** P4 · Cosmetic — no functional or user-visible impact
-- **Status:** Deferred
+- **Status:** ✅ Resolved / Obsolete — The entire biometry form has been modularized and extracted to `BiometrySection.tsx`. Standalone fields like `la`, `lc`, `vp`, `cm`, `nb`, and `nuchalFold` are individually positioned inside a 3-column CSS grid with empty filler cells, completely rendering the old `.map()` loop design obsolete.
 
 ---
 
@@ -265,7 +265,7 @@ This goes to the Functions host trace — it is **not** written to the `AuditLog
   - Include percentiles in create/update request payloads.
   - Replace client-side recomputation in `ExaminationDetailPage` and `viewModelBuilders` with reads from the stored field.
 - **Priority:** P1 · High — blocks manual percentile entry, a required clinical workflow
-- **Status:** Planned — implementation plan written; not yet implemented
+- **Status:** ✅ Resolved — Percentiles persistence is fully implemented. The percentile, GA, and `IsManual` override flags are mapped directly inside the existing `biometry` and `biometry2` JSON-string properties on the `Examination` entity. Auto-calculation runs reactively via `useBiometryAutoCalc.ts`. Seeding on edit-load and view-model rendering are fully operational.
 
 ---
 

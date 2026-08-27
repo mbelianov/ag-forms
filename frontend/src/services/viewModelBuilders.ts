@@ -65,7 +65,7 @@ const PRENATAL_BIOMETRY_CITATIONS =
   '6. Chang CH, Chang FM, Yu CH, et al. Ultrasound Med Biol. 2000;26(3):341–7. PMID 10722905. (TCD percentile and GA from TCD)';
 
 const FT_BIOMETRY_CITATIONS =
-  '7. Robinson HP. Br Med J. 1975;4(5986):28–31. PMID 1182090. (GA from CRL)';
+  '1. Robinson HP. Br Med J. 1975;4(5986):28–31. PMID 1182090. (GA from CRL)';
 
 // ─── Build view model ─────────────────────────────────────────────────────────
 
@@ -83,9 +83,8 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
     if (!b) return undefined;
     return {
       crl:       b.crl  != null ? `${b.crl.toFixed(2)} mm` : undefined,
-      // KI-009: prefer stored gaFromBio; fallback to gaFromCrl for backward compat
-      // Sub-Task 5: use gaFromBioIsManual (with fallback to gaFromCrlIsManual for older records)
-      gaFromCrl: withManualMarker(b.gaFromBio ?? b.gaFromCrl ?? undefined, b.gaFromBioIsManual ?? b.gaFromCrlIsManual),
+      gaFromCrl: withManualMarker(b.gaFromCrl ?? undefined, b.gaFromCrlIsManual),
+      gaFromBio: withManualMarker(b.gaFromBio ?? undefined, b.gaFromBioIsManual),
       nt:        b.nt   != null ? `${b.nt.toFixed(2)} mm` : undefined,
       nb:        b.nb   != null ? `${b.nb.toFixed(2)} mm` : undefined,
       puls:      b.puls != null ? `${b.puls} bpm` : undefined,

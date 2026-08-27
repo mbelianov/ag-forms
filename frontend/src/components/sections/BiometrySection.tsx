@@ -14,6 +14,7 @@
  */
 import { TextInput, FormGroup } from '@carbon/react';
 import { autoCalcLabel } from '../AutoCalcHelpers';
+import PercentileInput from '../PercentileInput';
 
 export interface BiometrySectionFormData {
   bpd: string;
@@ -100,7 +101,7 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
         <TextInput id={p('bpd')} labelText="BPD (mm)" placeholder="e.g., 85.5"
           value={data.bpd} onChange={(e) => onChange(p('bpd'), e.target.value)}
           invalid={!!errors[p('bpd')]} invalidText={errors[p('bpd')]} disabled={isSubmitting} autoComplete="off" />
-        <TextInput id={p('bpdPercentile')} labelText={autoCalcLabel('BPD Percentile', data.bpdPercentileIsManual)}
+        <PercentileInput id={p('bpdPercentile')} labelText={autoCalcLabel('BPD Percentile', data.bpdPercentileIsManual)}
           placeholder="auto" value={data.bpdPercentile}
           onChange={(e) => onChange(p('bpdPercentile'), e.target.value)}
           disabled={isSubmitting} />
@@ -113,7 +114,7 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
         <TextInput id={p('ofd')} labelText="OFD (mm)" placeholder="e.g., 0.0"
           value={data.ofd} onChange={(e) => onChange(p('ofd'), e.target.value)}
           invalid={!!errors[p('ofd')]} invalidText={errors[p('ofd')]} disabled={isSubmitting} autoComplete="off" />
-        <TextInput id={p('ofdPercentile')} labelText={autoCalcLabel('OFD Percentile', data.ofdPercentileIsManual)}
+        <PercentileInput id={p('ofdPercentile')} labelText={autoCalcLabel('OFD Percentile', data.ofdPercentileIsManual)}
           placeholder="auto" value={data.ofdPercentile}
           onChange={(e) => onChange(p('ofdPercentile'), e.target.value)}
           disabled={isSubmitting} />
@@ -126,7 +127,7 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
         <TextInput id={p('hc')} labelText="HC (mm)" placeholder="e.g., 310.5"
           value={data.hc} onChange={(e) => onChange(p('hc'), e.target.value)}
           invalid={!!errors[p('hc')]} invalidText={errors[p('hc')]} disabled={isSubmitting} autoComplete="off" />
-        <TextInput id={p('hcPercentile')} labelText={autoCalcLabel('HC Percentile', data.hcPercentileIsManual)}
+        <PercentileInput id={p('hcPercentile')} labelText={autoCalcLabel('HC Percentile', data.hcPercentileIsManual)}
           placeholder="auto" value={data.hcPercentile}
           onChange={(e) => onChange(p('hcPercentile'), e.target.value)}
           disabled={isSubmitting} />
@@ -139,7 +140,7 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
         <TextInput id={p('tad')} labelText="TAD (mm)" placeholder="e.g., 0.0"
           value={data.tad} onChange={(e) => onChange(p('tad'), e.target.value)}
           invalid={!!errors[p('tad')]} invalidText={errors[p('tad')]} disabled={isSubmitting} autoComplete="off" />
-        <TextInput id={p('tadPercentile')} labelText="TAD Percentile"
+        <PercentileInput id={p('tadPercentile')} labelText="TAD Percentile"
           placeholder="manual" value={data.tadPercentile}
           onChange={(e) => onChange(p('tadPercentile'), e.target.value)}
           disabled={isSubmitting} />
@@ -152,7 +153,7 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
         <TextInput id={p('apad')} labelText="APAD (mm)" placeholder="e.g., 0.0"
           value={data.apad} onChange={(e) => onChange(p('apad'), e.target.value)}
           invalid={!!errors[p('apad')]} invalidText={errors[p('apad')]} disabled={isSubmitting} autoComplete="off" />
-        <TextInput id={p('apadPercentile')} labelText="APAD Percentile"
+        <PercentileInput id={p('apadPercentile')} labelText="APAD Percentile"
           placeholder="manual" value={data.apadPercentile}
           onChange={(e) => onChange(p('apadPercentile'), e.target.value)}
           disabled={isSubmitting} />
@@ -165,7 +166,7 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
         <TextInput id={p('ac')} labelText="AC (mm)" placeholder="e.g., 280.5"
           value={data.ac} onChange={(e) => onChange(p('ac'), e.target.value)}
           invalid={!!errors[p('ac')]} invalidText={errors[p('ac')]} disabled={isSubmitting} autoComplete="off" />
-        <TextInput id={p('acPercentile')} labelText={autoCalcLabel('AC Percentile', data.acPercentileIsManual)}
+        <PercentileInput id={p('acPercentile')} labelText={autoCalcLabel('AC Percentile', data.acPercentileIsManual)}
           placeholder="auto" value={data.acPercentile}
           onChange={(e) => onChange(p('acPercentile'), e.target.value)}
           disabled={isSubmitting} />
@@ -178,7 +179,7 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
         <TextInput id={p('fl')} labelText="FL (mm)" placeholder="e.g., 55.5"
           value={data.fl} onChange={(e) => onChange(p('fl'), e.target.value)}
           invalid={!!errors[p('fl')]} invalidText={errors[p('fl')]} disabled={isSubmitting} autoComplete="off" />
-        <TextInput id={p('flPercentile')} labelText={autoCalcLabel('FL Percentile', data.flPercentileIsManual)}
+        <PercentileInput id={p('flPercentile')} labelText={autoCalcLabel('FL Percentile', data.flPercentileIsManual)}
           placeholder="auto" value={data.flPercentile}
           onChange={(e) => onChange(p('flPercentile'), e.target.value)}
           disabled={isSubmitting} />
@@ -191,7 +192,7 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
         <TextInput id={p('efw')} labelText={autoCalcLabel('EFW (grams)', data.efwIsManual)} placeholder="e.g., 1500"
           value={data.efw} onChange={(e) => onChange(p('efw'), e.target.value)}
           invalid={!!errors[p('efw')]} invalidText={errors[p('efw')]} disabled={isSubmitting} autoComplete="off" />
-        <TextInput id={p('efwPercentile')} labelText={autoCalcLabel('EFW Percentile', data.efwPercentileIsManual)}
+        <PercentileInput id={p('efwPercentile')} labelText={autoCalcLabel('EFW Percentile', data.efwPercentileIsManual)}
           placeholder="auto" value={data.efwPercentile}
           onChange={(e) => onChange(p('efwPercentile'), e.target.value)}
           disabled={isSubmitting} />
@@ -204,7 +205,7 @@ export default function BiometrySection({ prefix, data, errors, onChange, isSubm
         <TextInput id={p('tcd')} labelText="TCD (mm)" placeholder="e.g., 0.0"
           value={data.tcd} onChange={(e) => onChange(p('tcd'), e.target.value)}
           invalid={!!errors[p('tcd')]} invalidText={errors[p('tcd')]} disabled={isSubmitting} autoComplete="off" />
-        <TextInput id={p('tcdPercentile')} labelText={autoCalcLabel('TCD Percentile', data.tcdPercentileIsManual)}
+        <PercentileInput id={p('tcdPercentile')} labelText={autoCalcLabel('TCD Percentile', data.tcdPercentileIsManual)}
           placeholder="auto" value={data.tcdPercentile}
           onChange={(e) => onChange(p('tcdPercentile'), e.target.value)}
           disabled={isSubmitting} />

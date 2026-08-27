@@ -229,9 +229,9 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   const gaBioDisplay = isTwins
     ? `${vm.gestationalAgeFromBiometry || '—'} / ${vm.gestationalAgeFromBiometry2 || '—'}`
     : vm.gestationalAgeFromBiometry;
-  const gaFromCrlDisplay = isFtTwinsExam
-    ? `${vm.ftBiometry?.gaFromCrl || '—'} / ${vm.twin2FtBiometry?.gaFromCrl || '—'}`
-    : vm.ftBiometry?.gaFromCrl;
+  const gaFromBioDisplay = isFtTwinsExam
+    ? `${vm.ftBiometry?.gaFromBio || '—'} / ${vm.twin2FtBiometry?.gaFromBio || '—'}`
+    : vm.ftBiometry?.gaFromBio;
   // uzd-twins: layout constants for twin two-column layout
   // A4 usable width: 182 mm; twin column: 88 mm each with 6 mm gutter
   const TWIN_COL_W = 88;
@@ -294,12 +294,12 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
 
     // Sub-Task 5: "GA (Bio): " unified across all exam types.
     // For FT exams: GA from Bio = GA from CRL at current level of development.
-    const secondGaLabel = '  GA (Bio): ';
-    const secondGaValue = isFt ? (gaFromCrlDisplay || '—') : (gaBioDisplay || '—');
-    doc.text(secondGaLabel, MARGIN_L + 42, y);
+    const gaBioLabel = '  GA (Bio): ';
+    const gaBioValue = isFt ? (gaFromBioDisplay || '—') : (gaBioDisplay || '—');
+    doc.text(gaBioLabel, MARGIN_L + 42, y);
     doc.setFont(FONT_ID, 'bold');
     setTextColor(doc, C_DARK);
-    doc.text(secondGaValue, MARGIN_L + 42 + doc.getTextWidth(secondGaLabel), y);
+    doc.text(gaBioValue, MARGIN_L + 42 + doc.getTextWidth(gaBioLabel), y);
     doc.setFont(FONT_ID, 'normal');
     setTextColor(doc, C_MID);
 
@@ -368,7 +368,7 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
     // Row 2: Expected Delivery Date | GA from CRL / GA from Bio (inline, 5 mm pitch, no bg)
     drawInlineCell(xL, y, 'Expected Delivery Date: ', vm.expectedDeliveryDate, true);
     // Sub-Task 5: "GA from Bio: " unified across all exam types.
-    drawInlineCell(xR, y, 'GA from Bio: ', isFt ? gaFromCrlDisplay : gaBioDisplay);
+    drawInlineCell(xR, y, 'GA from Bio: ', isFt ? (gaFromBioDisplay || '—') : (gaBioDisplay || '—'));
     y += 5;
 
     // Row 3: Obstetric History | Family History (stacked, 8 mm pitch)

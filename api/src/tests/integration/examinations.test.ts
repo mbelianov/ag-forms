@@ -10,7 +10,6 @@ import { getExamination } from '../../functions/GetExamination';
 import { getExaminationByMRN } from '../../functions/GetExaminationByMRN';
 import { updateExamination } from '../../functions/UpdateExamination';
 import { deleteExamination } from '../../functions/DeleteExamination';
-import { calculateExamination } from '../../functions/CalculateExamination';
 import { emailExaminationReport } from '../../functions/EmailExaminationReport';
 import { createTestUser, createTestPatient, createTestExamination, cleanupTestData, seedCounter, mockHttpRequest, mockInvocationContext } from '../testUtils';
 import { getTableClient } from '../../utils/tableClient';
@@ -152,30 +151,6 @@ describe('Examinations Integration', () => {
 
         expect(response.status).toBe(200);
         expect(body.data.message).toBe('Examination deleted successfully');
-    });
-
-    test('should calculate examination EFW and GA', async () => {
-        const doctor = await createTestUser('doctor');
-        const patient = await createTestPatient();
-        const examination = await createTestExamination(patient.patientId);
-        const table = getTableClient('Examinations');
-        const persisted = await table.getEntity<any>('EXAM', examination.examinationId);
-
-        persisted.gestationalAge = undefined;
-        persisted.biometry = JSON.stringify({ bpd: 70, hc: 250, ac: 220, fl: 50 });
-        await table.updateEntity(persisted, 'Merge');
-
-        const request = mockHttpRequest('POST', undefined, {
-            cookie: `session_token=${doctor.token}`
-        });
-        (request as any).params = { id: examination.examinationId };
-        const context = mockInvocationContext();
-
-        const response = await calculateExamination(request, context);
-        const body = parseBody(response);
-
-        expect(response.status).toBe(200);
-        expect(body.data.examination.gestationalAge).toBeDefined();
     });
 
     test('should simulate email report sending', async () => {

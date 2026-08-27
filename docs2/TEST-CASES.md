@@ -4,7 +4,7 @@
 **Version:** 1.0  
 **Date:** June 15, 2026  
 **Based on:** Documentation v2.0  
-**Total Test Cases:** 180
+**Total Test Cases:** 179
 
 ---
 
@@ -29,13 +29,13 @@
 |----------|-----------|----------|
 | Authentication & User Management | 30 | P0 |
 | Patient Management | 35 | P0 |
-| Examination Management | 40 | P0 |
+| Examination Management | 39 | P0 |
 | Search Functionality | 15 | P1 |
 | PDF Report Generation | 10 | P0 |
 | Email Report Delivery | 10 | P1 |
 | Security & Authorization | 20 | P0 |
 | Edge Cases & Error Scenarios | 20 | P2 |
-| **TOTAL** | **180** | - |
+| **TOTAL** | **179** | - |
 
 ### Test Coverage by Role
 
@@ -1183,7 +1183,9 @@
 - **Priority:** P0
 - **Role:** Viewer
 
-### 3.5 Calculation Tests (5 cases)
+### 3.5 Calculation Tests (4 cases)
+
+> **Note:** All calculations (GA from LMP, EDD, biometry percentiles, EFW) are performed client-side in `frontend/src/utils/calculations.ts`. There is no server-side calculation endpoint. TC-CALC-004 has been removed — `POST /v1/examinations/:id/calculate` was deleted (see `docs2/KNOWN-ISSUES.md §KI-002`).
 
 **TC-CALC-001: Calculate Gestational Age from LMP**
 - **Steps:**
@@ -1213,20 +1215,11 @@
 - **Priority:** P0
 - **Role:** Doctor
 
-**TC-CALC-004: Calculation Endpoint Direct Call**
-- **Steps:**
-  1. POST to `/api/v1/examinations/{id}/calculate`
-- **Expected Result:**
-  - 200 OK with calculated values
-- **Priority:** P1
-- **Role:** Doctor
-
 **TC-CALC-005: Calculate with Missing Data**
 - **Steps:**
   1. Attempt calculation with incomplete biometry
 - **Expected Result:**
-  - Partial results OR
-  - Error indicating missing data
+  - Partial results shown for fields where inputs are available
 - **Priority:** P1
 - **Role:** Doctor
 

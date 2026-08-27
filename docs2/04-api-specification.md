@@ -774,43 +774,9 @@ Cookie: session_token=<signed-token>
 
 ---
 
-### POST /examinations/:id/calculate
+### ~~POST /examinations/:id/calculate~~ — **Removed**
 
-Trigger or perform automatic calculations for examination data.
-
-This endpoint executes synchronously for the current scope.
-
-**Request:**
-
-```http
-POST /api/v1/examinations/770e8400-e29b-41d4-a716-446655440002/calculate
-Cookie: session_token=<signed-token>
-```
-
-**Response (200 OK):**
-
-```json
-{
-  "success": true,
-  "data": {
-    "gestational_age": {
-      "weeks": 21,
-      "days": 3
-    },
-    "expected_delivery_date": "2026-10-22",
-    "biometry_percentiles": {
-      "bpd": 50,
-      "hc": 52,
-      "ac": 55,
-      "fl": 50
-    }
-  },
-  "meta": {
-    "timestamp": "2026-06-12T11:25:00Z",
-    "request_id": "req_exams_calc_001"
-  }
-}
-```
+> **Removed.** All EFW, gestational age, and percentile calculations are performed client-side in the React application using `frontend/src/utils/calculations.ts`. No server-side calculation endpoint exists or is needed. See `docs2/KNOWN-ISSUES.md §KI-002` for the full rationale.
 
 ---
 
