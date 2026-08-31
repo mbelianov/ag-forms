@@ -660,7 +660,7 @@ The `ExaminationsPage` filter dropdown currently shows all four types. After the
 
 The `EXAM_TYPE_CONFIG` proposed in §3 (ST-06) has two entries. With the Observable model, there is no `sections` list — both exam types render the same four section keys (`biometry`, `doppler`, `ultrasoundFindings`, `anatomy`), because the `ft_` distinction no longer exists at the section level. The `examinationType` tells the form which `ObservableTypeConfig` entries to populate in the `biometry` observable map, not which section components to show.
 
-`biometryTypes` and `dopplerTypes` are `readonly ObservableTypeConfig[]` — each element carries the full metadata needed to render and calculate a row (`type`, `label`, `unit`, `hasPercentile`, `hasGa`). The code sample below shows the shape; actual label/unit values are defined in full in `examinationTypes.ts` (ST-06):
+`biometryTypes` and `dopplerTypes` are `readonly ObservableTypeConfig[]` — each element carries the full metadata needed to render and calculate a row (`type`, `label`, `unit`, `hasPercentile`, `hasGa`, `validRange`, `sourceTag`). The code sample below shows the shape; actual label/unit values are defined in full in `examinationTypes.ts` (ST-06):
 
 ```typescript
 // Authoritative interface (defined in frontend/src/constants/examinationTypes.ts)
@@ -670,6 +670,12 @@ export interface ObservableTypeConfig {
   unit: string;          // unit string: "mm", "g", "bpm", etc.
   hasPercentile: boolean;// whether a percentile column is rendered and calculated
   hasGa: boolean;        // whether a GA column is rendered and calculated
+  validRange?: { min: number; max: number }; // valid input range for the value field;
+                         // copied from ObservableCalculationDescriptor.validRange when
+                         // building EXAM_TYPE_CONFIG; displayed as placeholder text
+  sourceTag?: string;    // ≤ 10-char attribution label (e.g. "Hadlock");
+                         // copied from ObservableCalculationDescriptor.sourceTag;
+                         // displayed in the field label instead of "(auto)"
 }
 
 export interface ExamTypeConfig {
@@ -685,7 +691,8 @@ export const EXAM_TYPE_CONFIG: Record<string, ExamTypeConfig> = {
     label: 'Prenatal',
     trimester: 'second',
     biometryTypes: [
-      { type: 'bpd', label: 'BPD', unit: 'mm', hasPercentile: true, hasGa: true },
+      { type: 'bpd', label: 'BPD', unit: 'mm', hasPercentile: true, hasGa: true,
+        validRange: { min: 20, max: 110 }, sourceTag: 'Hadlock' },
       // ... full list in examinationTypes.ts (§14.3)
     ],
     dopplerTypes: [
@@ -697,7 +704,8 @@ export const EXAM_TYPE_CONFIG: Record<string, ExamTypeConfig> = {
     label: 'First Trimester',
     trimester: 'first',
     biometryTypes: [
-      { type: 'crl', label: 'CRL', unit: 'mm', hasPercentile: false, hasGa: true },
+      { type: 'crl', label: 'CRL', unit: 'mm', hasPercentile: false, hasGa: true,
+        validRange: { min: 10, max: 65 }, sourceTag: 'Robinson' },
       // ...
     ],
     dopplerTypes: [
@@ -1274,29 +1282,71 @@ export interface ObservableCalculationDescriptor {
   calcGa?: (value: number) => string | undefined;
   calcPercentile?: (value: number, ga: string | number) => number | undefined;
   isDerivedValue?: boolean;
+  /**
+   * Valid input range for the measurement value.
+   * Sourced from the corresponding calcGAFromXXX function (which already enforces
+   * the range internally). Copied into ObservableTypeConfig.validRange when
+   * EXAM_TYPE_CONFIG is built, so ObservableRow can display it as placeholder text
+   * (e.g. "20–110" for BPD).
+   */
+  validRange?: { min: number; max: number };
+  /**
+   * Attribution label for the calculation source. Maximum 10 characters.
+   * Displayed in the ObservableRow field label instead of "(auto)" when the
+   * field has an auto-calculated value (e.g. "Hadlock", "Robinson").
+   * Copied into ObservableTypeConfig.sourceTag when EXAM_TYPE_CONFIG is built.
+   */
+  sourceTag?: string;
 }
 
 export const OBSERVABLE_CALC_REGISTRY: Record<string, ObservableCalculationDescriptor> = {
   // Prenatal standard biometry
-  bpd: { calcGa: calcGAFromBPD, calcPercentile: calcBPDPercentile },
-  hc:  { calcGa: calcGAFromHC,  calcPercentile: calcHCPercentile },
-  ac:  { calcGa: calcGAFromAC,  calcPercentile: calcACPercentile },
-  fl:  { calcGa: calcGAFromFL,  calcPercentile: calcFLPercentile },
-  
+  bpd: { calcGa: calcGAFromBPD, calcPercentile: calcBPDPercentile,
+         validRange: { min: 20, max: 110 }, sourceTag: 'Hadlock' },
+  hc:  { calcGa: calcGAFromHC,  calcPercentile: calcHCPercentile,
+         validRange: { min: 60, max: 360 }, sourceTag: 'Hadlock' },
+  ac:  { calcGa: calcGAFromAC,  calcPercentile: calcACPercentile,
+         validRange: { min: 60, max: 380 }, sourceTag: 'Hadlock' },
+  fl:  { calcGa: calcGAFromFL,  calcPercentile: calcFLPercentile,
+         validRange: { min: 10, max: 80 },  sourceTag: 'Hadlock' },
+
   // Prenatal extended biometry (§14.3)
-  ofd: { calcGa: calcGAFromOFD, calcPercentile: calcOFDPercentile },
-  tcd: { calcGa: calcGAFromTCD, calcPercentile: calcTCDPercentile },
-  
+  ofd: { calcGa: calcGAFromOFD, calcPercentile: calcOFDPercentile,
+         validRange: { min: 20, max: 120 }, sourceTag: 'Hadlock' },
+  tcd: { calcGa: calcGAFromTCD, calcPercentile: calcTCDPercentile,
+         validRange: { min: 10, max: 60 },  sourceTag: 'Chitty' },
+
   // First trimester biometry (§14.3)
-  crl: { calcGa: calcGAFromCRL },
+  crl: { calcGa: calcGAFromCRL,
+         validRange: { min: 10, max: 65 },  sourceTag: 'Robinson' },
 
   // Auto-derived multi-input measurement
   efw: {
     calcGa: calcGAFromEFW,
     calcPercentile: (val, ga) => calcEFWPercentile(val, ga),
-    isDerivedValue: true
+    isDerivedValue: true,
+    sourceTag: 'Hadlock'
+    // validRange omitted — EFW is a derived value, not a direct user input
   }
 };
+
+/**
+ * Build function that copies validRange and sourceTag from the registry into
+ * each ObservableTypeConfig entry when constructing EXAM_TYPE_CONFIG.
+ * Called once at module initialisation in examinationTypes.ts.
+ *
+ * @example
+ *   { type: 'bpd', label: 'BPD', unit: 'mm', hasPercentile: true, hasGa: true,
+ *     validRange: { min: 20, max: 110 }, sourceTag: 'Hadlock' }
+ */
+export function enrichTypeConfig(config: Omit<ObservableTypeConfig, 'validRange' | 'sourceTag'>): ObservableTypeConfig {
+  const desc = OBSERVABLE_CALC_REGISTRY[config.type];
+  return {
+    ...config,
+    ...(desc?.validRange ? { validRange: desc.validRange } : {}),
+    ...(desc?.sourceTag  ? { sourceTag:  desc.sourceTag  } : {}),
+  };
+}
 ```
 
 #### 15.3.2 Dynamic Calculation Function (`computeObservableDerivedFields`)
@@ -1487,24 +1537,31 @@ export const ObservableRow: React.FC<ObservableRowProps> = React.memo(({
   disabled = false,
   onChange
 }) => {
-  const { type, label, unit, hasPercentile, hasGa } = config;
+  const { type, label, unit, hasPercentile, hasGa, validRange, sourceTag } = config;
+
+  // sourceTag (e.g. "Hadlock") replaces "(auto)" when the value was auto-calculated.
+  const autoSuffix = (isManual: boolean | undefined) =>
+    isManual ? ' (manual)' : sourceTag ? ` (${sourceTag})` : ' (auto)';
 
   const valueLabel = `${label} (${unit})${
-    type === 'efw' && fieldState.value.value ? (fieldState.value.isManual ? ' (manual)' : ' (auto)') : ''
+    fieldState.value.value ? autoSuffix(fieldState.value.isManual) : ''
   }`;
   const gaLabel = `${label} GA${
-    fieldState.ga?.value ? (fieldState.ga.isManual ? ' (manual)' : ' (auto)') : ''
+    fieldState.ga?.value ? autoSuffix(fieldState.ga.isManual) : ''
   }`;
   const pctlLabel = `${label} %${
-    fieldState.percentile?.value ? (fieldState.percentile.isManual ? ' (manual)' : ' (auto)') : ''
+    fieldState.percentile?.value ? autoSuffix(fieldState.percentile.isManual) : ''
   }`;
+
+  // validRange drives the placeholder on the value input: "20–110", "10–65", etc.
+  const valuePlaceholder = validRange ? `${validRange.min}–${validRange.max}` : '0.0';
 
   return (
     <div className="observable-row-grid">
       <TextInput
         id={`${idPrefix}_value`}
         labelText={valueLabel}
-        placeholder="0.0"
+        placeholder={valuePlaceholder}
         value={fieldState.value.value}
         disabled={disabled}
         onChange={(e) => {
