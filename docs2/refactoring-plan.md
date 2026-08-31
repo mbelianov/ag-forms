@@ -8,12 +8,15 @@
 
 ## Overview
 
-The refactoring is divided into ten sequential sub-tasks. Each sub-task is independently deployable and leaves the application in a working state. Sub-tasks ST-01 and ST-02 are backend-only and can be applied immediately. ST-03 through ST-09 implement the fetus array data model and the two-type redesign. ST-10 is the final directory restructuring.
+The refactoring is divided into ten sequential sub-tasks. Each sub-task is independently deployable and leaves the application in a working state. Sub-tasks ST-01 and ST-02 are backend-only and can be applied immediately. ST-03 through ST-09 implement the Observable fetus array data model and the two-type redesign. ST-10 is the final directory restructuring.
 
-**Key design decisions (from findings document §10 and §12):**
+**Key design decisions (from findings document §10, §12, and §14):**
+- **Observable data model (§14):** biometry and doppler measurements are stored as `Observable[]` arrays — `{ type, value, percentile?, ga? }` — not flat named objects. `IsManual` flags live on the sub-object they guard. `BiometryData`, `DopplerData`, `FtBiometry`, `FtDoppler` types are removed.
+- **Unified sections (§14.3):** `ft_` prefix abolished. Both exam types use the same `biometry`, `doppler`, `anatomy`, `ultrasoundFindings` section keys. The `type` field in each observable distinguishes `crl` (FT) from `bpd` (prenatal). `markers` is a plain object used only for FT soft markers.
+- **`EXAM_TYPE_CONFIG` carries `biometryTypes` list (§12.3.3):** the config declares which observable `type` values appear in the `biometry` array for each exam type — not a `sections` array of section keys.
 - Migration: single atomic deployment — migration script + code change ship together; no dual-write period
-- Composite GA: computed on read by joining `fetuses.map(f => f.ga_from_biometry).join(' / ')` — no stored composite field
-- Form handler: `handleFetusChange(index, section, field, value)` added alongside existing `handleChange` for entity-level fields
+- Composite GA per fetus: `fetuses[i].gaFromBiometry` — `{ value, isManual? }` object; no stored composite across fetuses
+- Form handler: `handleFetusChange(index, section, type, field, value)` added alongside existing `handleChange` for entity-level fields
 - `fetusSectionCount`: runtime form state — **not** in `EXAM_TYPE_CONFIG`; user selects it on the create form; locked on edit
 - `examinationType`: two values only — `'prenatal'` and `'first_trimester'`; four legacy values migrated in ST-09
 - Fetus count decrease on create: Option A — silent slice, no confirmation prompt
@@ -94,9 +97,10 @@ Eliminate the copy-paste JSON serialization/deserialization blocks that appear a
 ### Todo List
 1. Create `api/src/utils/examinationSerializer.ts` (new file — goes into `utils/` now; will move to `shared/storage/` in ST-10):
    - Export `deserializeExamination(raw: any): Examination` — parses `biometry`, `doppler`, `biometry2`, `doppler2`, and `data` from JSON strings if they are strings; returns an object with all fields deserialized
-   - **Legacy read shim (pre-migration compatibility):** Inside `deserializeExamination`, after parsing `data`, call `normalizeFetusArray(data)` (imported from `api/src/utils/legacyExamAdapter.ts`) to populate `data.fetuses` when the entity was not yet migrated. `normalizeFetusArray` mirrors the frontend shim logic: if `data.fetuses` is already a non-empty array, return it as-is; otherwise synthesize `fetuses[0]` from top-level `biometry`/`doppler`/`gestationalAgeFromBiometry` and `fetuses[1]` (if `biometry2` exists) from `biometry2`/`doppler2`. Write `api/src/utils/legacyExamAdapter.ts` as a new file alongside the serializer. Both this file and its import are deleted in ST-09.
-   - Export `serializeExaminationFields(fields: Partial<ExaminationCreateRequest>): Record<string, any>` — stringifies `biometry`, `doppler`, `biometry2`, `doppler2`, and `data` to JSON strings for storage; returns a flat record
+   - **Legacy read shim (pre-migration compatibility):** Inside `deserializeExamination`, after parsing `data`, call `normalizeFetusArray(data)` (imported from `api/src/utils/legacyExamAdapter.ts`) to populate `data.fetuses` when the entity was not yet migrated. `normalizeFetusArray`: if `data.fetuses` is already a non-empty array with Observable entries, return as-is; otherwise synthesize `fetuses[0]` from legacy top-level `biometry`/`doppler` flat objects (converting each named field to an `Observable` entry), `ultrasound_findings`, `anatomy`, and `ft_*` keys; synthesize `fetuses[1]` similarly from `biometry2`/`doppler2`/`twin2_*` if present. Write `api/src/utils/legacyExamAdapter.ts` as a new file alongside the serializer. Both this file and its import are deleted in ST-09.
+   - Export `serializeExaminationFields(fields: Partial<ExaminationCreateRequest>): Record<string, any>` — stringifies `data` to a JSON string for storage (the `data` blob now contains the full `fetuses` Observable array); returns a flat record with only `data` key
 2. In `api/src/types/index.ts`:
+   - Add `Observable`, `GaFromBiometry`, `FetusSectionData`, `ExaminationData` interfaces (per §14.2)
    - Add `ExaminationCreateRequest` interface (extracts fields from the current local `interface ExaminationCreateBody` in `CreateExamination.ts`)
    - Add `ExaminationUpdateRequest` interface (extracts fields from the current local `interface ExaminationBody` in `UpdateExamination.ts`)
 3. In `api/src/functions/GetExamination.ts` — replace the inline JSON.parse block with `deserializeExamination(examination)`
@@ -108,9 +112,10 @@ Eliminate the copy-paste JSON serialization/deserialization blocks that appear a
 
 ### Relevant Context
 - The inline JSON.parse pattern appears in `GetExamination.ts`, `GetExaminations.ts`, `GetExaminationByMRN.ts` — each 6–8 lines with identical structure
-- The `biometry2`/`doppler2` fields are conditionally serialized in Create/Update — `serializeExaminationFields` must preserve this conditionality
+- After the Observable model, only `data` is serialized — `biometry`/`doppler`/`biometry2`/`doppler2` top-level columns are legacy; `serializeExaminationFields` no longer handles them
 - `api/src/types/index.ts` is the single source of truth for backend types
 - `api/src/utils/legacyExamAdapter.ts` — created in this sub-task; deleted in ST-09
+- `docs2/refactoring-findings.md §14` — Observable type definitions and encoding rules
 
 ---
 
@@ -119,45 +124,47 @@ Eliminate the copy-paste JSON serialization/deserialization blocks that appear a
 - **Status:** [ ] pending
 
 ### Intent
-Replace the promoted top-level `biometry`, `doppler`, `biometry2`, `doppler2`, `gestationalAgeFromBiometry`, `gestationalAgeFromBiometry2` fields on the `Examination` entity and interface with a generalized `fetuses: FetusSectionData[]` array inside the `ExaminationData` blob. Ship a migration script that converts all existing records atomically.
+Replace the promoted top-level `biometry`, `doppler`, `biometry2`, `doppler2`, `gestationalAgeFromBiometry`, `gestationalAgeFromBiometry2` fields on the `Examination` entity and interface with a `fetuses: FetusSectionData[]` array inside the `ExaminationData` blob, where each fetus's measurements are stored as `Observable[]` arrays. All `ft_*` and `twin2_*` data keys are absorbed into the fetus array. Ship a migration script that converts all existing records atomically.
 
 This is the largest single sub-task and the foundation for all frontend refactoring that follows.
 
 ### Expected Outcomes
 - `Examination` interface no longer has `biometry`, `doppler`, `biometry2`, `doppler2`, `gestationalAgeFromBiometry`, `gestationalAgeFromBiometry2` at the top level
 - `ExaminationData` has `fetuses: FetusSectionData[]` where index 0 = fetus 1, index 1 = fetus 2
-- `FetusSectionData` holds `biometry`, `doppler`, `ultrasound_findings`, `anatomy`, `ga_from_biometry` and all first-trimester equivalents
-- The `data.twin2_ultrasound_findings` and `data.twin2_anatomy` keys (currently separate top-level `data` properties) are moved into `data.fetuses[1].ultrasound_findings` and `data.fetuses[1].anatomy` respectively
-- All first-trimester `data.ft_*` and `data.twin2_ft_*` keys are moved into `data.fetuses[0].ft_*` and `data.fetuses[1].ft_*`
+- `FetusSectionData` holds `gaFromBiometry?: GaFromBiometry`, `biometry?: Observable[]`, `doppler?: Observable[]`, `ultrasoundFindings?`, `anatomy?`, `markers?` — no `ft_` prefix anywhere
+- All `data.twin2_*` and `data.ft_*` keys (currently top-level `data` properties) are absorbed into `fetuses[i]`
+- `BiometryData`, `DopplerData`, `FtBiometry`, `FtDoppler`, `FtMarkers`, `FtUltrasoundFindings` types are **removed** from `api/src/types/index.ts`
 - `CreateExamination.ts` and `UpdateExamination.ts` write only `data` (one JSON column); all other per-fetus serialization is removed
 - All GET functions return the new structure
-- A migration script reads every entity in the `EXAM` partition and rewrites it to the new shape; it is idempotent (re-runnable safely)
+- A migration script reads every entity in the `EXAM` partition and rewrites it to the Observable shape; it is idempotent (re-runnable safely)
 - All `api` tests pass against the new structure
 
 ### Todo List
 1. In `api/src/types/index.ts`:
-   - Add `FetusSectionData` interface with fields: `index: number`, `biometry?: BiometryData`, `doppler?: DopplerData`, `ultrasound_findings?: UltrasoundFindings`, `anatomy?: AnatomyFindings`, `ga_from_biometry?: string`, `ft_biometry?: FtBiometry`, `ft_markers?: FtMarkers`, `ft_ultrasound?: FtUltrasoundFindings`, `ft_anatomy?: AnatomyFindings`, `ft_doppler?: FtDoppler`
-   - Update `ExaminationData`: add `fetuses: FetusSectionData[]`; remove `twin2_ultrasound_findings`, `twin2_anatomy`, `twin2_ft_biometry`, `twin2_ft_markers`, `twin2_ft_ultrasound`, `twin2_ft_anatomy`, `twin2_ft_doppler`
+   - Add `Observable`, `GaFromBiometry`, `FetusSectionData`, updated `ExaminationData` interfaces (per `docs2/refactoring-findings.md §14.2`)
+   - Remove `BiometryData`, `DopplerData`, `FtBiometry`, `FtDoppler`, `FtMarkers`, `FtUltrasoundFindings` — replaced by `Observable`
+   - Remove all remaining `twin2_*` and `ft_*` keys from `ExaminationData`
    - Update `Examination`: remove `biometry`, `doppler`, `biometry2`, `doppler2`, `gestationalAgeFromBiometry`, `gestationalAgeFromBiometry2`
-   - Update `ExaminationCreateRequest` and `ExaminationUpdateRequest` to remove the same top-level fields; the `data` field now carries all fetus data
+   - Update `ExaminationCreateRequest` and `ExaminationUpdateRequest` to remove the same top-level fields; the `data` field now carries all fetus Observable data
 2. Update `api/src/utils/examinationSerializer.ts`:
-   - `deserializeExamination`: remove `biometry`/`doppler`/`biometry2`/`doppler2` parsing; parse only `data` as JSON — the fetuses array is already inside
-   - `serializeExaminationFields`: remove per-field JSON.stringify calls; the full `data` blob (which now includes fetuses) is stringified as one unit
+   - `deserializeExamination`: remove `biometry`/`doppler`/`biometry2`/`doppler2` parsing; parse only `data` as JSON
+   - `serializeExaminationFields`: remove per-field JSON.stringify; stringify only `data` as one unit
 3. Update `api/src/functions/CreateExamination.ts`:
-   - Remove extraction and serialization of `biometry`, `doppler`, `biometry2`, `doppler2`, `gestationalAgeFromBiometry`, `gestationalAgeFromBiometry2` from request body
-   - Entity construction writes only `data: JSON.stringify(body.data)` for all section data — the caller is responsible for placing fetus data inside `data.fetuses`
+   - Remove extraction and serialization of all legacy named biometry/doppler fields from request body
+   - Entity construction writes only `data: JSON.stringify(body.data)`
 4. Update `api/src/functions/UpdateExamination.ts` — same removals as step 3
 5. Update `api/src/utils/validation.ts`:
    - Remove `biometry2`/`doppler2`/`gestationalAgeFromBiometry2` from the top-level examination schema
-   - Validate `data.fetuses` as an array of `FetusSectionData` objects (basic structure validation; Joi `.array().items(...)`)
+   - Validate `data.fetuses` as an array (basic structure validation; Joi `.array().items(Joi.object())`)
 6. Write `scripts/migrate-examination-data.ts` (new file):
    - Connects to Azure Table Storage using `AZURE_STORAGE_CONNECTION_STRING`
    - Iterates all entities in the `EXAM` partition of the `Examinations` table
-   - **Pass 1 — fetus array migration:** for each entity where `biometry` top-level column exists and `data.fetuses` does not:
-     - Parse `data` JSON string
-     - Parse `biometry`, `doppler` JSON strings
-     - Construct `fetuses[0]` from `biometry`, `doppler`, `gestationalAgeFromBiometry`, `data.ultrasound_findings`, `data.anatomy`, `data.ft_*`
-     - Construct `fetuses[1]` (if `biometry2` exists) from `biometry2`, `doppler2`, `gestationalAgeFromBiometry2`, `data.twin2_ultrasound_findings`, `data.twin2_anatomy`, `data.twin2_ft_*`
+   - **Pass 1 — Observable migration:** for each entity where `biometry` top-level column exists and `data.fetuses[0].biometry` is not already an Observable array:
+     - Parse `biometry`, `doppler` JSON strings (flat named objects)
+     - Convert each named field to an `Observable` entry using the type-set table in `docs2/refactoring-findings.md §14.3`
+     - Construct `fetuses[0].biometry` as `Observable[]` from prenatal or FT measurements; `fetuses[0].doppler` as `Observable[]`; move `data.ultrasound_findings` → `fetuses[0].ultrasoundFindings`; `data.anatomy` → `fetuses[0].anatomy`; `data.ft_markers` → `fetuses[0].markers`
+     - Construct `fetuses[0].gaFromBiometry` from legacy `gestationalAgeFromBiometry` if present
+     - If `biometry2` exists: construct `fetuses[1]` symmetrically from `biometry2`/`doppler2`/`twin2_*`
      - Write updated `data` JSON back; clear legacy top-level columns
    - **Pass 2 — `examinationType` key migration:** for each entity, rewrite the `examinationType` column:
      - `'ultrasound_prenatal'` → `'prenatal'`
@@ -168,13 +175,14 @@ This is the largest single sub-task and the foundation for all frontend refactor
    - Runs on both `EXAM` and `PATIENT_*` partition entities
    - Logs progress and errors; exits with non-zero code on any failure
 7. Run the migration script against the local Azurite emulator with seeded test data; verify output
-8. Run `api` tests — update test fixtures in `api/src/tests/` to use the new `data.fetuses` structure and new `examinationType` keys; all must pass
+8. Run `api` tests — update test fixtures in `api/src/tests/` to use Observable `data.fetuses` structure and new `examinationType` keys; all must pass
 
 ### Relevant Context
-- `api/src/types/index.ts` — `ExaminationData` currently has `twin2_ultrasound_findings`, `twin2_anatomy`, and all `twin2_ft_*` as separate named properties; these all move into `fetuses[1]`
-- `api/src/tests/integration/examinations.test.ts` — test fixtures use `biometry`, `biometry2` top-level fields; must be updated to `data.fetuses[0].biometry`, `data.fetuses[1].biometry`
-- `api/src/utils/validation.ts` — the `examinationSchema` currently validates `biometry2`, `doppler2` at the top level
+- `api/src/types/index.ts` — `ExaminationData` currently has `twin2_*` and `ft_*` as separate named properties; all move into `fetuses[i]`
+- `api/src/tests/integration/examinations.test.ts` — test fixtures use `biometry`/`biometry2` flat objects; must be updated to `data.fetuses[0].biometry` Observable arrays
+- `api/src/utils/validation.ts` — the `examinationSchema` currently validates `biometry2`/`doppler2` at the top level
 - `scripts/` directory already exists for project utility scripts
+- `docs2/refactoring-findings.md §14.3` — definitive type-set tables for prenatal and FT observables
 
 ---
 
@@ -183,48 +191,58 @@ This is the largest single sub-task and the foundation for all frontend refactor
 - **Status:** [ ] pending
 
 ### Intent
-Replace the ~250 flat `t2_`-prefixed keys in `useExaminationForm.ts` `formData` with a structured `fetuses: FetusSectionFormData[]` array. Add `handleFetusChange(index, section, field, value)` for per-fetus updates and `handleFetusCountChange(n)` for live resizing of the fetus array. Update all section component prop signatures to accept a single data object.
+Replace the ~250 flat `t2_`/`ft_`/`twin2_`-prefixed keys in `useExaminationForm.ts` `formData` with a structured `fetuses: FetusSectionFormData[]` array where biometry and doppler are `ObservableFormData[]` arrays. Add `handleFetusChange(index, section, type, field, value)` for per-observable updates and `handleFetusCountChange(n)` for live resizing of the fetus array. Replace `BiometrySection` and `FirstTrimesterSection` with a generic `ObservableSection` component driven by `EXAM_TYPE_CONFIG.biometryTypes`.
 
 `fetusSectionCount` is a separate `formData` field — not derived from the exam type config. On create it starts at 1; the user changes it via `handleFetusCountChange`. On edit it is initialized to `examination.data.fetuses.length` and treated as read-only by the form.
 
 ### Expected Outcomes
-- `formData` has `fetusSectionCount: number` and `fetuses: FetusSectionFormData[]` instead of ~100 `t2_*` flat keys
-- `handleFetusChange(index, section, field, value)` updates `formData.fetuses[index][section][field]`
+- `formData` has `fetusSectionCount: number` and `fetuses: FetusSectionFormData[]` instead of ~250 flat keys
+- `FetusSectionFormData` contains `biometry: ObservableFormData[]`, `doppler: ObservableFormData[]`, `ultrasoundFindings`, `anatomy`, `markers` — no `ft_` prefix; identical shape for both exam types
+- `ObservableFormData` has `{ type, value: string, isManual?, percentile: string, percentileIsManual: boolean, ga: string, gaIsManual: boolean }`
+- `handleFetusChange(index, section, type, field, value)` immutably updates the matching observable in `formData.fetuses[index][section]`
 - `handleFetusCountChange(n)` resizes `formData.fetuses` to length `n`; if `n` decreases, trailing entries are silently discarded (Option A)
 - The existing `handleChange` remains for entity-level fields
-- `useExaminationForm.ts` seeds `fetuses` from `exam.data?.fetuses` on edit load
-- All reactive auto-calc `useEffect` hooks read from `formData.fetuses[i]` instead of flat keys
-- The submit payload sets `data.fetuses` from `formData.fetuses`
-- Section components accept a single typed `data` object prop — no change to rendered output
+- Auto-calc `useEffect` loops over `formData.fetuses[i].biometry` observables; reads `type` to select the correct calc function; writes derived `percentile`, `ga` back via `handleFetusChange`
+- `BiometrySection` component is replaced by `ObservableSection` — renders rows from `ObservableFormData[]`; `FirstTrimesterSection` is removed
+- The submit payload maps `ObservableFormData[]` → `Observable[]` via `buildSubmitPayload`, omitting empty entries
 
 ### Todo List
 1. In `frontend/src/types/index.ts`:
-   - Add `FetusSectionData` interface (mirrors backend ST-04 type)
-   - Update `ExaminationData` to have `fetuses: FetusSectionData[]` and remove `twin2_*` named keys
+   - Add `Observable`, `GaFromBiometry`, `FetusSectionData`, `ObservableFormData`, `FetusSectionFormData`, updated `ExaminationData` interfaces (mirrors backend ST-04 types; per `docs2/refactoring-findings.md §14.2` and §14.6)
+   - Remove `Biometry`, `Doppler`, `FtBiometry`, `FtDoppler`, `FtMarkers`, `FtUltrasoundFindings` types
    - Update `Examination` to remove `biometry`, `doppler`, `biometry2`, `doppler2`, `gestationalAgeFromBiometry`, `gestationalAgeFromBiometry2`
-2. Define `FetusSectionFormData` interface — nested objects with `string` values for input binding
-3. Write `buildFetusSectionFormData(data?: FetusSectionData): FetusSectionFormData` — maps stored number values to `.toFixed(2)` strings; returns empty-string defaults for absent fields
-4. **Legacy read shim (pre-migration compatibility):** Write `normalizeFetusArray(examData: any): FetusSectionData[]` in a new file `frontend/src/utils/legacyExamAdapter.ts`:
-   - If `examData.fetuses` is a non-empty array, return it as-is — post-migration path, no work needed
-   - Otherwise, synthesize a `fetuses` array from the legacy top-level fields: construct `fetuses[0]` from `examData.biometry`, `examData.doppler`, `examData.gestationalAgeFromBiometry`, `examData.ultrasound_findings`, `examData.anatomy`, and all `examData.ft_*` keys; construct `fetuses[1]` (if `examData.biometry2` exists) from the corresponding `biometry2`, `doppler2`, `twin2_*` keys
-   - This shim is used during the window between ST-05 code deploy and ST-09 migration script execution
-   - The file is deleted in ST-09 once all records are confirmed migrated
+2. Write `buildFetusSectionFormData(storedFetus: FetusSectionData | undefined, examinationType: string): FetusSectionFormData`:
+   - Looks up `EXAM_TYPE_CONFIG[examinationType].biometryTypes` for the ordered type list
+   - For each type: finds the matching `Observable` in `storedFetus.biometry` (if any) and converts to `ObservableFormData`; empty-string defaults for absent fields
+3. Write `buildSubmitPayload(formFetus: FetusSectionFormData): FetusSectionData`:
+   - Converts `ObservableFormData[]` → `Observable[]`, parsing floats, omitting entries where `value === ''`, writing `isManual: true` only when the boolean flag is `true`
+4. **Legacy read shim (pre-migration compatibility):** Write `normalizeFetusArray(examData: any, examinationType: string): FetusSectionData[]` in a new file `frontend/src/utils/legacyExamAdapter.ts`:
+   - If `examData.fetuses` is a non-empty array whose `fetuses[0].biometry` contains `Observable` objects (i.e. has `{ type, value }` shape), return as-is
+   - Otherwise, synthesize from legacy flat `examData.biometry`, `examData.doppler`, `gestationalAgeFromBiometry`, `ultrasound_findings`, `anatomy`, `ft_biometry`, `ft_markers`, etc. — converting each named field to the appropriate `Observable` entry; repeat for fetus 1 using `biometry2`/`twin2_*` keys
+   - Deleted in ST-09 once all records are confirmed migrated
 5. In `useExaminationForm.ts`:
-   - Seed `fetuses` via `normalizeFetusArray(examination?.data ?? {})` on edit load (uses shim from step 4)
-   - Add `fetusSectionCount` to initial `formData` state: for create = `1`; for edit = `normalizeFetusArray(examination.data).length ?? 1`
-   - Replace all `t2_*` flat keys with `fetuses: Array.from({ length: fetusSectionCount }, (_, i) => buildFetusSectionFormData(normalizedFetuses[i]))`
-   - Add `handleFetusChange(index, section, field, value)`: immutably updates `formData.fetuses[index][section][field]`
-   - Add `handleFetusCountChange(n)`: calls `setFormData(prev => ({ ...prev, fetusSectionCount: n, fetuses: Array.from({ length: n }, (_, i) => prev.fetuses[i] ?? buildFetusSectionFormData()) }))`; when `n` is less than current count, the array is sliced — no warning
-   - Update biometry and FT auto-calc `useEffect` hooks to iterate `formData.fetuses` by index
-   - In the submit handler: build `data.fetuses` by mapping `FetusSectionFormData` → `FetusSectionData` (parse float strings to numbers)
-6. Update `BiometrySection`, `DopplerSection`, `UltrasoundFindingsSection`, `AnatomySection`, `FirstTrimesterSection` props — pass `fetus.biometry`, `fetus.doppler` etc. as the single `data` prop
-7. Run `frontend` tests and `tsc -b` — all must pass
+   - Seed `fetuses` via `normalizeFetusArray(examination?.data ?? {}, examinationType)` on edit load
+   - Add `fetusSectionCount` to initial `formData` state: for create = `1`; for edit = `normalizedFetuses.length ?? 1`
+   - Replace all `t2_*`/`ft_*/`biometry`/`doppler` flat keys with `fetuses` array of `FetusSectionFormData`
+   - Add `handleFetusChange(index, section, type, field, value)`: finds the observable with matching `type` in `formData.fetuses[index][section]`, updates the specified `field` (`'value'`, `'percentile'`, `'ga'`, etc.)
+   - Add `handleFetusCountChange(n)`: resizes `formData.fetuses`; slices silently if `n` decreases
+   - Replace the biometry auto-calc `useEffect` hooks with a single loop over `formData.fetuses[i].biometry` observables — reads `type` to dispatch to the correct calc function; writes results back via `setFormData`
+   - Replace the FT CRL auto-calc `useEffect` with the same loop — when `type === 'crl'` and `gaIsManual` is false, call `calcGAFromCRL` and write `ga.value`
+   - In the submit handler: call `buildSubmitPayload(formFetus)` per fetus to assemble `data.fetuses`
+6. Write `ObservableSection` component in `frontend/src/components/sections/ObservableSection.tsx`:
+   - Props: `{ observables: ObservableFormData[], config: ObservableSectionConfig, errors, onChange, isSubmitting }`
+   - `ObservableSectionConfig` from `EXAM_TYPE_CONFIG`: ordered `type` list + per-type label, unit, and capability flags (`hasPercentile`, `hasGa`, `hasAutoCalc`)
+   - Renders one 3-column row per observable: measurement input | percentile input (if `hasPercentile`) | GA input (if `hasGa`)
+   - Replaces `BiometrySection`, `DopplerSection` (for observable types), and `FirstTrimesterSection`
+7. Remove `frontend/src/components/sections/BiometrySection.tsx` and `FirstTrimesterSection.tsx`; update `ExaminationForm.tsx` and `ExaminationDetailPage.tsx` to use `ObservableSection`
+8. Run `frontend` tests and `tsc -b` — all must pass
 
 ### Relevant Context
-- `frontend/src/hooks/useExaminationForm.ts` — the `formData` `useState` initializer currently spans ~200 lines
-- `frontend/src/components/sections/BiometrySection.tsx` — `BiometrySectionFormData` interface already exists; the issue is only in callers passing 27 individual props
-- `frontend/src/hooks/useBiometryAutoCalc.ts` — `computeBiometryDerivedFields` takes a flat object; callers just need to pass `fetus.biometry` instead of extracting flat keys
+- `frontend/src/hooks/useExaminationForm.ts` — the `formData` `useState` initializer currently spans ~200 lines; the `useBiometryAutoCalc.ts` hook processes flat keys
+- `frontend/src/hooks/useBiometryAutoCalc.ts` — `computeBiometryDerivedFields` takes a flat `BiometryAutoCalcInput` object; this is replaced by a type-dispatched loop over observables in ST-05
 - `frontend/src/utils/legacyExamAdapter.ts` — created in this sub-task; deleted in ST-09
+- `docs2/refactoring-findings.md §14.3` — Observable type sets and formula capability table
+- `docs2/refactoring-findings.md §14.6` — `ObservableFormData` ↔ `Observable` mapping rules
 
 ---
 
@@ -233,26 +251,26 @@ Replace the ~250 flat `t2_`-prefixed keys in `useExaminationForm.ts` `formData` 
 - **Status:** [ ] pending
 
 ### Intent
-Replace `SECTION_VISIBILITY` with `EXAM_TYPE_CONFIG` and simultaneously collapse the exam type registry from four keys to two: `'prenatal'` and `'first_trimester'`. `fetusSectionCount` is **not** in the config — it is runtime form state managed in ST-05. The config drives only which sections are shown and which trimester branch to use.
+Replace `SECTION_VISIBILITY` with `EXAM_TYPE_CONFIG` and simultaneously collapse the exam type registry from four keys to two: `'prenatal'` and `'first_trimester'`. `EXAM_TYPE_CONFIG` carries `biometryTypes` and `dopplerTypes` lists (the Observable `type` strings active for each exam type) and a `trimester` flag. The `sections` array and `SectionKey` union are not needed — both exam types render the same four section blocks; only the observable `type` values differ. `fetusSectionCount` is **not** in the config — it is runtime form state managed in ST-05.
 
 ### Expected Outcomes
 - `frontend/src/constants/examinationTypes.ts` exports exactly two exam types: `prenatal` and `first_trimester`
-- `EXAM_TYPE_CONFIG` has two entries with `label`, `trimester: 'second' | 'first'`, and `sections: SectionKey[]` — no `fetusSectionCount`
+- `EXAM_TYPE_CONFIG` has two entries with `label`, `trimester: 'second' | 'first'`, `biometryTypes: string[]`, `dopplerTypes: string[]` — no `fetusSectionCount`, no `sections` array
 - `getExamTypeConfig(type)` returns the config for a type key; falls back to `prenatal`
 - `getExamTypeLabel(type)` returns `'Prenatal'` or `'First Trimester'`
-- `SECTION_VISIBILITY`, `getSectionVisibility`, `isFirstTrimester`, `isFtTwins` are removed
+- `SECTION_VISIBILITY`, `getSectionVisibility`, `isFirstTrimester`, `isFtTwins`, `SectionKey` are removed
 - `api/src/constants/examinationTypes.ts` is updated to two keys: `prenatal` and `first_trimester` (with matching labels)
 - `api/src/utils/validation.ts` allowlist updated to `['prenatal', 'first_trimester']`
 - `api/src/functions/GetExaminations.ts` allowlist updated to match
 
 ### Todo List
-1. Define `SectionKey` as: `'biometry' | 'doppler' | 'ultrasoundFindings' | 'anatomy' | 'firstTrimester'`
-2. Define `ExamTypeConfig` interface: `{ label: string; trimester: 'second' | 'first'; sections: SectionKey[] }`
-3. Write `EXAM_TYPE_CONFIG` with exactly two entries:
-   - `prenatal`: `trimester: 'second'`, sections: `['biometry', 'doppler', 'ultrasoundFindings', 'anatomy']`, label: `'Prenatal'`
-   - `first_trimester`: `trimester: 'first'`, sections: `['firstTrimester']`, label: `'First Trimester'`
-4. Export `getExamTypeConfig(type: string | undefined): ExamTypeConfig` with fallback to `prenatal`
-5. Export `getExamTypeLabel` derived from `EXAM_TYPE_CONFIG[type]?.label`
+1. Define `ExamTypeConfig` interface: `{ label: string; trimester: 'second' | 'first'; biometryTypes: string[]; dopplerTypes: string[] }`
+2. Write `EXAM_TYPE_CONFIG` with exactly two entries (per `docs2/refactoring-findings.md §12.3.3` and §14.3):
+   - `prenatal`: `trimester: 'second'`, `biometryTypes: ['bpd','ofd','hc','ac','fl','efw','tcd','tad','apad','cm','nuchalFold','nb','la','lc','vp']`, `dopplerTypes: ['pi','ri','utADexPI','utADexRI','utASinPI','utASinRI','cma','psv','cpr','ducVen']`, label: `'Prenatal'`
+   - `first_trimester`: `trimester: 'first'`, `biometryTypes: ['crl','nt','nb','puls']`, `dopplerTypes: ['utADexPI','utADexRI','utASinPI','utASinRI']`, label: `'First Trimester'`
+3. Export `getExamTypeConfig(type: string | undefined): ExamTypeConfig` with fallback to `prenatal`
+4. Export `getExamTypeLabel` derived from `EXAM_TYPE_CONFIG[type]?.label`
+5. Export `OBSERVABLE_META: Record<string, { label: string; unit: string; hasPercentile: boolean; hasGa: boolean; hasAutoCalc: boolean }>` — per-type display metadata used by `ObservableSection` (ST-05) and the PDF renderer (ST-08)
 6. Remove `EXAM_TYPES` four-value array, `SECTION_VISIBILITY`, `getSectionVisibility`, `isFirstTrimester`, `isFtTwins`
 7. Update `api/src/constants/examinationTypes.ts` to two entries with identical keys and labels
 8. Update `api/src/utils/validation.ts` — change `EXAM_TYPE_KEYS` to `['prenatal', 'first_trimester']`
@@ -264,7 +282,8 @@ Replace `SECTION_VISIBILITY` with `EXAM_TYPE_CONFIG` and simultaneously collapse
 - `frontend/src/constants/examinationTypes.ts` — current source with four-value set
 - `api/src/constants/examinationTypes.ts` — backend mirror; must match frontend keys exactly
 - `api/src/functions/GetExaminations.ts` — `EXAM_TYPE_KEYS` used for allowlist validation on the filter parameter
-- `docs2/refactoring-findings.md §12.3.3` — `EXAM_TYPE_CONFIG` design with `fetusSectionCount` removed
+- `docs2/refactoring-findings.md §12.3.3` — updated `EXAM_TYPE_CONFIG` design with `biometryTypes` list
+- `docs2/refactoring-findings.md §14.3` — Observable type sets and formula capability table (source for `biometryTypes` values)
 
 ---
 
@@ -273,60 +292,52 @@ Replace `SECTION_VISIBILITY` with `EXAM_TYPE_CONFIG` and simultaneously collapse
 - **Status:** [ ] pending
 
 ### Intent
-Replace the `isTwins` / `isFt` / `isFtTwinsMode` conditional branch trees in `ExaminationForm.tsx` and `ExaminationDetailPage.tsx` with loops over `EXAM_TYPE_CONFIG[type].sections` and `formData.fetuses`. Implement the two-type UI: the create form shows an Exam Type selector (two options) and a Number of Fetuses input; both are locked read-only on edit. Fetus column headers generalize from "Twin 1/2" to "Fetus 1/2/…".
+Replace the `isTwins` / `isFt` / `isFtTwinsMode` conditional branch trees in `ExaminationForm.tsx` and `ExaminationDetailPage.tsx` with loops over `formData.fetuses` and `ObservableSection`. Implement the two-type UI: the create form shows an Exam Type selector (two options) and a Number of Fetuses input; both are locked read-only on edit. Fetus column headers generalize from "Twin 1/2" to "Fetus 1/2/…". The only remaining conditional is `config.trimester === 'first'` to decide whether to render the `markers` block.
 
 ### Expected Outcomes
-- `ExaminationForm.tsx` has no references to `isTwins`, `isFt`, `isFtTwinsMode`
-- Create form: Exam Type dropdown (2 options) + Number of Fetuses input (Carbon `NumberInput`, min 1, default 1); both are displayed as locked `TextInput` on edit showing `getExamTypeLabel(type)` and `N fetus / fetuses`
-- Section loop: `config.sections.map(sectionKey => formData.fetuses.map((fetus, i) => <SectionComponent ... />))` — one column when `fetusSectionCount === 1`; side-by-side grid when > 1
+- `ExaminationForm.tsx` has no references to `isTwins`, `isFt`, `isFtTwinsMode`, `firstTrimester` section key
+- Create form: Exam Type dropdown (2 options) + Carbon `NumberInput` for fetus count (min 1, default 1); both locked read-only on edit
+- Each fetus column renders: `ObservableSection` for biometry, `ObservableSection` for doppler, `UltrasoundFindingsSection`, `AnatomySection`, and (if `config.trimester === 'first'`) a `MarkersSection`
 - Column headers read "Fetus 1", "Fetus 2", … (not "Twin 1/2"); shown only when `fetusSectionCount > 1`
 - `ExaminationDetailPage.tsx` summary tile shows `"{examTypeLabel} — N fetus / fetuses"` (type + count composite)
-- `ExaminationDetailPage.tsx` renders fetus sections by iterating `examination.data.fetuses`; no `isTwins` branches
+- `ExaminationDetailPage.tsx` renders fetus sections by iterating `examination.data.fetuses` observables; no `isTwins` or `isFt` branches
 - `ExaminationsPage.tsx` and `PatientDetailPage.tsx` filter dropdowns show two exam type options
 - List type column shows `"Prenatal"` or `"First Trimester"` with optional fetus count suffix `"(×2)"` when `data.fetuses.length > 1`
 - Breadcrumb and page title use the composite `examTypeLabel` + fetus count
-- Two exam types render correctly; all existing records display correctly via backward-compatible fetus array read path
+- Two exam types render correctly; all existing records display correctly via the Observable legacy shim
 
 ### Todo List
 1. In `ExaminationForm.tsx` — replace the Exam Type + fetus count header row:
    - On create: `<Select>` with two options (`prenatal` / `first_trimester`) + Carbon `<NumberInput id="fetusSectionCount" min={1} max={9} value={formData.fetusSectionCount} onChange={handleFetusCountChange} />`
    - On edit: two locked `<TextInput>` fields showing type label and fetus count
-2. Replace all `isTwins`, `isFt`, `isFtTwinsMode` references with `getExamTypeConfig(formData.examinationType)`
-3. Replace the `{isTwins && (...)}` and `{!isTwins && !isFt && (...)}` blocks with a single config-driven loop:
+2. Replace all `isTwins`, `isFt`, `isFtTwinsMode` references with `config = getExamTypeConfig(formData.examinationType)`
+3. Replace the `{isTwins && (...)}` and `{!isTwins && !isFt && (...)}` blocks with a single fetus loop:
    ```tsx
-   {config.sections.map(sectionKey => (
-     <div key={sectionKey} style={formData.fetusSectionCount > 1 ? twinsGridStyle : singleStyle}>
-       {formData.fetuses.map((fetus, i) => renderFetusSection(sectionKey, i, fetus))}
+   {formData.fetuses.map((fetus, i) => (
+     <div key={i} style={formData.fetusSectionCount > 1 ? fetusColumnStyle : singleStyle}>
+       {fetusSectionCount > 1 && <h4>Fetus {i + 1}</h4>}
+       <ObservableSection observables={fetus.biometry} config={config} section="biometry" ... />
+       <ObservableSection observables={fetus.doppler} config={config} section="doppler" ... />
+       <UltrasoundFindingsSection data={fetus.ultrasoundFindings} ... />
+       <AnatomySection data={fetus.anatomy} ... />
+       {config.trimester === 'first' && <MarkersSection data={fetus.markers} ... />}
      </div>
    ))}
    ```
-4. Extract `renderFetusSection(sectionKey, i, fetus)` — dispatches to the appropriate section component; shows "Fetus {i+1}" header when `fetusSectionCount > 1`
-5. In `ExaminationDetailPage.tsx`:
+4. In `ExaminationDetailPage.tsx`:
    - Remove `isTwins`, `isFt`, `isFtTwinsExam`; derive `config` from `getExamTypeConfig(examination.examinationType)`
    - Summary tile: show `"{examTypeLabel} — {N} fetus"` or `"{examTypeLabel} — {N} fetuses"` where `N = examination.data.fetuses.length`
-   - Replace per-fetus section rendering with `examination.data?.fetuses?.map((fetus, i) => renderFetusDetail(fetus, i, config))`
-6. In `ExaminationsPage.tsx` — update the "Filter by Type" dropdown to show two options from `Object.entries(EXAM_TYPE_CONFIG)`
-7. In `PatientDetailPage.tsx` — same dropdown update
-8. In `ExaminationsPage.tsx` list rows — update the type column to display `getExamTypeLabel(exam.examinationType)` with fetus count suffix computed from `exam.data?.fetuses?.length`
-9. **Screen layout fix for N > 2 fetuses (§13.3):** Replace the fetus section wrapper style with:
-   ```
-   display: flex;
-   flex-direction: row;
-   flex-wrap: nowrap;      /* critical — prevents columns wrapping to the next line */
-   gap: 1.5rem;
-   overflow-x: auto;       /* horizontal scrollbar appears when columns exceed viewport */
-   ```
-   - `flex-wrap: nowrap` is mandatory — without it flex wraps to the next line and the scrollbar never appears
-   - When `fetusSectionCount === 1`: container keeps existing `maxWidth: 1200px` — no behaviour change; `overflow-x` is effectively `visible` since no overflow can occur with one column
-   - When `fetusSectionCount > 1`: container removes `maxWidth` cap so columns can extend past the viewport and trigger the scrollbar naturally
-   - Each fetus column `<div>` uses `min-width: 480px; flex: 0 0 auto` — columns never shrink below minimum usable width; `flex: 0 0 auto` prevents flex from resizing columns
-   - The outer page container in `CreateExaminationPage.tsx` / `EditExaminationPage.tsx` retains `maxWidth: 1200px; margin: 0 auto` — only the inner fetus section wrapper changes
-10. Run `tsc -b` and frontend tests; manually verify both exam types and 1-, 2-, 3-fetus configurations render correctly
+   - Replace per-fetus section rendering with `examination.data?.fetuses?.map((fetus, i) => renderFetusDetail(fetus, i, config))`; `renderFetusDetail` iterates `fetus.biometry` observables using `OBSERVABLE_META` for labels/units
+5. In `ExaminationsPage.tsx` — update the "Filter by Type" dropdown to show two options from `Object.entries(EXAM_TYPE_CONFIG)`
+6. In `PatientDetailPage.tsx` — same dropdown update
+7. In `ExaminationsPage.tsx` list rows — update the type column to display `getExamTypeLabel(exam.examinationType)` with fetus count suffix computed from `exam.data?.fetuses?.length`
+8. **Screen layout fix for N > 2 fetuses (§13.3):** Replace the fetus section wrapper style with flex + `overflow-x: auto` + `min-width: 480px` per column (full spec in `docs2/refactoring-findings.md §13.3`)
+9. Run `tsc -b` and frontend tests; manually verify both exam types and 1-, 2-, 3-fetus configurations render correctly
 
 ### Relevant Context
 - `ExaminationForm.tsx` — `{isTwins && (...)}` block currently ~150 lines; single-fetus blocks ~100 lines
 - `ExaminationDetailPage.tsx` — `isTwins` and `isFt` branches span the GA-from-Bio, Biometry, Doppler, Anatomy sections
-- Section components already accept `prefix` and a single `data` object — no changes needed inside them
+- `ObservableSection` — created in ST-05; `OBSERVABLE_META` — exported in ST-06
 - Carbon `NumberInput` is available in `@carbon/react`
 
 ---
@@ -336,46 +347,46 @@ Replace the `isTwins` / `isFt` / `isFtTwinsMode` conditional branch trees in `Ex
 - **Status:** [ ] pending
 
 ### Intent
-Update `ExamPdfViewModel`, `viewModelBuilders.ts`, `pdfDocument.ts`, and `pdfSections.ts` to use the `fetuses[]` array, replacing the current optional `biometry2`, `doppler2`, `ultrasound2`, `anatomy2`, and `twin2Ft*` fields.
+Update `ExamPdfViewModel`, `viewModelBuilders.ts`, `pdfDocument.ts`, and `pdfSections.ts` to use the Observable fetus array, replacing the current optional `biometry2`, `doppler2`, `ultrasound2`, `anatomy2`, and `twin2Ft*` / `ftBiometry` etc. fields. The PDF renders measurement rows by iterating `fetus.biometry` observables and looking up labels/units from `OBSERVABLE_META` — no `isTwins` or `isFt` branches.
 
 ### Expected Outcomes
-- `ExamPdfViewModel` has `fetuses: FetusPdfViewModel[]` instead of optional `biometry2`, `doppler2`, `ultrasound2`, `anatomy2`, `twin2FtBiometry`, `twin2FtMarkers`, etc.
-- `buildViewModel` in `viewModelBuilders.ts` maps `exam.data.fetuses` → `vm.fetuses`
-- `pdfDocument.ts` iterates `vm.fetuses` to render fetus sections; no `isTwins` branches
+- `ExamPdfViewModel` has `fetuses: FetusPdfViewModel[]` — no `ft*` or `twin2*` optional fields
+- `FetusPdfViewModel` has `biometry?: ObservablePdfEntry[]`, `doppler?: ObservablePdfEntry[]`, `ultrasound?`, `anatomy?`, `markers?`, `gaFromBiometry?` — identical shape for both exam types
+- `buildViewModel` in `viewModelBuilders.ts` maps `exam.data.fetuses` → `vm.fetuses` by converting each `Observable` to `ObservablePdfEntry` (stripping `isManual` flags)
+- `pdfDocument.ts` iterates `vm.fetuses` with no `isTwins` or `isFt` branches; renders `markers` block only when `vm.examinationType === 'first_trimester'`
 - PDF output is functionally identical to current for all four exam types
+- Multi-fetus pair pagination implemented per `docs2/refactoring-findings.md §13.4`
 
 ### Todo List
-1. Define `FetusPdfViewModel` interface in `frontend/src/services/print.service.ts` (or a co-located types file):
-   - `index: number`, `biometry?: BiometryViewModel`, `doppler?: DopplerViewModel`, `ultrasound?: UltrasoundViewModel`, `anatomy?: AnatomyViewModel`, `gaFromBiometry?: string`, `ftBiometry?: FtBiometryViewModel`, `ftMarkers?: FtMarkersViewModel`, `ftUltrasound?: FtUltrasoundViewModel`, `ftAnatomy?: AnatomyViewModel`, `ftDoppler?: FtDopplerViewModel`
+1. Define `ObservablePdfEntry` and `FetusPdfViewModel` interfaces (per `docs2/refactoring-findings.md §3.6`):
+   - `ObservablePdfEntry`: `{ type: string; value: number | string; percentile?: number; ga?: string }`
+   - `FetusPdfViewModel`: `{ index: number; gaFromBiometry?: string; biometry?: ObservablePdfEntry[]; doppler?: ObservablePdfEntry[]; ultrasound?: Record<string, string | number>; anatomy?: Record<string, string>; markers?: Record<string, string> }`
 2. Update `ExamPdfViewModel` in `print.service.ts`:
-   - Remove `biometry2`, `doppler2`, `ultrasound2`, `anatomy2`, `twin2FtBiometry`, `twin2FtMarkers`, `twin2FtUltrasound`, `twin2FtAnatomy`, `twin2FtDoppler`
+   - Remove all `biometry2`, `doppler2`, `ultrasound2`, `anatomy2`, `twin2Ft*`, `ftBiometry`, `ftMarkers`, etc. optional fields
    - Add `fetuses: FetusPdfViewModel[]`
 3. Update `buildViewModel` in `frontend/src/services/viewModelBuilders.ts`:
-   - **Legacy read shim:** Resolve the fetus array via `normalizeFetusArray(exam.data ?? {})` (same `legacyExamAdapter.ts` shim used in ST-05); map the result to `FetusPdfViewModel[]` — one entry per fetus. When `exam.data.fetuses` is already populated (post-migration), the shim is a no-op pass-through.
-   - Remove the `isTwins` / `isFtTwins` conditional block that currently adds `biometry2`, `doppler2`, etc.
-   - Compute `headerTitle` from type + fetus count (§13.5): `const n = vm.fetuses.length; const fetusLabel = n === 1 ? '' : \` (${n} fetuses)\``; combine with type label — no `isTwins` / `isFtTwins` branches
-4. **PDF pair-loop refactor (§13.4):** Introduce `PairLayout` interface and helper functions in `pdfDocument.ts`:
-   - `chunkFetuses(fetuses: FetusPdfViewModel[], pageSize = 2): FetusPdfViewModel[][]` — splits fetus array into pairs: `[F1,F2,F3]` → `[[F1,F2],[F3]]`
-   - `computePairLayout(pairLength: 1 | 2): PairLayout` — returns `{ colW, xStart[], xEnd[] }`:
-     - `pairLength = 1`: `colW = 182`, `xStart = [14]`
-     - `pairLength = 2`: `colW = 88`, `xStart = [14, 108]` — identical geometry to current twin layout
-   - Extract `drawCommonSections(doc, vm, pageIndex, totalPages): number` — draws header bar, patient block, pregnancy data; returns Y where clinical content starts
-   - Extract `drawClinicalInformation(doc, vm, y): number` — draws findings, comments, notes block
-   - Extract `drawSignatureLine(doc, y): void`
-   - Extract `drawFooter(doc, pageIndex, totalPages): void` — prints `"Page N of M"` in the footer
-   - Replace the current linear `buildExaminationPDF` body with a `for` loop over `pairs`: `if (pageIdx > 0) doc.addPage()`; call `drawCommonSections` on every page; call `renderClinicalSectionsPair` on every page; call `drawClinicalInformation` and `drawSignatureLine` on last page only; call `drawFooter` on every page
-   - Remove hard-coded `TWIN_COL_W`, `T1_X`, `T2_X` constants — replaced by `computePairLayout` output
-5. **`renderClinicalSections` signature change (§13.4.5):** In `pdfSections.ts`:
-   - Rename to `renderClinicalSectionsPair(doc, vm, pair: FetusPdfViewModel[], layout: PairLayout, y, helpers, pageIndex, totalPages): number`
-   - Remove `isTwins: boolean` parameter; remove internal `if (isTwins)` branch
-   - Iterate `pair.length` — naturally handles 1-fetus and 2-fetus pairs
-   - Remove `TWIN_COL_W`, `T1_X`, `T2_X` from the `PdfDrawHelpers` interface; add `layout: PairLayout`
+   - **Legacy read shim:** Resolve via `normalizeFetusArray(exam.data ?? {}, exam.examinationType)` (same shim from ST-05); map the result to `FetusPdfViewModel[]` by converting each `Observable` to `ObservablePdfEntry`. When `exam.data.fetuses` is already the Observable shape (post-migration), the shim is a no-op.
+   - Remove the `isTwins` / `isFtTwins` conditional block
+   - Compute `headerTitle` from type + fetus count (§13.5): `const n = vm.fetuses.length; const fetusLabel = n === 1 ? '' : \` (${n} fetuses)\``; combine with type label
+4. **PDF pair-loop refactor (§13.4):** Introduce `PairLayout` and helper functions in `pdfDocument.ts` (full spec in `docs2/refactoring-findings.md §13.4`):
+   - `chunkFetuses`, `computePairLayout`, `drawCommonSections`, `drawClinicalInformation`, `drawSignatureLine`, `drawFooter`
+   - Replace linear `buildExaminationPDF` body with pair-loop
+   - Remove hard-coded `TWIN_COL_W`, `T1_X`, `T2_X` constants
+5. **`renderClinicalSections` refactor (§13.4.5 + Observable):** In `pdfSections.ts`:
+   - Rename to `renderClinicalSectionsPair(doc, vm, pair: FetusPdfViewModel[], layout: PairLayout, y, helpers): number`
+   - Remove `isTwins: boolean`; remove `if (isTwins)` branch
+   - Render biometry rows by iterating `fetus.biometry` observables; look up label and unit from `OBSERVABLE_META[obs.type]` (imported from `examinationTypes.ts`)
+   - Render `markers` block only when `vm.examinationType === 'first_trimester'`
+   - Remove `TWIN_COL_W`, `T1_X`, `T2_X` from `PdfDrawHelpers`; add `layout: PairLayout`
 6. Run `tsc -b`; generate PDFs for 1-, 2-, and 3-fetus prenatal cases and a 1-fetus first-trimester case; verify content and pagination are correct
 
 ### Relevant Context
-- `frontend/src/services/print.service.ts` — `ExamPdfViewModel` currently has optional `biometry2`, `doppler2`, `ultrasound2`, `anatomy2` and `twin2Ft*` fields
-- `frontend/src/services/viewModelBuilders.ts` — builds the view model from `Examination`; the twin branch is the primary target
+- `frontend/src/services/print.service.ts` — `ExamPdfViewModel` currently has optional `biometry2`, `doppler2`, `ultrasound2`, `anatomy2` and `twin2Ft*` / `ft*` fields
+- `frontend/src/services/viewModelBuilders.ts` — builds the view model from `Examination`; twin and FT branches are the primary targets
 - `frontend/src/components/reports/pdfDocument.ts` — currently branches on `isTwins`
+- `OBSERVABLE_META` — exported from `examinationTypes.ts` in ST-06; provides label, unit, and capability flags per type
+- `docs2/refactoring-findings.md §13.4` — full PDF pair-loop spec
+- `docs2/refactoring-findings.md §3.6` — `ObservablePdfEntry` / `FetusPdfViewModel` type definitions
 
 ---
 
