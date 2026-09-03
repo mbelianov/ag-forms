@@ -1,6 +1,9 @@
 /**
  * Table Storage Client Wrapper
  * Provides helper methods for Azure Table Storage operations
+ *
+ * ST-02: Added module-level TableClient cache and ensureTableExists Set cache
+ * to eliminate per-request client allocation and unnecessary storage round-trips.
  */
 
 import { TableClient, TableServiceClient, odata } from "@azure/data-tables";
@@ -26,22 +29,39 @@ export const getTableServiceClient = (): TableServiceClient => {
     return tableServiceClient;
 };
 
+/** ST-02: Module-level TableClient cache — keyed by table name */
+const tableClientCache = new Map<string, TableClient>();
+
 /**
- * Get a TableClient for a specific table
+ * Get a TableClient for a specific table.
+ * ST-02: Returns cached instance on second call; creates and caches on first call.
  * @param tableName - Name of the table
  * @returns TableClient instance
  */
 export const getTableClient = (tableName: string): TableClient => {
+    const cached = tableClientCache.get(tableName);
+    if (cached) {
+        return cached;
+    }
     const connectionString = getConnectionString();
-    return TableClient.fromConnectionString(connectionString, tableName);
+    const client = TableClient.fromConnectionString(connectionString, tableName);
+    tableClientCache.set(tableName, client);
+    return client;
 };
 
+/** ST-02: Set of table names already verified to exist — skip storage call on repeat */
+const verifiedTables = new Set<string>();
+
 /**
- * Ensure a table exists, create it if it doesn't
+ * Ensure a table exists, create it if it doesn't.
+ * ST-02: Skips the storage call for table names already verified in this host lifetime.
  * @param tableName - Name of the table to create
  * @returns Promise<void>
  */
 export const ensureTableExists = async (tableName: string): Promise<void> => {
+    if (verifiedTables.has(tableName)) {
+        return;
+    }
     try {
         const serviceClient = getTableServiceClient();
         await serviceClient.createTable(tableName);
@@ -51,6 +71,7 @@ export const ensureTableExists = async (tableName: string): Promise<void> => {
             throw error;
         }
     }
+    verifiedTables.add(tableName);
 };
 
 /**

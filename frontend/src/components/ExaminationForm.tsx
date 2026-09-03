@@ -1,3 +1,13 @@
+/**
+ * ExaminationForm.tsx — Config-driven examination form (ST-07 rewrite).
+ *
+ * Drives all section rendering from EXAM_TYPE_CONFIG + formData.fetuses[].
+ * Uses ObservableSection for biometry/doppler, existing section components for descriptive fields.
+ * Fetus section container: flex row + min-width 480px + overflow-x auto (§13.3).
+ * Create form: exam type selector (2 options) + fetus count selector.
+ * Edit form: both exam type and fetus count are read-only.
+ */
+import React from 'react';
 import {
   Form,
   Stack,
@@ -10,27 +20,24 @@ import {
   SelectItem,
   DatePicker,
   DatePickerInput,
+  NumberInput,
 } from '@carbon/react';
 import { EXAM_TYPES, getExamTypeLabel } from '../constants/examinationTypes';
-import { autoCalcLabel } from './AutoCalcHelpers';
-import BiometrySection from './sections/BiometrySection';
-import DopplerSection from './sections/DopplerSection';
-import UltrasoundFindingsSection from './sections/UltrasoundFindingsSection';
-import AnatomySection from './sections/AnatomySection';
-import FirstTrimesterSection from './sections/FirstTrimesterSection';
-import type { FirstTrimesterSectionFormData } from './sections/FirstTrimesterSection';
+import { autoSuffix } from './AutoCalcHelpers';
+import { ObservableSection } from './sections/ObservableSection';
+import { DopplerSection } from './sections/DopplerSection';
 import { useExaminationForm } from '../hooks/useExaminationForm';
 import type { ExaminationFormProps } from '../hooks/useExaminationForm';
 
 export type { ExaminationFormProps };
 
-// Helper: parse a stored YYYY-MM-DD string into the DatePicker's dd/mm/yyyy display format
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function toDisplayDate(iso: string): string {
   const [yyyy, mm, dd] = iso.split('-');
   return `${dd}/${mm}/${yyyy}`;
 }
 
-// Helper: format a Date object picked by the DatePicker into YYYY-MM-DD
 function toISODate(d: Date): string {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -38,10 +45,11 @@ function toISODate(d: Date): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-// Helper: today as YYYY-MM-DD for DatePicker maxDate (dd/mm/yyyy display)
 function todayDisplayDate(): string {
   return toDisplayDate(toISODate(new Date()));
 }
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ExaminationForm(props: ExaminationFormProps) {
   const {
@@ -49,41 +57,238 @@ export default function ExaminationForm(props: ExaminationFormProps) {
     errors,
     isSubmitting,
     submitError,
-    setSubmitError,
-    isTwins,
-    isFt,
-    isFtTwinsMode,
     edd,
-    handleChange,
-    handleChangeT1,
-    handleGaFromBioTwinsChange,
-    handleSubmit,
-    visibility,
+    examConfig,
     patientAge,
+    handleChange,
+    handleFetusChange,
+    handleFetusDescriptorChange,
+    handleFetusCountChange,
+    handleSubmit,
   } = useExaminationForm(props);
 
   const { examination, patients, preselectedPatientId, onCancel, isEdit = false } = props;
 
-  // ── Layout helpers ────────────────────────────────────────────────────────
-  // row2 removed (KI-009: Notes field removed, Comments expanded to full width)
+  // Dismiss submit error helper (not exposed from hook, managed locally)
+  const [localSubmitError, setLocalSubmitError] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    setLocalSubmitError(submitError);
+  }, [submitError]);
+
+  const fetusCount = formData.fetuses.length;
+
+  // Layout helpers
   const row3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' };
-  const row4: React.CSSProperties = { display: 'grid', gridTemplateColumns: '5fr 3fr 2fr 2fr', gap: '0.75rem' };
-  const row6: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.75rem' };
+  const row4: React.CSSProperties = { display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr 1fr', gap: '0.75rem' };
+
+  // Fetus section container (§13.3)
+  const fetusSectionContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    gap: '1.5rem',
+    width: '100%',
+    overflowX: 'auto',
+  };
+
+  const fetusColumnStyle: React.CSSProperties = {
+    minWidth: '480px',
+    flex: '0 0 calc(50% - 0.75rem)',
+  };
+
+  const renderFetusSections = (fi: number) => {
+    const fetus = formData.fetuses[fi];
+    if (!fetus) return null;
+    const config = examConfig;
+    const uf = fetus.ultrasoundFindings as Record<string, string>;
+    const anat = fetus.anatomy as Record<string, string>;
+    const markers = fetus.markers as Record<string, string>;
+    const prefix = `f${fi}`;
+
+    return (
+      <div key={fi} style={fetusColumnStyle}>
+        {/* Column header — only when multiple fetuses */}
+        {fetusCount > 1 && (
+          <h3 style={{ marginBottom: '1rem', fontWeight: 600, fontSize: '1rem' }}>
+            Fetus {fi + 1}
+          </h3>
+        )}
+
+        {/* Ultrasound Findings */}
+        <div style={{ marginBottom: '1rem' }}>
+          <h5 className="observable-section-title">Ultrasound Findings</h5>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+            <Select
+              id={`${prefix}_uf_presentation`}
+              labelText="Presentation"
+              value={uf.presentation ?? ''}
+              onChange={(e) => handleFetusDescriptorChange(fi, 'ultrasoundFindings', 'presentation', e.target.value)}
+              disabled={isSubmitting}
+              size="sm"
+            >
+              <SelectItem value="" text="Select" />
+              <SelectItem value="cephalic" text="Cephalic" />
+              <SelectItem value="breech" text="Breech" />
+              <SelectItem value="transverse" text="Transverse" />
+              <SelectItem value="oblique" text="Oblique" />
+            </Select>
+            <Select
+              id={`${prefix}_uf_gender`}
+              labelText="Gender"
+              value={uf.gender ?? ''}
+              onChange={(e) => handleFetusDescriptorChange(fi, 'ultrasoundFindings', 'gender', e.target.value)}
+              disabled={isSubmitting}
+              size="sm"
+            >
+              <SelectItem value="" text="Select" />
+              <SelectItem value="male" text="Male" />
+              <SelectItem value="female" text="Female" />
+              <SelectItem value="unknown" text="Unknown" />
+            </Select>
+            <TextInput
+              id={`${prefix}_uf_heart_rate`}
+              labelText="FHR (bpm)"
+              placeholder="e.g. 145"
+              value={uf.heart_rate ?? ''}
+              onChange={(e) => handleFetusDescriptorChange(fi, 'ultrasoundFindings', 'heart_rate', e.target.value)}
+              invalid={!!errors[`${prefix}_hr`]}
+              invalidText={errors[`${prefix}_hr`]}
+              disabled={isSubmitting}
+              size="sm"
+            />
+            <Select
+              id={`${prefix}_uf_fetal_movement`}
+              labelText="Fetal Movement"
+              value={uf.fetal_movement ?? ''}
+              onChange={(e) => handleFetusDescriptorChange(fi, 'ultrasoundFindings', 'fetal_movement', e.target.value)}
+              disabled={isSubmitting}
+              size="sm"
+            >
+              <SelectItem value="" text="Select" />
+              <SelectItem value="active" text="Active" />
+              <SelectItem value="present" text="Present" />
+              <SelectItem value="reduced" text="Reduced" />
+              <SelectItem value="absent" text="Absent" />
+            </Select>
+            <TextInput
+              id={`${prefix}_uf_placenta`}
+              labelText="Placenta"
+              value={uf.placenta ?? ''}
+              onChange={(e) => handleFetusDescriptorChange(fi, 'ultrasoundFindings', 'placenta', e.target.value)}
+              disabled={isSubmitting}
+              size="sm"
+            />
+            <TextInput
+              id={`${prefix}_uf_umbilical_cord`}
+              labelText="Umbilical Cord"
+              value={uf.umbilical_cord ?? ''}
+              onChange={(e) => handleFetusDescriptorChange(fi, 'ultrasoundFindings', 'umbilical_cord', e.target.value)}
+              disabled={isSubmitting}
+              size="sm"
+            />
+          </div>
+        </div>
+
+        <h5 className="observable-section-title">Biometry</h5>
+        {/* GA from Biometry */}
+        <TextInput
+          id={`${prefix}_gaFromBio`}
+          labelText={
+            <>
+              GA from Biometry {autoSuffix(fetus.gaFromBiometry.isManual, undefined, !!fetus.gaFromBiometry.value)}
+            </>
+          }
+          placeholder="auto"
+          value={fetus.gaFromBiometry.value}
+          onChange={(e) => handleFetusDescriptorChange(fi, 'gaFromBiometry', '', e.target.value)}
+          invalid={!!errors[`${prefix}_gaFromBio`]}
+          invalidText={errors[`${prefix}_gaFromBio`]}
+          disabled={isSubmitting}
+          style={{ marginBottom: '1rem' }}
+        />
+
+        {/* Biometry section */}
+        <ObservableSection
+          title="Measurements"
+          fetusIndex={fi}
+          sectionKey="biometry"
+          typeConfigs={config.biometryTypes}
+          data={fetus.biometry}
+          disabled={isSubmitting}
+          onFieldChange={handleFetusChange}
+        />
+
+        {/* Doppler section */}
+        <DopplerSection
+          fetusIndex={fi}
+          vesselConfigs={config.dopplerVessels}
+          singleConfigs={config.dopplerSingle}
+          data={fetus.doppler}
+          disabled={isSubmitting}
+          onFieldChange={handleFetusChange}
+        />
+
+        {/* Anatomy */}
+        <div style={{ marginTop: '1.5rem' }}>
+          <h5 className="observable-section-title">Anatomy</h5>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+            {['head','brain','heart','abdomen','kidneys','limbs','skeleton','face','neckSkin','spine','thorax'].map(key => (
+              <TextInput
+                key={key}
+                id={`${prefix}_anat_${key}`}
+                labelText={key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}
+                value={anat[key] ?? ''}
+                onChange={(e) => handleFetusDescriptorChange(fi, 'anatomy', key, e.target.value)}
+                disabled={isSubmitting}
+                size="sm"
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Markers — config-driven, only rendered when markerTypes is non-empty */}
+        {examConfig.markerTypes.length > 0 && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <h5 className="observable-section-title">First Trimester Markers</h5>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+              {examConfig.markerTypes.map(({ key, label }) => (
+                <Select
+                  key={key}
+                  id={`${prefix}_mkr_${key}`}
+                  labelText={label}
+                  value={markers[key] ?? ''}
+                  onChange={(e) => handleFetusDescriptorChange(fi, 'markers', key, e.target.value)}
+                  disabled={isSubmitting}
+                  size="sm"
+                >
+                  <SelectItem value="" text="Select" />
+                  <SelectItem value="absent" text="Absent" />
+                  <SelectItem value="present" text="Present" />
+                  <SelectItem value="normal" text="Normal" />
+                  <SelectItem value="abnormal" text="Abnormal" />
+                </Select>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <Form onSubmit={handleSubmit} autoComplete="off">
       <Stack gap={4}>
-        {submitError && (
+        {localSubmitError && (
           <InlineNotification
             kind="error"
             title="Error"
-            subtitle={submitError.includes('\n') ? '' : submitError}
-            onCloseButtonClick={() => setSubmitError(null)}
+            subtitle={localSubmitError.includes('\n') ? '' : localSubmitError}
+            onCloseButtonClick={() => setLocalSubmitError(null)}
             lowContrast
           >
-            {submitError.includes('\n') && (
+            {localSubmitError.includes('\n') && (
               <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
-                {submitError.split('\n').map((line, i) => (
+                {localSubmitError.split('\n').map((line, i) => (
                   <li key={i}>{line.startsWith('• ') ? line.slice(2) : line}</li>
                 ))}
               </ul>
@@ -91,8 +296,8 @@ export default function ExaminationForm(props: ExaminationFormProps) {
           </InlineNotification>
         )}
 
-        {/* ── Patient (full width) ── */}
-        {!isEdit && (
+        {/* Patient selector */}
+        {!isEdit ? (
           <Select
             id="patientId"
             labelText="Patient"
@@ -104,26 +309,20 @@ export default function ExaminationForm(props: ExaminationFormProps) {
           >
             <SelectItem value="" text="Select a patient" />
             {patients.map((patient) => (
-              <SelectItem
-                key={patient.patientId}
-                value={patient.patientId}
-                text={patient.name}
-              />
+              <SelectItem key={patient.patientId} value={patient.patientId} text={patient.name} />
             ))}
           </Select>
-        )}
-
-        {isEdit && examination && (
+        ) : (
           <TextInput
             id="patientName"
             labelText="Patient"
-            value={examination.patientName}
+            value={examination?.patientName ?? ''}
             readOnly
             disabled
           />
         )}
 
-        {/* ── Examination Type (locked on edit) | Exam Date | Status | Patient Age (row4, REQ-08) ── */}
+        {/* Exam type | Fetus count | Exam date | Status | Patient age */}
         <div style={row4}>
           {isEdit ? (
             <TextInput
@@ -147,26 +346,46 @@ export default function ExaminationForm(props: ExaminationFormProps) {
             </Select>
           )}
 
+          {isEdit ? (
+            <TextInput
+              id="fetusCount"
+              labelText="Number of Fetuses"
+              value={String(fetusCount)}
+              readOnly
+              disabled
+            />
+          ) : (
+            <NumberInput
+              id="fetusCount"
+              label="Number of Fetuses"
+              value={formData.fetusCount}
+              min={1}
+              max={10}
+              onChange={(_e, { value }) =>
+                handleFetusCountChange(typeof value === 'number' ? value : parseInt(String(value), 10))
+              }
+              disabled={isSubmitting}
+            />
+          )}
+
           <DatePicker
             datePickerType="single"
             dateFormat="d/m/Y"
-            value={formData.examDate ? toDisplayDate(formData.examDate) : ''}
+            value={formData.examinationDate ? toDisplayDate(formData.examinationDate) : ''}
             onChange={(dates: Date[]) => {
-              if (dates[0]) {
-                handleChange('examDate', toISODate(dates[0]));
-              }
+              if (dates[0]) handleChange('examinationDate', toISODate(dates[0]));
             }}
             onClose={(dates: Date[]) => {
-              if (dates[0]) handleChange('examDate', toISODate(dates[0]));
+              if (dates[0]) handleChange('examinationDate', toISODate(dates[0]));
             }}
             maxDate={todayDisplayDate()}
           >
             <DatePickerInput
-              id="examDate"
+              id="examinationDate"
               labelText="Examination Date"
               placeholder="dd/mm/yyyy"
-              invalid={!!errors.examDate}
-              invalidText={errors.examDate}
+              invalid={!!errors.examinationDate}
+              invalidText={errors.examinationDate}
               disabled={isSubmitting}
             />
           </DatePicker>
@@ -183,117 +402,61 @@ export default function ExaminationForm(props: ExaminationFormProps) {
             <SelectItem value="reviewed" text="Reviewed" />
           </Select>
 
-          {/* Patient Age at Exam occupies the 4th slot in the row4 ── */}
           <TextInput
             id="patientAgeAtExam"
-            labelText="Patient Age at Exam"
+            labelText="Patient Age"
             value={patientAge !== undefined ? `${patientAge} yrs` : '—'}
             readOnly
             disabled
           />
         </div>
 
-        {/* ── Clinical data sections ── */}
+        {/* Pregnancy Data */}
         <div>
-
-          {/* ── Pregnancy Data ── */}
-          {visibility.pregnancyData && (
-          <div>
-            <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Pregnancy Data</h4>
-            <Stack gap={3}>
-
-              {/* LMP | GA from LMP | GA from Bio — single row */}
-              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'nowrap' }}>
-                <div style={{ flex: '0 0 auto', minWidth: '200px' }}>
-                  <DatePicker
-                    datePickerType="single"
-                    dateFormat="d/m/Y"
-                    value={formData.last_menstrual_period ? toDisplayDate(formData.last_menstrual_period) : ''}
-                    maxDate={todayDisplayDate()}
-                    onChange={(dates: Date[]) => {
-                      if (dates[0]) handleChange('last_menstrual_period', toISODate(dates[0]));
-                    }}
-                    onClose={(dates: Date[]) => {
-                      if (dates[0]) handleChange('last_menstrual_period', toISODate(dates[0]));
-                    }}
-                  >
-                    <DatePickerInput
-                      id="last_menstrual_period"
-                      labelText="Last Menstrual Period (LMP)"
-                      placeholder="dd/mm/yyyy"
-                      invalid={!!errors.last_menstrual_period}
-                      invalidText={errors.last_menstrual_period}
-                      disabled={isSubmitting}
-                    />
-                  </DatePicker>
-                </div>
-
-                <div style={{ flex: 1, minWidth: '180px' }}>
-                  <TextInput
-                    id="gestationalAge"
-                    labelText={autoCalcLabel('Gestational Age from LMP', formData.gestationalAgeIsManual)}
-                    placeholder="auto"
-                    value={formData.gestationalAge}
-                    onChange={(e) => handleChange('gestationalAge', e.target.value)}
-                    invalid={!!errors.gestationalAge}
-                    invalidText={errors.gestationalAge}
+          <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Pregnancy Data</h4>
+          <Stack gap={3}>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'nowrap' }}>
+              <div style={{ flex: '0 0 auto', minWidth: '200px' }}>
+                <DatePicker
+                  datePickerType="single"
+                  dateFormat="d/m/Y"
+                  value={formData.last_menstrual_period ? toDisplayDate(formData.last_menstrual_period) : ''}
+                  maxDate={todayDisplayDate()}
+                  onChange={(dates: Date[]) => {
+                    if (dates[0]) handleChange('last_menstrual_period', toISODate(dates[0]));
+                  }}
+                  onClose={(dates: Date[]) => {
+                    if (dates[0]) handleChange('last_menstrual_period', toISODate(dates[0]));
+                  }}
+                >
+                  <DatePickerInput
+                    id="last_menstrual_period"
+                    labelText="Last Menstrual Period (LMP)"
+                    placeholder="dd/mm/yyyy"
+                    invalid={!!errors.last_menstrual_period}
+                    invalidText={errors.last_menstrual_period}
                     disabled={isSubmitting}
                   />
-                </div>
-
-                <div style={{ flex: 1, minWidth: '180px' }}>
-                  <TextInput
-                    id="gestationalAgeFromBiometry"
-                    labelText={autoCalcLabel('GA from Bio',
-                      isFt && !isFtTwinsMode
-                        ? !!formData.t1_ft_gaFromBioIsManual
-                        : isFtTwinsMode
-                          ? (!!formData.t1_ft_gaFromBioIsManual || !!formData.t2_ft_gaFromBioIsManual)
-                          : isTwins
-                            ? (!!formData.gestationalAgeFromBiometryIsManual || !!formData.t2_gestationalAgeFromBiometryIsManual)
-                            : !!formData.gestationalAgeFromBiometryIsManual
-                    )}
-                    placeholder="auto"
-                    value={
-                      isFt && !isFtTwinsMode
-                        ? formData.t1_ft_gaFromBio
-                        : isFtTwinsMode
-                          ? `${formData.t1_ft_gaFromBio} / ${formData.t2_ft_gaFromBio}`
-                          : isTwins
-                            ? `${formData.gestationalAgeFromBiometry || '—'} / ${formData.t2_gestationalAgeFromBiometry || '—'}`
-                            : formData.gestationalAgeFromBiometry
-                    }
-                    onChange={
-                      isFt && !isFtTwinsMode
-                        ? (e) => handleChange('t1_ft_gaFromBio', e.target.value)
-                        : isFtTwinsMode
-                          ? (e) => handleGaFromBioTwinsChange('ft_', e.target.value)
-                          : isTwins
-                            ? (e) => handleGaFromBioTwinsChange('', e.target.value)
-                            : (e) => handleChange('gestationalAgeFromBiometry', e.target.value)
-                    }
-                    invalid={
-                      (isFt && !isFtTwinsMode && !!errors.t1_ft_gaFromBio) ||
-                      (isFtTwinsMode && (!!errors.t1_ft_gaFromBio || !!errors.t2_ft_gaFromBio)) ||
-                      (isTwins && (!!errors.gestationalAgeFromBiometry || !!errors.t2_gestationalAgeFromBiometry)) ||
-                      (!isFt && !isFtTwinsMode && !isTwins && !!errors.gestationalAgeFromBiometry)
-                    }
-                    invalidText={
-                      isFt && !isFtTwinsMode
-                        ? errors.t1_ft_gaFromBio
-                        : isFtTwinsMode
-                          ? (errors.t1_ft_gaFromBio || errors.t2_ft_gaFromBio)
-                          : isTwins
-                            ? (errors.gestationalAgeFromBiometry || errors.t2_gestationalAgeFromBiometry)
-                            : errors.gestationalAgeFromBiometry
-                    }
-                    disabled={isSubmitting}
-                  />
-                </div>
+                </DatePicker>
               </div>
-
-              {/* EDD | Obstetric History | Family History — always in row3 (REQ-08 rule 8) */}
-              <div style={row3}>
+              <div style={{ flex: 1, minWidth: '180px' }}>
+                <TextInput
+                  id="gestationalAge"
+                  labelText={
+                    <>
+                      Gestational Age from LMP
+                      {autoSuffix(formData.gestationalAge.isManual, undefined, !!formData.gestationalAge.value)}
+                    </>
+                  }
+                  placeholder="auto"
+                  value={formData.gestationalAge.value}
+                  onChange={(e) => handleChange('gestationalAge', e.target.value)}
+                  invalid={!!errors.gestationalAge}
+                  invalidText={errors.gestationalAge}
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: '120px' }}>
                 <TextInput
                   id="edd"
                   labelText="Expected Delivery Date (EDD)"
@@ -301,432 +464,75 @@ export default function ExaminationForm(props: ExaminationFormProps) {
                   readOnly
                   disabled
                 />
-                <TextInput
-                  id="obstetric_history"
-                  labelText="Obstetric History"
-                  placeholder="e.g., G1P0"
-                  value={formData.obstetric_history}
-                  onChange={(e) => handleChange('obstetric_history', e.target.value)}
-                  disabled={isSubmitting}
-                />
-                <TextInput
-                  id="family_history"
-                  labelText="Family History"
-                  placeholder="e.g., None"
-                  value={formData.family_history}
-                  onChange={(e) => handleChange('family_history', e.target.value)}
-                  disabled={isSubmitting}
-                />
               </div>
-            </Stack>
-          </div>
-          )}
-
-          {/* ── Ultrasound Findings (single-fetus path) ── */}
-          {visibility.ultrasoundFindings && !isTwins && !isFt && (
-          <div>
-            <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Ultrasound Findings</h4>
-              {/* Single row6 — Presentation, Gender, HeartRate, FetalMovement, Placenta, UmbilicalCord (REQ-08 rule 7) */}
-              <div style={row6}>
-                <Select id="presentation" labelText="Presentation" value={formData.presentation} onChange={(e) => handleChange('presentation', e.target.value)} disabled={isSubmitting}>
-                  <SelectItem value="" text="Select presentation" />
-                  <SelectItem value="cephalic" text="Cephalic" />
-                  <SelectItem value="breech" text="Breech" />
-                  <SelectItem value="transverse" text="Transverse" />
-                  <SelectItem value="oblique" text="Oblique" />
-                </Select>
-                <Select id="gender" labelText="Gender" value={formData.gender} onChange={(e) => handleChange('gender', e.target.value)} disabled={isSubmitting}>
-                  <SelectItem value="" text="Select gender" />
-                  <SelectItem value="male" text="Male" />
-                  <SelectItem value="female" text="Female" />
-                  <SelectItem value="unknown" text="Unknown" />
-                </Select>
-                <TextInput id="heart_rate" labelText="FHR (bpm)" placeholder="e.g., 145" value={formData.heart_rate} invalid={!!errors.heart_rate} invalidText={errors.heart_rate} disabled={isSubmitting} onChange={(e) => handleChange('heart_rate', e.target.value)} />
-                <Select id="fetal_movement" labelText="Fetal Movement" value={formData.fetal_movement} onChange={(e) => handleChange('fetal_movement', e.target.value)} disabled={isSubmitting}>
-                  <SelectItem value="" text="Select fetal movement" />
-                  <SelectItem value="active" text="Active" />
-                  <SelectItem value="present" text="Present" />
-                  <SelectItem value="reduced" text="Reduced" />
-                  <SelectItem value="absent" text="Absent" />
-                </Select>
-                <TextInput id="placenta" labelText="Placenta" placeholder="e.g., anterior, grade 1" value={formData.placenta} onChange={(e) => handleChange('placenta', e.target.value)} disabled={isSubmitting} />
-                <TextInput id="umbilical_cord" labelText="Umbilical Cord" placeholder="e.g., 3 vessels" value={formData.umbilical_cord} onChange={(e) => handleChange('umbilical_cord', e.target.value)} disabled={isSubmitting} />
-              </div>
-          </div>
-          )}
-
-          {/* ── Biometry (single-fetus path) — HF-2: delegated to BiometrySection ── */}
-          {visibility.biometry && !isTwins && !isFt && (
-          <>
-          <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Biometry (decimal values accepted, in mm/grams)</h4>
-          <BiometrySection
-            prefix="t1"
-            data={{
-              bpd: formData.bpd, hc: formData.hc, ac: formData.ac, fl: formData.fl,
-              efw: formData.efw, ofd: formData.ofd, vp: formData.vp, tcd: formData.tcd,
-              cm: formData.cm, nuchalFold: formData.nuchalFold, nb: formData.nb,
-              apad: formData.apad, tad: formData.tad, la: formData.la, lc: formData.lc,
-              gestationalAge: formData.gestationalAge,
-              // KI-009: Persisted percentile and GA fields
-              bpdPercentile: formData.bpdPercentile, hcPercentile: formData.hcPercentile,
-              acPercentile: formData.acPercentile, flPercentile: formData.flPercentile,
-              ofdPercentile: formData.ofdPercentile, tadPercentile: formData.tadPercentile,
-              apadPercentile: formData.apadPercentile, efwPercentile: formData.efwPercentile,
-              tcdPercentile: formData.tcdPercentile,
-              bpdGa: formData.bpdGa, hcGa: formData.hcGa, acGa: formData.acGa,
-              flGa: formData.flGa, ofdGa: formData.ofdGa, tadGa: formData.tadGa,
-              apadGa: formData.apadGa, efwGa: formData.efwGa,
-              tcdGa: formData.tcdGa,
-              // KI-009: IsManual flags
-              bpdPercentileIsManual: formData.bpdPercentileIsManual,
-              hcPercentileIsManual: formData.hcPercentileIsManual,
-              acPercentileIsManual: formData.acPercentileIsManual,
-              flPercentileIsManual: formData.flPercentileIsManual,
-              ofdPercentileIsManual: formData.ofdPercentileIsManual,
-              tadPercentileIsManual: formData.tadPercentileIsManual,
-              apadPercentileIsManual: formData.apadPercentileIsManual,
-              efwPercentileIsManual: formData.efwPercentileIsManual,
-              tcdPercentileIsManual: formData.tcdPercentileIsManual,
-              bpdGaIsManual: formData.bpdGaIsManual, hcGaIsManual: formData.hcGaIsManual,
-              acGaIsManual: formData.acGaIsManual, flGaIsManual: formData.flGaIsManual,
-              ofdGaIsManual: formData.ofdGaIsManual, tadGaIsManual: formData.tadGaIsManual,
-              apadGaIsManual: formData.apadGaIsManual, efwGaIsManual: formData.efwGaIsManual,
-              tcdGaIsManual: formData.tcdGaIsManual,
-              efwIsManual: formData.efwIsManual,
-            }}
-            errors={errors}
-            onChange={handleChangeT1}
-            isSubmitting={isSubmitting}
-          />
-          </>
-          )}
-
-          {/* ── Anatomy (single-fetus path) ── */}
-          {visibility.anatomy && !isTwins && !isFt && (
-          <div>
-            <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Anatomy</h4>
-            {/* Single row6 — 11 fields across 2 auto rows via CSS grid (REQ-08 rule 6) */}
-            <div style={row6}>
-              <TextInput id="anat_head"     labelText="Head"     placeholder="e.g., normal" value={formData.anat_head}     onChange={(e) => handleChange('anat_head',     e.target.value)} disabled={isSubmitting} />
-              <TextInput id="anat_brain"    labelText="Brain"    placeholder="e.g., normal" value={formData.anat_brain}    onChange={(e) => handleChange('anat_brain',    e.target.value)} disabled={isSubmitting} />
-              <TextInput id="anat_heart"    labelText="Heart"    placeholder="e.g., normal" value={formData.anat_heart}    onChange={(e) => handleChange('anat_heart',    e.target.value)} disabled={isSubmitting} />
-              <TextInput id="anat_abdomen"  labelText="Abdomen"  placeholder="e.g., normal" value={formData.anat_abdomen}  onChange={(e) => handleChange('anat_abdomen',  e.target.value)} disabled={isSubmitting} />
-              <TextInput id="anat_kidneys"  labelText="Kidneys"  placeholder="e.g., normal" value={formData.anat_kidneys}  onChange={(e) => handleChange('anat_kidneys',  e.target.value)} disabled={isSubmitting} />
-              <TextInput id="anat_limbs"    labelText="Limbs"    placeholder="e.g., normal" value={formData.anat_limbs}    onChange={(e) => handleChange('anat_limbs',    e.target.value)} disabled={isSubmitting} />
-              <TextInput id="anat_skeleton" labelText="Skeleton" placeholder="e.g., normal" value={formData.anat_skeleton} onChange={(e) => handleChange('anat_skeleton', e.target.value)} disabled={isSubmitting} />
-              <TextInput id="anat_face"     labelText="Face"     placeholder="e.g., normal" value={formData.anat_face}     onChange={(e) => handleChange('anat_face',     e.target.value)} disabled={isSubmitting} />
-              <TextInput id="anat_neckSkin" labelText="Neck Skin" placeholder="e.g., normal" value={formData.anat_neckSkin} onChange={(e) => handleChange('anat_neckSkin', e.target.value)} disabled={isSubmitting} />
-              <TextInput id="anat_spine"    labelText="Spine"    placeholder="e.g., normal" value={formData.anat_spine}    onChange={(e) => handleChange('anat_spine',    e.target.value)} disabled={isSubmitting} />
-              <TextInput id="anat_thorax"   labelText="Thorax"   placeholder="e.g., normal" value={formData.anat_thorax}   onChange={(e) => handleChange('anat_thorax',   e.target.value)} disabled={isSubmitting} />
             </div>
-          </div>
-          )}
-
-          {/* ── Doppler (single-fetus path) — HF-3: uses DopplerSection component ── */}
-          {visibility.doppler && !isTwins && !isFt && (
-          <>
-          <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Doppler</h4>
-          <DopplerSection
-            prefix="t1"
-            data={{
-              pi: formData.pi, ri: formData.ri,
-              ducVen: formData.ducVen, utADexPI: formData.utADexPI, utADexRI: formData.utADexRI,
-              utASinPI: formData.utASinPI, utASinRI: formData.utASinRI,
-              cma: formData.cma, psv: formData.psv, cpr: formData.cpr,
-            }}
-            errors={errors}
-            onChange={handleChangeT1}
-            isSubmitting={isSubmitting}
-          />
-          </>
-          )}
-
+            <div style={row3}>
+              <TextInput
+                id="obstetric_history"
+                labelText="Obstetric History"
+                placeholder="e.g., G1P0"
+                value={formData.obstetric_history}
+                onChange={(e) => handleChange('obstetric_history', e.target.value)}
+                disabled={isSubmitting}
+              />
+              <TextInput
+                id="family_history"
+                labelText="Family History"
+                placeholder="e.g., None"
+                value={formData.family_history}
+                onChange={(e) => handleChange('family_history', e.target.value)}
+                disabled={isSubmitting}
+              />
+            </div>
+          </Stack>
         </div>
 
-        {/* ── UZPT: Single first-trimester layout ── */}
-        {isFt && !isFtTwinsMode && (
-          <div>
-            <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Ултразвук Първи Триместър</h4>
-            <FirstTrimesterSection
-              prefix="t1"
-              data={formData as unknown as FirstTrimesterSectionFormData}
-              errors={errors}
-              onChange={handleChange}
-              isSubmitting={isSubmitting}
-            />
+        {/* Per-fetus clinical sections */}
+        <div style={{ overflow: 'hidden' }}>
+          <h4 style={{ marginBottom: '0.75rem', fontWeight: 600 }}>
+            Clinical Measurements
+            {fetusCount > 1 ? ` (${fetusCount} fetuses)` : ''}
+          </h4>
+          <div style={fetusSectionContainerStyle}>
+            {formData.fetuses.map((_, fi) => renderFetusSections(fi))}
           </div>
-        )}
+        </div>
 
-        {/* ── UZPT: Twins first-trimester side-by-side layout ── */}
-        {isFtTwinsMode && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }} className="twins-grid">
-              <h4 style={{ marginBottom: '0.75rem', fontWeight: 700, borderBottom: '2px solid #0f62fe', paddingBottom: '0.5rem' }}>Twin 1</h4>
-              <h4 style={{ marginBottom: '0.75rem', fontWeight: 700, borderBottom: '2px solid #6929c4', paddingBottom: '0.5rem' }}>Twin 2</h4>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }} className="twins-grid">
-              <div>
-                <FirstTrimesterSection
-                  prefix="t1"
-                  data={formData as unknown as FirstTrimesterSectionFormData}
-                  errors={errors}
-                  onChange={handleChange}
-                  isSubmitting={isSubmitting}
-                />
-              </div>
-              <div>
-                <FirstTrimesterSection
-                  prefix="t2"
-                  data={formData as unknown as FirstTrimesterSectionFormData}
-                  errors={errors}
-                  onChange={handleChange}
-                  isSubmitting={isSubmitting}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── uzd-twins: Twin side-by-side layout (HF-1: reordered to UF → Bio → Anatomy → Doppler) ── */}
-        {/* Breakpoint: collapses to single column below 1024px */}
-        {isTwins && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }} className="twins-grid">
-              <h4 style={{ marginBottom: '0.75rem', fontWeight: 700, borderBottom: '2px solid #0f62fe', paddingBottom: '0.5rem' }}>Twin 1</h4>
-              <h4 style={{ marginBottom: '0.75rem', fontWeight: 700, borderBottom: '2px solid #6929c4', paddingBottom: '0.5rem' }}>Twin 2</h4>
-            </div>
-
-            {visibility.ultrasoundFindings && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }} className="twins-grid">
-                <div>
-                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Ultrasound Findings</h5>
-                  <UltrasoundFindingsSection
-                    prefix="t1"
-                    columns={3}
-                    data={{
-                      presentation: formData.presentation, gender: formData.gender,
-                      heart_rate: formData.heart_rate, fetal_movement: formData.fetal_movement,
-                      placenta: formData.placenta, umbilical_cord: formData.umbilical_cord,
-                    }}
-                    errors={errors}
-                    onChange={handleChangeT1}
-                    isSubmitting={isSubmitting}
-                  />
-                </div>
-                <div>
-                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Ultrasound Findings</h5>
-                  <UltrasoundFindingsSection
-                    prefix="t2"
-                    columns={3}
-                    data={{
-                      presentation: formData.t2_presentation, gender: formData.t2_gender,
-                      heart_rate: formData.t2_heart_rate, fetal_movement: formData.t2_fetal_movement,
-                      placenta: formData.t2_placenta, umbilical_cord: formData.t2_umbilical_cord,
-                    }}
-                    errors={errors}
-                    onChange={handleChange}
-                    isSubmitting={isSubmitting}
-                  />
-                </div>
-              </div>
-            )}
-
-            {visibility.biometry && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }} className="twins-grid">
-                <div>
-                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Biometry</h5>
-                  <BiometrySection
-                   prefix="t1"
-                   data={{
-                     bpd: formData.bpd, hc: formData.hc, ac: formData.ac, fl: formData.fl,
-                     efw: formData.efw, ofd: formData.ofd, vp: formData.vp, tcd: formData.tcd,
-                     cm: formData.cm, nuchalFold: formData.nuchalFold, nb: formData.nb,
-                     apad: formData.apad, tad: formData.tad, la: formData.la, lc: formData.lc,
-                     gestationalAge: formData.gestationalAge,
-                     bpdPercentile: formData.bpdPercentile, hcPercentile: formData.hcPercentile,
-                     acPercentile: formData.acPercentile, flPercentile: formData.flPercentile,
-                     ofdPercentile: formData.ofdPercentile, tadPercentile: formData.tadPercentile,
-                     apadPercentile: formData.apadPercentile, efwPercentile: formData.efwPercentile,
-                     tcdPercentile: formData.tcdPercentile,
-                     bpdGa: formData.bpdGa, hcGa: formData.hcGa, acGa: formData.acGa,
-                     flGa: formData.flGa, ofdGa: formData.ofdGa, tadGa: formData.tadGa,
-                     apadGa: formData.apadGa, efwGa: formData.efwGa,
-                     tcdGa: formData.tcdGa,
-                     bpdPercentileIsManual: formData.bpdPercentileIsManual,
-                     hcPercentileIsManual: formData.hcPercentileIsManual,
-                     acPercentileIsManual: formData.acPercentileIsManual,
-                     flPercentileIsManual: formData.flPercentileIsManual,
-                     ofdPercentileIsManual: formData.ofdPercentileIsManual,
-                     tadPercentileIsManual: formData.tadPercentileIsManual,
-                     apadPercentileIsManual: formData.apadPercentileIsManual,
-                     efwPercentileIsManual: formData.efwPercentileIsManual,
-                     tcdPercentileIsManual: formData.tcdPercentileIsManual,
-                     bpdGaIsManual: formData.bpdGaIsManual, hcGaIsManual: formData.hcGaIsManual,
-                     acGaIsManual: formData.acGaIsManual, flGaIsManual: formData.flGaIsManual,
-                     ofdGaIsManual: formData.ofdGaIsManual, tadGaIsManual: formData.tadGaIsManual,
-                     apadGaIsManual: formData.apadGaIsManual, efwGaIsManual: formData.efwGaIsManual,
-                     tcdGaIsManual: formData.tcdGaIsManual,
-                     efwIsManual: formData.efwIsManual,
-                   }}
-                   errors={errors}
-                   onChange={handleChangeT1}
-                   isSubmitting={isSubmitting}
-                 />
-                </div>
-                <div>
-                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Biometry</h5>
-                  <BiometrySection
-                    prefix="t2"
-                    data={{
-                      bpd: formData.t2_bpd, hc: formData.t2_hc, ac: formData.t2_ac, fl: formData.t2_fl,
-                      efw: formData.t2_efw, ofd: formData.t2_ofd, vp: formData.t2_vp, tcd: formData.t2_tcd,
-                      cm: formData.t2_cm, nuchalFold: formData.t2_nuchalFold, nb: formData.t2_nb,
-                      apad: formData.t2_apad, tad: formData.t2_tad, la: formData.t2_la, lc: formData.t2_lc,
-                      gestationalAge: formData.gestationalAge,
-                      bpdPercentile: formData.t2_bpdPercentile, hcPercentile: formData.t2_hcPercentile,
-                      acPercentile: formData.t2_acPercentile, flPercentile: formData.t2_flPercentile,
-                      ofdPercentile: formData.t2_ofdPercentile, tadPercentile: formData.t2_tadPercentile,
-                      apadPercentile: formData.t2_apadPercentile, efwPercentile: formData.t2_efwPercentile,
-                      tcdPercentile: formData.t2_tcdPercentile,
-                      bpdGa: formData.t2_bpdGa, hcGa: formData.t2_hcGa, acGa: formData.t2_acGa,
-                      flGa: formData.t2_flGa, ofdGa: formData.t2_ofdGa, tadGa: formData.t2_tadGa,
-                      apadGa: formData.t2_apadGa, efwGa: formData.t2_efwGa,
-                      tcdGa: formData.t2_tcdGa,
-                      bpdPercentileIsManual: formData.t2_bpdPercentileIsManual,
-                      hcPercentileIsManual: formData.t2_hcPercentileIsManual,
-                      acPercentileIsManual: formData.t2_acPercentileIsManual,
-                      flPercentileIsManual: formData.t2_flPercentileIsManual,
-                      ofdPercentileIsManual: formData.t2_ofdPercentileIsManual,
-                      tadPercentileIsManual: formData.t2_tadPercentileIsManual,
-                      apadPercentileIsManual: formData.t2_apadPercentileIsManual,
-                      efwPercentileIsManual: formData.t2_efwPercentileIsManual,
-                      tcdPercentileIsManual: formData.t2_tcdPercentileIsManual,
-                      bpdGaIsManual: formData.t2_bpdGaIsManual, hcGaIsManual: formData.t2_hcGaIsManual,
-                      acGaIsManual: formData.t2_acGaIsManual, flGaIsManual: formData.t2_flGaIsManual,
-                      ofdGaIsManual: formData.t2_ofdGaIsManual, tadGaIsManual: formData.t2_tadGaIsManual,
-                      apadGaIsManual: formData.t2_apadGaIsManual, efwGaIsManual: formData.t2_efwGaIsManual,
-                      tcdGaIsManual: formData.t2_tcdGaIsManual,
-                      efwIsManual: formData.t2_efwIsManual,
-                    }}
-                    errors={errors}
-                    onChange={handleChange}
-                    isSubmitting={isSubmitting}
-                  />
-                </div>
-              </div>
-            )}
-
-            {visibility.anatomy && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }} className="twins-grid">
-                <div>
-                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Anatomy</h5>
-                  <AnatomySection
-                    prefix="t1"
-                    columns={4}
-                    data={{
-                      anat_head: formData.anat_head, anat_brain: formData.anat_brain,
-                      anat_heart: formData.anat_heart, anat_abdomen: formData.anat_abdomen,
-                      anat_kidneys: formData.anat_kidneys, anat_limbs: formData.anat_limbs,
-                      anat_skeleton: formData.anat_skeleton, anat_face: formData.anat_face,
-                      anat_neckSkin: formData.anat_neckSkin, anat_spine: formData.anat_spine,
-                      anat_thorax: formData.anat_thorax,
-                    }}
-                    errors={errors}
-                    onChange={handleChangeT1}
-                    isSubmitting={isSubmitting}
-                  />
-                </div>
-                <div>
-                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Anatomy</h5>
-                  <AnatomySection
-                    prefix="t2"
-                    columns={4}
-                    data={{
-                      anat_head: formData.t2_anat_head, anat_brain: formData.t2_anat_brain,
-                      anat_heart: formData.t2_anat_heart, anat_abdomen: formData.t2_anat_abdomen,
-                      anat_kidneys: formData.t2_anat_kidneys, anat_limbs: formData.t2_anat_limbs,
-                      anat_skeleton: formData.t2_anat_skeleton, anat_face: formData.t2_anat_face,
-                      anat_neckSkin: formData.t2_anat_neckSkin, anat_spine: formData.t2_anat_spine,
-                      anat_thorax: formData.t2_anat_thorax,
-                    }}
-                    errors={errors}
-                    onChange={handleChange}
-                    isSubmitting={isSubmitting}
-                  />
-                </div>
-              </div>
-            )}
-
-            {visibility.doppler && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }} className="twins-grid">
-                <div>
-                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Doppler</h5>
-                  <DopplerSection
-                    prefix="t1"
-                    data={{
-                      pi: formData.pi, ri: formData.ri,
-                      ducVen: formData.ducVen, utADexPI: formData.utADexPI, utADexRI: formData.utADexRI,
-                      utASinPI: formData.utASinPI, utASinRI: formData.utASinRI,
-                      cma: formData.cma, psv: formData.psv, cpr: formData.cpr,
-                    }}
-                    errors={errors}
-                    onChange={handleChangeT1}
-                    isSubmitting={isSubmitting}
-                  />
-                </div>
-                <div>
-                  <h5 style={{ marginBottom: '0.25rem', fontWeight: 600 }}>Doppler</h5>
-                  <DopplerSection
-                    prefix="t2"
-                    data={{
-                      pi: formData.t2_pi, ri: formData.t2_ri,
-                      ducVen: formData.t2_ducVen, utADexPI: formData.t2_utADexPI, utADexRI: formData.t2_utADexRI,
-                      utASinPI: formData.t2_utASinPI, utASinRI: formData.t2_utASinRI,
-                      cma: formData.t2_cma, psv: formData.t2_psv, cpr: formData.t2_cpr,
-                    }}
-                    errors={errors}
-                    onChange={handleChange}
-                    isSubmitting={isSubmitting}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Narrative fields ── */}
+        {/* Findings / Comments / Notes */}
         <TextArea
           id="findings"
-          labelText="Findings (optional)"
-          placeholder="Enter examination findings"
+          labelText="Findings"
           value={formData.findings}
           onChange={(e) => handleChange('findings', e.target.value)}
-          rows={4}
+          rows={3}
           disabled={isSubmitting}
         />
-
-        {/* KI-009: Notes removed; Comments expanded to full width */}
         <TextArea
           id="comments"
-          labelText="Comments (optional)"
-          placeholder="Enter general comments"
+          labelText="Comments"
           value={formData.comments}
           onChange={(e) => handleChange('comments', e.target.value)}
-          rows={4}
+          rows={3}
+          disabled={isSubmitting}
+        />
+        <TextArea
+          id="clinicalNotes"
+          labelText="Notes"
+          value={formData.clinicalNotes}
+          onChange={(e) => handleChange('clinicalNotes', e.target.value)}
+          rows={3}
           disabled={isSubmitting}
         />
 
-        <ButtonSet style={{ justifyContent: 'flex-end' }}>
+        <ButtonSet>
           <Button kind="secondary" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting || (!isEdit && !formData.patientId)}>
-            {isSubmitting ? 'Saving...' : isEdit ? `Update ${getExamTypeLabel(formData.examinationType)}` : `Create ${getExamTypeLabel(formData.examinationType)}`}
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Examination'}
           </Button>
         </ButtonSet>
       </Stack>
     </Form>
   );
 }
-
-// Made with Bob

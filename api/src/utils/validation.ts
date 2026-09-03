@@ -43,7 +43,7 @@ const fullNameField = Joi.string()
     });
 
 const emailField = Joi.string()
-    .email()
+    .email({ tlds: { allow: false } })
     .required()
     .messages({
         'string.email': 'Email must be a valid email address',
@@ -145,233 +145,71 @@ const patientSchema = Joi.object({
         })
 });
 
+// ── ST-04: Observable fetus-array data validation schemas ─────────────────────
+
 /**
- * Biometry data validation schema
- * TASK-034/035: Extended biometry parameters added.
- * Fields accept floating-point values (e.g. 85.3 mm); integer inputs remain valid.
+ * Observable sub-schema — a single measurement with optional percentile and GA.
+ * value may be a number (most measurements) or a string (free-text: vp, la, ducVen).
  */
-const biometrySchema = Joi.object({
-    bpd: Joi.number().min(0).max(200).optional().messages({
-        'number.base': 'BPD must be a valid number',
-        'number.min': 'BPD must be a positive value',
-        'number.max': 'BPD value is out of valid range'
-    }),
-    hc: Joi.number().min(0).max(500).optional().messages({
-        'number.base': 'HC must be a valid number',
-        'number.min': 'HC must be a positive value',
-        'number.max': 'HC value is out of valid range'
-    }),
-    ac: Joi.number().min(0).max(500).optional().messages({
-        'number.base': 'AC must be a valid number',
-        'number.min': 'AC must be a positive value',
-        'number.max': 'AC value is out of valid range'
-    }),
-    fl: Joi.number().min(0).max(100).optional().messages({
-        'number.base': 'FL must be a valid number',
-        'number.min': 'FL must be a positive value',
-        'number.max': 'FL value is out of valid range'
-    }),
-    efw: Joi.number().min(0).max(10000).optional().messages({
-        'number.base': 'EFW must be a valid number',
-        'number.min': 'EFW must be a positive value',
-        'number.max': 'EFW value is out of valid range'
-    }),
-    // TASK-034: Extended biometry
-    ofd: Joi.number().min(0).max(200).optional().messages({ 'number.base': 'OFD must be a valid number' }),
-    vp:  Joi.string().max(500).optional().allow(''),
-    tcd: Joi.number().min(0).max(100).optional().messages({ 'number.base': 'TCD must be a valid number' }),
-    cm:  Joi.number().min(0).max(50).optional().messages({ 'number.base': 'CM must be a valid number' }),
-    nuchalFold: Joi.number().min(0).max(30).optional().messages({ 'number.base': 'Nuchal Fold must be a valid number' }),
-    nb:  Joi.number().min(0).max(30).optional().messages({ 'number.base': 'NB must be a valid number' }),
-    apad: Joi.number().min(0).max(200).optional().messages({ 'number.base': 'APAD must be a valid number' }),
-    tad:  Joi.number().min(0).max(200).optional().messages({ 'number.base': 'TAD must be a valid number' }),
-    // TASK-035: LA (migrated to string) and LC
-    la: Joi.string().max(500).optional().allow(''),
-    lc: Joi.number().min(0).max(100).optional().messages({ 'number.base': 'LC must be a valid number' }),
-    // KI-009: Per-measurement GA fields
-    bpdGa:  Joi.string().pattern(GA_REGEX).optional().allow(''),
-    hcGa:   Joi.string().pattern(GA_REGEX).optional().allow(''),
-    acGa:   Joi.string().pattern(GA_REGEX).optional().allow(''),
-    flGa:   Joi.string().pattern(GA_REGEX).optional().allow(''),
-    ofdGa:  Joi.string().pattern(GA_REGEX).optional().allow(''),
-    tadGa:  Joi.string().pattern(GA_REGEX).optional().allow(''),
-    apadGa: Joi.string().pattern(GA_REGEX).optional().allow(''),
-    efwGa:  Joi.string().pattern(GA_REGEX).optional().allow(''),
-    tcdGa:  Joi.string().pattern(GA_REGEX).optional().allow(''),
-    // KI-009: Persisted percentile fields (integers 1–99)
-    bpdPercentile:  Joi.number().integer().min(1).max(99).optional(),
-    hcPercentile:   Joi.number().integer().min(1).max(99).optional(),
-    acPercentile:   Joi.number().integer().min(1).max(99).optional(),
-    flPercentile:   Joi.number().integer().min(1).max(99).optional(),
-    ofdPercentile:  Joi.number().integer().min(1).max(99).optional(),
-    tadPercentile:  Joi.number().integer().min(1).max(99).optional(),
-    apadPercentile: Joi.number().integer().min(1).max(99).optional(),
-    efwPercentile:  Joi.number().integer().min(1).max(99).optional(),
-    tcdPercentile:  Joi.number().integer().min(1).max(99).optional(),
-    // KI-009: IsManual flags
-    bpdPercentileIsManual:  Joi.boolean().optional(),
-    hcPercentileIsManual:   Joi.boolean().optional(),
-    acPercentileIsManual:   Joi.boolean().optional(),
-    flPercentileIsManual:   Joi.boolean().optional(),
-    ofdPercentileIsManual:  Joi.boolean().optional(),
-    tadPercentileIsManual:  Joi.boolean().optional(),
-    apadPercentileIsManual: Joi.boolean().optional(),
-    efwPercentileIsManual:  Joi.boolean().optional(),
-    tcdPercentileIsManual:  Joi.boolean().optional(),
-    bpdGaIsManual:  Joi.boolean().optional(),
-    hcGaIsManual:   Joi.boolean().optional(),
-    acGaIsManual:   Joi.boolean().optional(),
-    flGaIsManual:   Joi.boolean().optional(),
-    ofdGaIsManual:  Joi.boolean().optional(),
-    tadGaIsManual:  Joi.boolean().optional(),
-    apadGaIsManual: Joi.boolean().optional(),
-    efwGaIsManual:  Joi.boolean().optional(),
-    tcdGaIsManual:  Joi.boolean().optional(),
-    efwIsManual:    Joi.boolean().optional(),
-    gestationalAgeFromBiometryIsManual: Joi.boolean().optional(),
+const observableSchema = Joi.object({
+    type: Joi.string().required(),
+    value: Joi.alternatives().try(
+        Joi.number(),
+        Joi.string().allow('')
+    ).required(),
+    isManual: Joi.boolean().optional(),
+    percentile: Joi.object({
+        value: Joi.number().integer().min(1).max(99).required(),
+        isManual: Joi.boolean().optional()
+    }).optional(),
+    ga: Joi.object({
+        value: Joi.string().pattern(GA_REGEX).required()
+            .messages({ 'string.pattern.base': 'GA must be in format "Xw Yd"' }),
+        isManual: Joi.boolean().optional()
+    }).optional()
 }).optional();
 
 /**
- * Doppler data validation schema
- * TASK-036: Extended vascular parameters added.
+ * GaFromBiometry sub-schema — fetus-level composite GA.
  */
-const dopplerSchema = Joi.object({
-    pi: Joi.number().min(0).max(10).optional().messages({
-        'number.min': 'PI must be a positive value',
-        'number.max': 'PI value is out of valid range'
-    }),
-    ri: Joi.number().min(0).max(1).optional().messages({
-        'number.min': 'RI must be a positive value',
-        'number.max': 'RI must be between 0 and 1'
-    }),
-    // TASK-036: Extended vascular parameters (HF-3: vessel removed)
-    utADexPI: Joi.number().min(0).max(10).optional(),
-    utADexRI: Joi.number().min(0).max(1).optional(),
-    utASinPI: Joi.number().min(0).max(10).optional(),
-    utASinRI: Joi.number().min(0).max(1).optional(),
-    cma:      Joi.number().min(0).max(10).optional(),
-    psv:      Joi.number().min(0).max(200).optional(),
-    cpr:      Joi.number().min(0).max(10).optional(),
-    ducVen:   Joi.string().max(200).optional().allow('')
+const gaFromBiometrySchema = Joi.object({
+    value: Joi.string().pattern(GA_REGEX).required()
+        .messages({ 'string.pattern.base': 'GA from biometry must be in format "Xw Yd"' }),
+    isManual: Joi.boolean().optional()
 }).optional();
 
 /**
- * Pregnancy data sub-schema
+ * Fetus section sub-schema — one entry per fetus in data.fetuses[].
  */
-const pregnancyDataSchema = Joi.object({
-    last_menstrual_period: Joi.string()
-        .pattern(/^\d{4}-\d{2}-\d{2}$/)
-        .optional()
-        .allow('')
-        .messages({ 'string.pattern.base': 'LMP must be in YYYY-MM-DD format' }),
-    obstetric_history: Joi.string().max(500).optional().allow(''),
-    family_history: Joi.string().max(500).optional().allow('')
+const fetusSectionSchema = Joi.object({
+    index: Joi.number().integer().min(0).required(),
+    gaFromBiometry: gaFromBiometrySchema,
+    biometry:  Joi.array().items(observableSchema).optional(),
+    doppler:   Joi.array().items(observableSchema).optional(),
+    ultrasoundFindings: Joi.object().optional(),
+    anatomy:   Joi.object().optional(),
+    markers:   Joi.object().optional()
 }).optional();
 
 /**
- * Ultrasound findings sub-schema
- */
-const ultrasoundFindingsSchema = Joi.object({
-    presentation: Joi.string().max(100).optional().allow(''),
-    gender: Joi.string().valid('male', 'female', 'unknown').optional().allow(''),
-    heart_rate: Joi.number().integer().min(1).max(300).optional().messages({
-        'number.min': 'Heart rate must be a positive value',
-        'number.max': 'Heart rate value is out of valid range'
-    }),
-    fetal_movement: Joi.string().max(100).optional().allow(''),
-    placenta: Joi.string().max(500).optional().allow(''),
-    umbilical_cord: Joi.string().max(500).optional().allow('')
-}).optional();
-
-/**
- * Anatomy sub-schema
- * TASK-036: Extended anatomy fields added.
- */
-const anatomySchema = Joi.object({
-    head: Joi.string().max(500).optional().allow(''),
-    brain: Joi.string().max(500).optional().allow(''),
-    heart: Joi.string().max(500).optional().allow(''),
-    abdomen: Joi.string().max(500).optional().allow(''),
-    kidneys: Joi.string().max(500).optional().allow(''),
-    limbs: Joi.string().max(500).optional().allow(''),
-    skeleton: Joi.string().max(500).optional().allow(''),
-    // TASK-036: Extended anatomy fields
-    face:     Joi.string().max(500).optional().allow(''),
-    neckSkin: Joi.string().max(500).optional().allow(''),
-    spine:    Joi.string().max(500).optional().allow(''),
-    thorax:   Joi.string().max(500).optional().allow('')
-}).optional();
-
-/**
- * UZPT — First Trimester sub-schemas
- */
-const ftBiometrySchema = Joi.object({
-    crl:       Joi.number().min(0).max(200).optional(),
-    gaFromCrl: Joi.string().pattern(GA_REGEX).optional().allow(''),
-    gaFromCrlIsManual: Joi.boolean().optional(),
-    nt:        Joi.number().min(0).max(30).optional(),
-    nb:        Joi.number().min(0).max(30).optional(),
-    puls:      Joi.number().integer().min(0).max(300).optional(),
-    // KI-009: GA from biometry composite field for first-trimester common section
-    gaFromBio: Joi.string().pattern(GA_REGEX).optional().allow(''),
-    // Sub-Task 6 (ga-from-bio-editable): manual override flag for gaFromBio
-    gaFromBioIsManual: Joi.boolean().optional(),
-}).optional();
-
-const ftMarkersSchema = Joi.object({
-    arrhythmia:              Joi.string().valid('yes', 'no', '').optional().allow(''),
-    tricuspidRegurgitation:  Joi.string().valid('yes', 'no', '').optional().allow(''),
-    abnormalDvFlow:          Joi.string().valid('yes', 'no', '').optional().allow(''),
-    echogenicCardiacFocus:   Joi.string().valid('yes', 'no', '').optional().allow(''),
-    singleUmbilicalArtery:   Joi.string().valid('yes', 'no', '').optional().allow(''),
-    choroidPlexusCysts:      Joi.string().valid('yes', 'no', '').optional().allow(''),
-    exomphalos:              Joi.string().valid('yes', 'no', '').optional().allow(''),
-    megacystis:              Joi.string().valid('yes', 'no', '').optional().allow(''),
-    placenta:                Joi.string().max(500).optional().allow(''),
-    cordInsertion:           Joi.string().max(500).optional().allow(''),
-}).optional();
-
-const ftUltrasoundSchema = Joi.object({
-    placenta:      Joi.string().max(500).optional().allow(''),
-    heartRate:     Joi.number().integer().min(1).max(300).optional(),
-    umbilicalCord: Joi.string().max(500).optional().allow(''),
-}).optional();
-
-const ftDopplerSchema = Joi.object({
-    utADexPI: Joi.number().min(0).max(10).optional(),
-    utADexRI: Joi.number().min(0).max(1).optional(),
-    utASinPI: Joi.number().min(0).max(10).optional(),
-    utASinRI: Joi.number().min(0).max(1).optional(),
-}).optional();
-
-/**
- * Examination clinical data sub-schema
+ * ST-04: Examination data sub-schema — replaces all legacy ft_* / twin2_* schemas.
+ * All measurement data now lives inside fetuses[].
  */
 const examinationDataSchema = Joi.object({
-    pregnancy_data: pregnancyDataSchema,
-    ultrasound_findings: ultrasoundFindingsSchema,
-    anatomy: anatomySchema,
-    // uzd-twins: Twin 2 fields
-    twin2_ultrasound_findings: ultrasoundFindingsSchema,
-    twin2_anatomy: anatomySchema,
-    // UZPT — First Trimester fields
-    ft_biometry:           ftBiometrySchema,
-    ft_markers:            ftMarkersSchema,
-    ft_ultrasound:         ftUltrasoundSchema,
-    ft_anatomy:            anatomySchema,
-    ft_doppler:            ftDopplerSchema,
-    twin2_ft_biometry:     ftBiometrySchema,
-    twin2_ft_markers:      ftMarkersSchema,
-    twin2_ft_ultrasound:   ftUltrasoundSchema,
-    twin2_ft_anatomy:      anatomySchema,
-    twin2_ft_doppler:      ftDopplerSchema,
-    comments: Joi.string().max(5000).optional().allow('')
+    pregnancyData: Joi.object({
+        lastMenstrualPeriod: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow('')
+            .messages({ 'string.pattern.base': 'LMP must be in YYYY-MM-DD format' }),
+        obstetricHistory: Joi.string().max(500).optional().allow(''),
+        familyHistory:    Joi.string().max(500).optional().allow('')
+    }).optional(),
+    comments: Joi.string().max(5000).optional().allow(''),
+    fetuses: Joi.array().items(fetusSectionSchema).min(1).required()
 }).optional();
 
 /**
  * Examination validation schema
- * TASK-033: examinationType added.
- * TASK-037: patientAgeAtExam added.
+ * ST-04: Removed top-level biometry/doppler/biometry2/doppler2/gestationalAgeFromBiometry* fields.
+ *        All measurement data now lives inside data.fetuses[].
  */
 const examinationSchema = Joi.object({
     mrn: Joi.forbidden()
@@ -398,13 +236,6 @@ const examinationSchema = Joi.object({
             'string.pattern.base': 'Gestational age must be in format "28w 3d" or "28с 3д"'
         }),
     gestationalAgeIsManual: Joi.boolean().optional(),
-    gestationalAgeFromBiometry: Joi.string()
-        .pattern(GA_REGEX)
-        .optional()
-        .allow('')
-        .messages({
-            'string.pattern.base': 'Gestational age from biometry must be in format "28w 3d" or "28с 3д"'
-        }),
     status: Joi.string()
         .valid('draft', 'completed', 'reviewed')
         .required()
@@ -412,19 +243,7 @@ const examinationSchema = Joi.object({
             'any.only': 'Status must be one of: draft, completed, reviewed',
             'any.required': 'Status is required'
         }),
-    examinationType: Joi.string().valid(...EXAM_TYPE_KEYS).optional().allow(''), // FLAG-03, REQ-01
-    biometry: biometrySchema,
-    doppler: dopplerSchema,
-    // uzd-twins: Twin 2 fields
-    biometry2: biometrySchema,
-    doppler2: dopplerSchema,
-    gestationalAgeFromBiometry2: Joi.string()
-        .pattern(GA_REGEX)
-        .optional()
-        .allow('')
-        .messages({
-            'string.pattern.base': 'Gestational age from biometry (Twin 2) must be in format "28w 3d" or "28с 3д"'
-        }),
+    examinationType: Joi.string().valid(...EXAM_TYPE_KEYS).optional().allow(''),
     notes: Joi.string()
         .max(5000)
         .optional()
@@ -440,7 +259,7 @@ const examinationSchema = Joi.object({
             'string.max': 'Findings must not exceed 5000 characters'
         }),
     data: examinationDataSchema,
-    patientAgeAtExam: Joi.number().integer().min(2).max(99).optional() // TASK-037
+    patientAgeAtExam: Joi.number().integer().min(2).max(99).optional()
 });
 
 /**

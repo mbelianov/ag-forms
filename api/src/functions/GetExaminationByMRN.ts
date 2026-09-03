@@ -4,6 +4,7 @@ import { handleError } from '../utils/errorHandler';
 import { successResponse, unauthorizedResponse, notFoundResponse, errorResponse } from '../utils/responseHelpers';
 import { ensureTableExists, getEntity } from '../utils/tableClient';
 import { isValidMRN } from '../utils/mrnGenerator';
+import { deserializeExaminationData } from '../utils/examinationSerializer';
 import { Examination, MRNLookup } from '../types';
 
 const EXAMINATIONS_TABLE = 'Examinations';
@@ -48,22 +49,10 @@ export async function getExaminationByMRN(request: HttpRequest, context: Invocat
             return notFoundResponse('Examination not found');
         }
 
-        // Deserialize biometry/doppler from JSON strings back to objects
+        // ST-03: Deserialize the data blob using the shared utility
         const deserializedExamination = {
             ...examination,
-            biometry: examination.biometry && typeof examination.biometry === 'string'
-                ? JSON.parse(examination.biometry as any)
-                : examination.biometry,
-            doppler: examination.doppler && typeof examination.doppler === 'string'
-                ? JSON.parse(examination.doppler as any)
-                : examination.doppler,
-            // uzd-twins: Twin 2 deserialization
-            biometry2: examination.biometry2 && typeof examination.biometry2 === 'string'
-                ? JSON.parse(examination.biometry2 as any)
-                : examination.biometry2,
-            doppler2: examination.doppler2 && typeof examination.doppler2 === 'string'
-                ? JSON.parse(examination.doppler2 as any)
-                : examination.doppler2,
+            data: deserializeExaminationData(examination.data as any)
         };
 
         context.log('Examination retrieved by MRN:', { mrn, examinationId: examination.examinationId, requestedBy: user.userId });

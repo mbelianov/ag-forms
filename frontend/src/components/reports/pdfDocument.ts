@@ -1,7 +1,6 @@
-﻿import { jsPDF } from 'jspdf';
+import { jsPDF } from 'jspdf';
 import type { ExamPdfViewModel } from '../../services/print.service';
-import { getSectionVisibility, isFirstTrimester, isFtTwins } from '../../constants/examinationTypes';
-import { renderClinicalSections } from './pdfSections';
+import { chunkFetuses, computePairLayout, renderClinicalSectionsPair } from './pdfSections';
 import type { PdfDrawHelpers } from './pdfSections';
 
 // ─── Layout constants (mm on A4: 210 × 297) ──────────────────────────────────
@@ -22,9 +21,6 @@ const C_HEADER_BG = '#f4f4f4';
 
 // ─── Font registration ────────────────────────────────────────────────────────
 
-// NotoSans covers full Latin + Cyrillic with Identity-H (Unicode) encoding.
-// TTFs are served from /public/fonts/, fetched at runtime, and loaded into
-// jsPDF's virtual file system (VFS) as base64 — the only supported path.
 const FONT_ID = 'NotoSans';
 
 async function fetchBase64(url: string): Promise<string> {
@@ -47,7 +43,6 @@ async function registerFonts(doc: jsPDF): Promise<void> {
     fetchBase64(`${root}${base}fonts/NotoSans-Bold.ttf`),
   ]);
 
-  // Register binary data in VFS, then declare the font with Identity-H (Unicode)
   doc.addFileToVFS('NotoSans-Regular.ttf', regB64);
   doc.addFont('NotoSans-Regular.ttf', FONT_ID, 'normal', 'Identity-H');
 
@@ -77,19 +72,16 @@ function setDrawColor(doc: jsPDF, color: string) {
   doc.setDrawColor(...hexColor(color));
 }
 
-/** Draw a thin horizontal rule. */
 function rule(doc: jsPDF, y: number) {
   setDrawColor(doc, C_RULE);
   doc.setLineWidth(0.2);
   doc.line(MARGIN_L, y, MARGIN_R, y);
 }
 
-/** Draw a section heading with a short accent underline, then a light rule extending to the right margin. */
 function sectionHeading(doc: jsPDF, label: string, y: number): number {
   return sectionHeadingAt(doc, label, y, MARGIN_L, MARGIN_R);
 }
 
-/** uzd-twins: Like sectionHeading but positional (xStart to xEnd). */
 function sectionHeadingAt(doc: jsPDF, label: string, y: number, xStart: number, xEnd: number): number {
   doc.setFont(FONT_ID, 'bold');
   doc.setFontSize(8);
@@ -106,11 +98,6 @@ function sectionHeadingAt(doc: jsPDF, label: string, y: number, xStart: number, 
   return y + 5;
 }
 
-/**
- * Render a grid of label/value pairs in N columns.
- * Empty values render as an em dash so field presence stays unconditional.
- * Returns new Y after the block.
- */
 function kvGrid(
   doc: jsPDF,
   pairs: Array<[string, string | undefined]>,
@@ -120,11 +107,6 @@ function kvGrid(
   return kvGridAt(doc, pairs, y, cols, MARGIN_L, COL_W);
 }
 
-/**
- * uzd-twins: Like kvGrid but positional — renders at specific xStart / colW.
- * Used by the two-column twin PDF layout.
- * Returns new Y after the block.
- */
 function kvGridAt(
   doc: jsPDF,
   pairs: Array<[string, string | undefined]>,
@@ -132,15 +114,13 @@ function kvGridAt(
   cols: number,
   xStart: number,
   colW: number,
-  bodyFontSize = 8
+  bodyFontSize = 8,
 ): number {
   const visible = pairs.map(([label, value]) => [label, value || '—'] as [string, string]);
-
   const cW = colW / cols;
   const labelW = cW * 0.43;
   const valueW = cW * 0.54;
 
-  // Track the actual Y bottom of each rendered row
   let rowY = y;
   let col = 0;
   let rowBottom = y;
@@ -148,13 +128,11 @@ function kvGridAt(
   visible.forEach(([label, value]) => {
     const x = xStart + col * cW;
 
-    // Label
     doc.setFont(FONT_ID, 'normal');
     doc.setFontSize(7.5);
     setTextColor(doc, C_MID);
     doc.text(label, x, rowY);
 
-    // Value (may wrap)
     doc.setFont(FONT_ID, 'bold');
     doc.setFontSize(bodyFontSize);
     setTextColor(doc, C_DARK);
@@ -172,15 +150,9 @@ function kvGridAt(
     }
   });
 
-  // col === 0: last row was complete and already flushed; rowY holds the next-row start.
-  // col > 0:  last row was partial and never flushed; add pitch from rowBottom.
-  return col === 0 ? rowY - 3.85/2 : rowBottom + 3.85/2 ;
+  return col === 0 ? rowY - 3.85 / 2 : rowBottom + 3.85 / 2;
 }
 
-/**
- * Render a wrapped paragraph with a bold caption.
- * Returns new Y after the block.
- */
 function textBlock(
   doc: jsPDF,
   caption: string,
@@ -208,48 +180,20 @@ function textBlock(
   return y + 5 + lines.length * 4.5;
 }
 
-// ─── Main document builder ────────────────────────────────────────────────────
+// ─── Common page sections ─────────────────────────────────────────────────────
 
-/**
- * Build an A4 PDF document for one examination.
- * Async because font loading from /public is async.
- * Returns the jsPDF instance — caller decides whether to save or print.
- */
-export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+function drawHeader(doc: jsPDF, vm: ExamPdfViewModel): number {
+  const isFt = vm.examinationType === 'first_trimester';
+  const fetusCount = vm.fetuses.length;
+  const baseTitle = isFt ? 'First Trimester Ultrasound' : 'Prenatal Ultrasound Report';
+  const headerTitle = fetusCount > 1 ? `${baseTitle} (${fetusCount} fetuses)` : baseTitle;
 
-  // Register Unicode fonts before drawing any text
-  await registerFonts(doc);
-
-  const visibility = getSectionVisibility(vm.examinationType);
-  // uzd-twins: detect twins exam type
-  const isTwins = vm.examinationType === 'ultrasound_prenatal_twins';
-  const isFt = isFirstTrimester(vm.examinationType);
-  const isFtTwinsExam = isFtTwins(vm.examinationType);
-  const gaBioDisplay = isTwins
-    ? `${vm.gestationalAgeFromBiometry || '—'} / ${vm.gestationalAgeFromBiometry2 || '—'}`
-    : vm.gestationalAgeFromBiometry;
-  const gaFromBioDisplay = isFtTwinsExam
-    ? `${vm.ftBiometry?.gaFromBio || '—'} / ${vm.twin2FtBiometry?.gaFromBio || '—'}`
-    : vm.ftBiometry?.gaFromBio;
-  // uzd-twins: layout constants for twin two-column layout
-  // A4 usable width: 182 mm; twin column: 88 mm each with 6 mm gutter
-  const TWIN_COL_W = 88;
-  const TWIN_GUTTER = 6;
-  const T1_X = MARGIN_L;                     // 14
-  const T2_X = MARGIN_L + TWIN_COL_W + TWIN_GUTTER; // 108
-  // ── 1. Header bar ────────────────────────────────────────────────────────────
   setFill(doc, C_HEADER_BG);
   doc.rect(0, 0, PAGE_W, 22, 'F');
 
   doc.setFont(FONT_ID, 'bold');
   doc.setFontSize(13);
   setTextColor(doc, C_DARK);
-  const headerTitle = isFtTwinsExam
-    ? 'First Trimester Ultrasound (Twins)'
-    : isFt
-    ? 'First Trimester Ultrasound'
-    : 'Prenatal Ultrasound Report';
   doc.text(headerTitle, MARGIN_L, 10);
 
   doc.setFont(FONT_ID, 'normal');
@@ -258,9 +202,10 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   doc.text(`MRN: ${vm.mrn}`, MARGIN_L, 16);
   doc.text(`Exam Date: ${vm.examDate}`, MARGIN_R, 16, { align: 'right' });
 
-  let y = 26;
+  return 26;
+}
 
-  // ── 2. Patient block ─────────────────────────────────────────────────────────
+function drawPatientBlock(doc: jsPDF, vm: ExamPdfViewModel, y: number): number {
   doc.setFont(FONT_ID, 'bold');
   doc.setFontSize(11);
   setTextColor(doc, C_DARK);
@@ -279,113 +224,92 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   doc.setFont(FONT_ID, 'normal');
   doc.setFontSize(8);
   setTextColor(doc, C_MID);
-
   doc.text(`Patient age at exam: ${vm.patientAgeAtExam !== undefined ? `${vm.patientAgeAtExam} years` : '—'}`, MARGIN_L, y);
   y += 4;
 
-  if (visibility.pregnancyData) {
-    const gaLabel = 'GA (LMP): ';
-    doc.text(gaLabel, MARGIN_L, y);
-    doc.setFont(FONT_ID, 'bold');
-    setTextColor(doc, C_DARK);
-    doc.text(vm.gestationalAge || '—', MARGIN_L + doc.getTextWidth(gaLabel), y);
-    doc.setFont(FONT_ID, 'normal');
-    setTextColor(doc, C_MID);
+  // GA from LMP + GA from Bio + EDD row
+  const gaLabel = 'GA (LMP): ';
+  doc.text(gaLabel, MARGIN_L, y);
+  doc.setFont(FONT_ID, 'bold');
+  setTextColor(doc, C_DARK);
+  doc.text(vm.gestationalAge || '—', MARGIN_L + doc.getTextWidth(gaLabel), y);
+  doc.setFont(FONT_ID, 'normal');
+  setTextColor(doc, C_MID);
 
-    // Sub-Task 5: "GA (Bio): " unified across all exam types.
-    // For FT exams: GA from Bio = GA from CRL at current level of development.
-    const gaBioLabel = '  GA (Bio): ';
-    const gaBioValue = isFt ? (gaFromBioDisplay || '—') : (gaBioDisplay || '—');
-    doc.text(gaBioLabel, MARGIN_L + 42, y);
-    doc.setFont(FONT_ID, 'bold');
-    setTextColor(doc, C_DARK);
-    doc.text(gaBioValue, MARGIN_L + 42 + doc.getTextWidth(gaBioLabel), y);
-    doc.setFont(FONT_ID, 'normal');
-    setTextColor(doc, C_MID);
+  // GA from Bio — derive from first fetus gaFromBiometry
+  const gaBioValues = vm.fetuses.map(f => f.gaFromBiometry).filter(Boolean) as string[];
+  const gaBioDisplay = gaBioValues.length > 0 ? gaBioValues.join(' / ') : undefined;
+  const gaBioLabel = '  GA (Bio): ';
+  doc.text(gaBioLabel, MARGIN_L + 42, y);
+  doc.setFont(FONT_ID, 'bold');
+  setTextColor(doc, C_DARK);
+  doc.text(gaBioDisplay || '—', MARGIN_L + 42 + doc.getTextWidth(gaBioLabel), y);
+  doc.setFont(FONT_ID, 'normal');
+  setTextColor(doc, C_MID);
 
-    doc.setFont(FONT_ID, 'bold');
-    setTextColor(doc, C_ACCENT);
-    doc.setFontSize(8.5);
-    doc.text(`EDD: ${vm.expectedDeliveryDate || '—'}`, MARGIN_R, y, { align: 'right' });
-    doc.setFont(FONT_ID, 'normal');
-    setTextColor(doc, C_MID);
-    doc.setFontSize(8);
+  doc.setFont(FONT_ID, 'bold');
+  setTextColor(doc, C_ACCENT);
+  doc.setFontSize(8.5);
+  doc.text(`EDD: ${vm.expectedDeliveryDate || '—'}`, MARGIN_R, y, { align: 'right' });
+  doc.setFont(FONT_ID, 'normal');
+  setTextColor(doc, C_MID);
+  doc.setFontSize(8);
+  y += 4;
 
-    y += 4;
-  }
+  return y;
+}
 
+function drawPregnancyData(doc: jsPDF, vm: ExamPdfViewModel, y: number): number {
   rule(doc, y);
   y += 5;
+  y = sectionHeading(doc, 'Pregnancy Data', y);
 
-  // ── Pregnancy Data ───────────────────────────────────────────────────────────
-  if (visibility.pregnancyData) {
-    y = sectionHeading(doc, 'Pregnancy Data', y);
+  const COL_HALF = COL_W / 2;
+  const LABEL_SIZE = 7.5;
+  const VALUE_SIZE = 8;
+  const xL = MARGIN_L;
+  const xR = MARGIN_L + COL_HALF;
 
-    // 3-row x 2-column manual layout per template spec
-    const COL_HALF = COL_W / 2; // 91 mm per column
-    const LABEL_SIZE = 7.5;
-    const VALUE_SIZE = 8;
-    const xL = MARGIN_L;           // left column x
-    const xR = MARGIN_L + COL_HALF; // right column x
-
-    // Helper: draw inline label+value on a single line
-    const drawInlineCell = (x: number, rowY: number, label: string, value: string | undefined, isAccent = false) => {
-      doc.setFont(FONT_ID, 'normal');
-      doc.setFontSize(LABEL_SIZE);
-      setTextColor(doc, C_MID);
-      doc.text(label, x, rowY);
-      doc.setFont(FONT_ID, 'bold');
-      doc.setFontSize(VALUE_SIZE);
-      if (isAccent) {
-        setTextColor(doc, C_ACCENT);
-      } else {
-        setTextColor(doc, C_DARK);
-      }
-      doc.text(value || '\u2014', x + doc.getTextWidth(label), rowY);
-    };
-
-    // Helper: draw stacked label+value (label on rowY, value on rowY+3.5)
-    const drawCell = (x: number, rowY: number, label: string, value: string | undefined, isAccent = false) => {
-      doc.setFont(FONT_ID, 'normal');
-      doc.setFontSize(LABEL_SIZE);
-      setTextColor(doc, C_MID);
-      doc.text(label, x, rowY);
-      doc.setFont(FONT_ID, 'bold');
-      doc.setFontSize(VALUE_SIZE);
-      if (isAccent) {
-        setTextColor(doc, C_ACCENT);
-      } else {
-        setTextColor(doc, C_DARK);
-      }
-      doc.text(value || '\u2014', x, rowY + 3.5);
-    };
-
-    // Row 1: LMP Date | GA from LMP (inline, 5 mm pitch)
-    drawInlineCell(xL, y, 'LMP Date: ',    vm.pregnancy.lmp);
-    drawInlineCell(xR, y, 'GA from LMP: ', vm.gestationalAge);
-    y += 5;
-
-    // Row 2: Expected Delivery Date | GA from CRL / GA from Bio (inline, 5 mm pitch, no bg)
-    drawInlineCell(xL, y, 'Expected Delivery Date: ', vm.expectedDeliveryDate, true);
-    // Sub-Task 5: "GA from Bio: " unified across all exam types.
-    drawInlineCell(xR, y, 'GA from Bio: ', isFt ? (gaFromBioDisplay || '—') : (gaBioDisplay || '—'));
-    y += 5;
-
-    // Row 3: Obstetric History | Family History (stacked, 8 mm pitch)
-    drawCell(xL, y, 'Obstetric History', vm.pregnancy.obstetricHistory);
-    drawCell(xR, y, 'Family History',    vm.pregnancy.familyHistory);
-    y += 3.5;
-    y += 1;
-  }
-
-  // ── 3–7. Per-fetus sections ───────────────────────────────────────────────────
-  const pdfHelpers: PdfDrawHelpers = {
-    rule, sectionHeading, sectionHeadingAt, kvGrid, kvGridAt,
-    TWIN_COL_W, TWIN_GUTTER, T1_X, T2_X, FONT_ID,
+  const drawInlineCell = (x: number, rowY: number, label: string, value: string | undefined, isAccent = false) => {
+    doc.setFont(FONT_ID, 'normal');
+    doc.setFontSize(LABEL_SIZE);
+    setTextColor(doc, C_MID);
+    doc.text(label, x, rowY);
+    doc.setFont(FONT_ID, 'bold');
+    doc.setFontSize(VALUE_SIZE);
+    setTextColor(doc, isAccent ? C_ACCENT : C_DARK);
+    doc.text(value || '\u2014', x + doc.getTextWidth(label), rowY);
   };
-  y = renderClinicalSections(doc, vm, y, visibility, isTwins, pdfHelpers, isFt, isFtTwinsExam);
 
-  // ── 8. Clinical Information — always rendered (matches UI behaviour) ──────────
+  const drawCell = (x: number, rowY: number, label: string, value: string | undefined) => {
+    doc.setFont(FONT_ID, 'normal');
+    doc.setFontSize(LABEL_SIZE);
+    setTextColor(doc, C_MID);
+    doc.text(label, x, rowY);
+    doc.setFont(FONT_ID, 'bold');
+    doc.setFontSize(VALUE_SIZE);
+    setTextColor(doc, C_DARK);
+    doc.text(value || '\u2014', x, rowY + 3.5);
+  };
+
+  drawInlineCell(xL, y, 'LMP Date: ', vm.pregnancy.lmp);
+  drawInlineCell(xR, y, 'GA from LMP: ', vm.gestationalAge);
+  y += 5;
+
+  drawInlineCell(xL, y, 'Expected Delivery Date: ', vm.expectedDeliveryDate, true);
+  const gaBioValues = vm.fetuses.map(f => f.gaFromBiometry).filter(Boolean) as string[];
+  drawInlineCell(xR, y, 'GA from Bio: ', gaBioValues.length > 0 ? gaBioValues.join(' / ') : undefined);
+  y += 5;
+
+  drawCell(xL, y, 'Obstetric History', vm.pregnancy.obstetricHistory);
+  drawCell(xR, y, 'Family History', vm.pregnancy.familyHistory);
+  y += 3.5;
+  y += 1;
+
+  return y;
+}
+
+function drawClinicalInformation(doc: jsPDF, vm: ExamPdfViewModel, y: number): number {
   rule(doc, y);
   y += 4;
   y = sectionHeading(doc, 'Clinical Information', y);
@@ -395,28 +319,10 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   y += 2;
   y = textBlock(doc, 'Notes', vm.notes ?? '—', y, 10, 6);
   y += 2;
+  return y;
+}
 
-  // ── 9. Doctor Signature ──────────────────────────────────────────────────────
-  const SIG_MAX = PAGE_H - 24.5;
-  const sigYIdeal = Math.max(y + 6, PAGE_H - 28);
-  let sigY = Math.min(sigYIdeal, SIG_MAX);
-  let totalPages = 1;
-  if (sigYIdeal > SIG_MAX) {
-    // Content overflows page 1 — draw page-1 footer before the page break.
-    const p1FooterY = PAGE_H - 8;
-    rule(doc, p1FooterY - 3);
-    doc.setFont(FONT_ID, 'normal');
-    doc.setFontSize(6.5);
-    setTextColor(doc, C_MID);
-    doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, MARGIN_L, p1FooterY);
-    doc.text('CONFIDENTIAL — For clinical use only', PAGE_W / 2, p1FooterY, { align: 'center' });
-    doc.text('Page 1 of 2', MARGIN_R, p1FooterY, { align: 'right' });
-
-    doc.addPage();
-    sigY = 30;
-    totalPages = 2;
-  }
-
+function drawSignatureLine(doc: jsPDF, sigY: number) {
   rule(doc, sigY);
 
   doc.setFont(FONT_ID, 'bold');
@@ -434,8 +340,9 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   doc.setFontSize(7);
   setTextColor(doc, C_MID);
   doc.text('Signature', MARGIN_L + 40, sigY + 11.5);
+}
 
-  // ── 10. Footer ───────────────────────────────────────────────────────────────
+function drawFooter(doc: jsPDF, pageNum: number, totalPages: number) {
   const FOOTER_Y = PAGE_H - 8;
   rule(doc, FOOTER_Y - 3);
 
@@ -444,7 +351,67 @@ export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> 
   setTextColor(doc, C_MID);
   doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, MARGIN_L, FOOTER_Y);
   doc.text('CONFIDENTIAL — For clinical use only', PAGE_W / 2, FOOTER_Y, { align: 'center' });
-  doc.text(totalPages === 1 ? 'Page 1 of 1' : 'Page 2 of 2', MARGIN_R, FOOTER_Y, { align: 'right' });
+  doc.text(`Page ${pageNum} of ${totalPages}`, MARGIN_R, FOOTER_Y, { align: 'right' });
+}
+
+// ─── Main document builder ────────────────────────────────────────────────────
+
+export async function buildExaminationPDF(vm: ExamPdfViewModel): Promise<jsPDF> {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+
+  await registerFonts(doc);
+
+  // Chunk fetuses into pairs (max 2 per page)
+  const pairs = chunkFetuses(vm.fetuses.length > 0 ? vm.fetuses : [{ index: 0, biometry: [], doppler: [] }]);
+  const totalPages = pairs.length + 1; // 1 page per pair + clinical info page (or all on 1 if it fits)
+
+  const pdfHelpers: PdfDrawHelpers = {
+    rule, sectionHeading, sectionHeadingAt, kvGrid, kvGridAt, FONT_ID,
+  };
+
+  // ── Page 1: Header + Patient + Pregnancy Data + Pair 0 ────────────────────────
+  let y = drawHeader(doc, vm);
+  y = drawPatientBlock(doc, vm, y);
+  y = drawPregnancyData(doc, vm, y);
+
+  // Render first pair of fetuses on page 1
+  const layout0 = computePairLayout(pairs[0].length);
+  y = renderClinicalSectionsPair(doc, vm, pairs[0], layout0, y, pdfHelpers);
+
+  // ── Additional pages for more fetus pairs ─────────────────────────────────────
+  let currentPage = 1;
+  for (let pi = 1; pi < pairs.length; pi++) {
+    // Footer for current page before adding a new one
+    drawFooter(doc, currentPage, totalPages);
+    doc.addPage();
+    currentPage++;
+
+    // Repeat header + patient block on each subsequent page
+    y = drawHeader(doc, vm);
+    y = drawPatientBlock(doc, vm, y);
+    rule(doc, y);
+    y += 5;
+
+    const layoutI = computePairLayout(pairs[pi].length);
+    y = renderClinicalSectionsPair(doc, vm, pairs[pi], layoutI, y, pdfHelpers);
+  }
+
+  // ── Clinical Information + Signature ─────────────────────────────────────────
+  y = drawClinicalInformation(doc, vm, y);
+
+  const SIG_MAX = PAGE_H - 24.5;
+  const sigYIdeal = Math.max(y + 6, PAGE_H - 28);
+  let sigY = Math.min(sigYIdeal, SIG_MAX);
+
+  if (sigYIdeal > SIG_MAX) {
+    drawFooter(doc, currentPage, totalPages + 1);
+    doc.addPage();
+    currentPage++;
+    sigY = 30;
+  }
+
+  drawSignatureLine(doc, sigY);
+  drawFooter(doc, currentPage, currentPage);
 
   return doc;
 }

@@ -3,6 +3,7 @@ import { requireAuth } from '../utils/authMiddleware';
 import { handleError } from '../utils/errorHandler';
 import { successResponse, unauthorizedResponse, errorResponse } from '../utils/responseHelpers';
 import { getEntity, ensureTableExists } from '../utils/tableClient';
+import { deserializeExaminationData } from '../utils/examinationSerializer';
 import { Examination } from '../types';
 
 const EXAMINATIONS_TABLE = 'Examinations';
@@ -39,25 +40,10 @@ export async function getExamination(request: HttpRequest, context: InvocationCo
 
         context.log('Examination retrieved:', { examinationId });
 
-        // Deserialize biometry/doppler/data from JSON strings back to objects
+        // ST-03: Deserialize the data blob using the shared utility
         const deserializedExamination = {
             ...examination,
-            biometry: examination.biometry && typeof examination.biometry === 'string'
-                ? JSON.parse(examination.biometry as any)
-                : examination.biometry,
-            doppler: examination.doppler && typeof examination.doppler === 'string'
-                ? JSON.parse(examination.doppler as any)
-                : examination.doppler,
-            data: examination.data && typeof examination.data === 'string'
-                ? JSON.parse(examination.data as any)
-                : examination.data,
-            // uzd-twins: Twin 2 deserialization
-            biometry2: examination.biometry2 && typeof examination.biometry2 === 'string'
-                ? JSON.parse(examination.biometry2 as any)
-                : examination.biometry2,
-            doppler2: examination.doppler2 && typeof examination.doppler2 === 'string'
-                ? JSON.parse(examination.doppler2 as any)
-                : examination.doppler2,
+            data: deserializeExaminationData(examination.data as any)
         };
 
         return successResponse({

@@ -333,3 +333,19 @@ For an FT twins exam, the same blob also carries `twin2_ft_biometry`, `twin2_ft_
 
 - **Priority:** P5 · Informational — no action required; document for developer awareness
 - **Status:** Documented — no fix planned; layout is consistent and intentional
+
+---
+
+## KI-011 · Marker definitions in `pdfSections.ts` and `viewModelBuilders.ts` are not driven by `EXAM_TYPE_CONFIG`
+
+- **Files:**
+  - `frontend/src/components/reports/pdfSections.ts` (lines 281–290) — hardcoded `[label, value]` pairs for all 10 first-trimester markers
+  - `frontend/src/services/viewModelBuilders.ts` (lines 167–178) — hardcoded per-key reads from `fetus.markers` for all 10 markers
+- **Symptom:** None — purely a maintenance debt. No user-visible impact.
+- **Root cause:** `EXAM_TYPE_CONFIG['first_trimester'].markerTypes` is now the single source of truth for marker keys and labels (added during V2 refactor). The form (`ExaminationForm.tsx`) already iterates `examConfig.markerTypes` config-driven. However `pdfSections.ts` and `viewModelBuilders.ts` were not updated — they still contain their own hardcoded inline lists that duplicate the same 10 keys and labels.
+- **Risk:** If a marker is added, removed, or renamed in `EXAM_TYPE_CONFIG`, the form will update correctly but the PDF and detail-page view model will silently diverge — the new marker will appear in the form but not in the PDF or detail page, and vice versa for removals.
+- **Fix:**
+  - In `viewModelBuilders.ts`: import `EXAM_TYPE_CONFIG` and iterate `EXAM_TYPE_CONFIG['first_trimester'].markerTypes` to build the `result.markers` object dynamically instead of hardcoding each key.
+  - In `pdfSections.ts`: import `EXAM_TYPE_CONFIG` and iterate `markerTypes` to build the label/value rows for the markers PDF block instead of the hardcoded `[label, value]` array.
+- **Priority:** P3 · Low — no current user impact; becomes a real bug the moment any marker definition changes
+- **Status:** Deferred — to be handled after current V2 stabilisation sprint

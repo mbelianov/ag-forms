@@ -4,6 +4,7 @@ import { requireAuth } from '../utils/authMiddleware';
 import { handleError } from '../utils/errorHandler';
 import { successResponse, unauthorizedResponse, errorResponse } from '../utils/responseHelpers';
 import { getTableClient, ensureTableExists } from '../utils/tableClient';
+import { deserializeExaminationData } from '../utils/examinationSerializer';
 import { Examination } from '../types';
 import { EXAM_TYPE_KEYS } from '../constants/examinationTypes';
 
@@ -94,22 +95,10 @@ export async function getExaminations(request: HttpRequest, context: InvocationC
         for await (const page of entitiesIter) {
             for (const entity of page) {
                 const exam = entity as any;
-                // Deserialize biometry/doppler from JSON strings
+                // ST-03: Deserialize the data blob using the shared utility
                 examinations.push({
                     ...exam,
-                    biometry: exam.biometry && typeof exam.biometry === 'string'
-                        ? JSON.parse(exam.biometry)
-                        : exam.biometry,
-                    doppler: exam.doppler && typeof exam.doppler === 'string'
-                        ? JSON.parse(exam.doppler)
-                        : exam.doppler,
-                    // uzd-twins: Twin 2 deserialization
-                    biometry2: exam.biometry2 && typeof exam.biometry2 === 'string'
-                        ? JSON.parse(exam.biometry2)
-                        : exam.biometry2,
-                    doppler2: exam.doppler2 && typeof exam.doppler2 === 'string'
-                        ? JSON.parse(exam.doppler2)
-                        : exam.doppler2
+                    data: deserializeExaminationData(exam.data)
                 } as Examination);
             }
             nextContinuationToken = page.continuationToken;

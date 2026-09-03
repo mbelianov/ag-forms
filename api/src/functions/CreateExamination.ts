@@ -8,7 +8,8 @@ import { validateExamination } from '../utils/validation';
 import { logExaminationCreated } from '../utils/auditService';
 import { adjustCounter } from '../utils/counterService';
 import { generateMRN } from '../utils/mrnGenerator';
-import { Examination, Patient, MRNLookup } from '../types';
+import { serializeExaminationData } from '../utils/examinationSerializer';
+import { Examination, Patient, MRNLookup, ExaminationCreateRequest } from '../types';
 
 const EXAMINATIONS_TABLE = 'Examinations';
 const PATIENTS_TABLE = 'Patients';
@@ -25,39 +26,17 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             return forbiddenResponse('Doctor or admin role required');
         }
 
-        interface ExaminationCreateBody {
-            patientId?: string;
-            examDate?: string;
-            gestationalAge?: string;
-            gestationalAgeIsManual?: boolean;
-            gestationalAgeFromBiometry?: string;
-            biometry?: any;
-            doppler?: any;
-            // uzd-twins: Twin 2 fields
-            biometry2?: any;
-            doppler2?: any;
-            gestationalAgeFromBiometry2?: string;
-            findings?: string;
-            notes?: string;
-            status?: string;
-            data?: any;
-            examinationType?: string;
-            patientAgeAtExam?: number;
-        }
-        const body = await request.json() as ExaminationCreateBody;
-        const { patientId, examDate, gestationalAge, gestationalAgeIsManual, gestationalAgeFromBiometry, biometry, doppler, biometry2, doppler2, gestationalAgeFromBiometry2, findings, notes, status, data, examinationType, patientAgeAtExam } = body;
+        const body = await request.json() as ExaminationCreateRequest;
+        const {
+            patientId, examDate, gestationalAge, gestationalAgeIsManual,
+            findings, notes, status, data, examinationType, patientAgeAtExam
+        } = body;
 
         const validation = validateExamination({
             patientId,
             examDate,
             gestationalAge,
             gestationalAgeIsManual,
-            gestationalAgeFromBiometry,
-            biometry,
-            doppler,
-            biometry2,
-            doppler2,
-            gestationalAgeFromBiometry2,
             findings,
             notes,
             status,
@@ -99,19 +78,15 @@ export async function createExamination(request: HttpRequest, context: Invocatio
         
         // Calculate reverse ticks for descending chronological order
         const reverseTicks = 9999999999999 - Date.now();
+        const primaryRowKey = `${reverseTicks}_${examinationId}`;
 
-        // Serialize nested objects to JSON strings for Azure Table Storage
-        const biometryStr = biometry ? JSON.stringify(biometry) : undefined;
-        const dopplerStr = doppler ? JSON.stringify(doppler) : undefined;
-        const dataStr = data ? JSON.stringify(data) : undefined;
-        // uzd-twins: Twin 2 serialization
-        const biometry2Str = biometry2 ? JSON.stringify(biometry2) : undefined;
-        const doppler2Str = doppler2 ? JSON.stringify(doppler2) : undefined;
+        // ST-03: Serialize the entire data blob in one call — no per-field serialization
+        const dataStr = serializeExaminationData(data);
 
         // Create primary examination entity (for patient's exam list)
         const primaryExamEntity: Examination & { updatedBy: string; patientNameLower: string } = {
             partitionKey: `PATIENT_${patientId}`,
-            rowKey: `${reverseTicks}_${examinationId}`,
+            rowKey: primaryRowKey,
             examinationId,
             mrn,
             patientId,
@@ -120,15 +95,8 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             examDate,
             gestationalAge: gestationalAge || undefined,
             gestationalAgeIsManual: gestationalAgeIsManual || undefined,
-            gestationalAgeFromBiometry: gestationalAgeFromBiometry || undefined,
             status: status as 'completed' | 'draft' | 'reviewed',
             examinationType: examinationType || undefined,
-            biometry: biometryStr as any,
-            doppler: dopplerStr as any,
-            // uzd-twins: Twin 2 fields
-            biometry2: biometry2Str as any,
-            doppler2: doppler2Str as any,
-            gestationalAgeFromBiometry2: gestationalAgeFromBiometry2 || undefined,
             findings: findings || undefined,
             notes: notes || undefined,
             data: dataStr as any,
@@ -142,6 +110,7 @@ export async function createExamination(request: HttpRequest, context: Invocatio
         };
 
         // Create lookup entity (for direct access by examination ID)
+        // ST-02: Store primaryRowKey on the lookup entity to enable O(1) update without partition scan
         const lookupExamEntity: Examination & { updatedBy: string; patientNameLower: string } = {
             partitionKey: 'EXAM',
             rowKey: examinationId,
@@ -153,19 +122,13 @@ export async function createExamination(request: HttpRequest, context: Invocatio
             examDate,
             gestationalAge: gestationalAge || undefined,
             gestationalAgeIsManual: gestationalAgeIsManual || undefined,
-            gestationalAgeFromBiometry: gestationalAgeFromBiometry || undefined,
             status: status as 'completed' | 'draft' | 'reviewed',
             examinationType: examinationType || undefined,
-            biometry: biometryStr as any,
-            doppler: dopplerStr as any,
-            // uzd-twins: Twin 2 fields
-            biometry2: biometry2Str as any,
-            doppler2: doppler2Str as any,
-            gestationalAgeFromBiometry2: gestationalAgeFromBiometry2 || undefined,
             findings: findings || undefined,
             notes: notes || undefined,
             data: dataStr as any,
             patientAgeAtExam: resolvedPatientAge,
+            primaryRowKey, // ST-02: enables O(1) primary entity lookup on update
             createdAt: now,
             updatedAt: now,
             createdBy: user.userId,

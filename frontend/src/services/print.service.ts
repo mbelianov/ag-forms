@@ -1,155 +1,73 @@
 import type { Examination } from '../types';
 import { buildViewModel } from './viewModelBuilders';
 
-// ─── View model ──────────────────────────────────────────────────────────────
+// ─── Observable PDF entry ─────────────────────────────────────────────────────
 
-export interface BiometryViewModel {
-  bpd?: string;
-  hc?: string;
-  ac?: string;
-  fl?: string;
-  efw?: string;
-  ofd?: string;
-  vp?: string;
-  tcd?: string;
-  cm?: string;
-  nuchalFold?: string;
-  nb?: string;
-  apad?: string;
-  tad?: string;
-  la?: string;
-  lc?: string;
-  // Percentile strings for the row-by-row biometry renderer
-  bpdPct?: string;
-  hcPct?: string;
-  acPct?: string;
-  flPct?: string;
-  efwPct?: string;
-  // Sub-Task 4: Expanded percentile set (OFD, TAD, APAD — NEW in v2)
-  ofdPct?: string;
-  tadPct?: string;
-  apadPct?: string;
-  tcdPct?: string;
-  // Sub-Task 4: Per-measurement GA strings (all string | undefined)
-  bpdGa?: string;
-  ofdGa?: string;
-  hcGa?: string;
-  tadGa?: string;
-  apadGa?: string;
-  acGa?: string;
-  flGa?: string;
-  efwGa?: string;
-  tcdGa?: string;
+/** A single biometry or doppler measurement formatted for PDF rendering. */
+export interface ObservablePdfEntry {
+  type: string;          // canonical key: "bpd", "hc", "pi", etc.
+  label: string;         // display label with unit: "BPD (mm)", "CMA PI", etc.
+  value: string;         // formatted value string: "45.50 mm", "0.75", "—"
+  percentile?: string;   // "45 %-ile" or "45 %-ile †" or undefined
+  ga?: string;           // "28w 3d" or "28w 3d †" or undefined
 }
 
-export interface DopplerViewModel {
-  pi?: string;
-  ri?: string;
-  utADexPI?: string;
-  utADexRI?: string;
-  utASinPI?: string;
-  utASinRI?: string;
-  cma?: string;
-  psv?: string;
-  cpr?: string;
-  ducVen?: string;
+// ─── Per-fetus view model ─────────────────────────────────────────────────────
+
+export interface FetusPdfViewModel {
+  index: number;          // 0-based fetus index
+  biometry: ObservablePdfEntry[];
+  doppler: ObservablePdfEntry[];
+  ultrasound?: {
+    presentation?: string;
+    gender?: string;
+    heartRate?: string;
+    fetalMovement?: string;
+    placenta?: string;
+    umbilicalCord?: string;
+  };
+  anatomy?: {
+    head?: string;
+    brain?: string;
+    heart?: string;
+    abdomen?: string;
+    kidneys?: string;
+    limbs?: string;
+    skeleton?: string;
+    face?: string;
+    neckSkin?: string;
+    spine?: string;
+    thorax?: string;
+  };
+  markers?: {
+    arrhythmia?: string;
+    tricuspidRegurgitation?: string;
+    abnormalDvFlow?: string;
+    echogenicCardiacFocus?: string;
+    singleUmbilicalArtery?: string;
+    choroidPlexusCysts?: string;
+    exomphalos?: string;
+    megacystis?: string;
+    placenta?: string;
+    cordInsertion?: string;
+  };
+  gaFromBiometry?: string;   // "28w 3d" or "28w 3d †" for manual
 }
 
-export interface UltrasoundViewModel {
-  presentation?: string;
-  gender?: string;
-  heartRate?: string;
-  fetalMovement?: string;
-  placenta?: string;
-  umbilicalCord?: string;
-}
-
-export interface AnatomyViewModel {
-  head?: string;
-  brain?: string;
-  heart?: string;
-  abdomen?: string;
-  kidneys?: string;
-  limbs?: string;
-  skeleton?: string;
-  face?: string;
-  neckSkin?: string;
-  spine?: string;
-  thorax?: string;
-}
-
-export interface FtBiometryViewModel {
-  crl?: string;
-  gaFromCrl?: string;
-  gaFromBio?: string;
-  nt?: string;
-  nb?: string;
-  puls?: string;
-  // Sub-Task 4: NT and NB per-measurement GA strings
-  gaFromNt?: string;
-  gaFromNb?: string;
-}
-
-export interface FtMarkersViewModel {
-  arrhythmia?: string;
-  tricuspidRegurgitation?: string;
-  abnormalDvFlow?: string;
-  echogenicCardiacFocus?: string;
-  singleUmbilicalArtery?: string;
-  choroidPlexusCysts?: string;
-  exomphalos?: string;
-  megacystis?: string;
-  placenta?: string;
-  cordInsertion?: string;
-}
-
-export interface FtUltrasoundViewModel {
-  placenta?: string;
-  heartRate?: string;
-  umbilicalCord?: string;
-}
-
-export interface FtDopplerViewModel {
-  utADexPI?: string;
-  utADexRI?: string;
-  utASinPI?: string;
-  utASinRI?: string;
-}
+// ─── Top-level exam view model ────────────────────────────────────────────────
 
 export interface ExamPdfViewModel {
   patientName: string;
   mrn: string;
   examDate: string;
   status: string;
-  examinationType?: string;        // TASK-033
-  patientAgeAtExam?: number;       // TASK-037
+  examinationType?: string;
+  patientAgeAtExam?: number;
 
-  gestationalAge?: string;
-  gestationalAgeFromBiometry?: string;
+  gestationalAge?: string;         // GA from LMP (with optional " †")
   expectedDeliveryDate?: string;
 
-  // uzd-twins: T2 blocks (absent for single-fetus exams)
-  gestationalAgeFromBiometry2?: string;
-  biometry2?: BiometryViewModel;
-  doppler2?: DopplerViewModel;
-  ultrasound2?: UltrasoundViewModel;
-  anatomy2?: AnatomyViewModel;
-
-  // UZPT — FT blocks
-  ftBiometry?: FtBiometryViewModel;
-  ftMarkers?: FtMarkersViewModel;
-  ftUltrasound?: FtUltrasoundViewModel;
-  ftAnatomy?: AnatomyViewModel;
-  ftDoppler?: FtDopplerViewModel;
-  twin2FtBiometry?: FtBiometryViewModel;
-  twin2FtMarkers?: FtMarkersViewModel;
-  twin2FtUltrasound?: FtUltrasoundViewModel;
-  twin2FtAnatomy?: AnatomyViewModel;
-  twin2FtDoppler?: FtDopplerViewModel;
-
-  biometry: BiometryViewModel;
-
-  doppler: DopplerViewModel;
+  fetuses: FetusPdfViewModel[];    // one per fetus
 
   pregnancy: {
     lmp?: string;
@@ -157,12 +75,8 @@ export interface ExamPdfViewModel {
     familyHistory?: string;
   };
 
-  ultrasound: UltrasoundViewModel;
-
-  anatomy: AnatomyViewModel;
-
   findings?: string;
-  notes?: string;
+  notes?: string;         // citations + static dagger footnote
   comments?: string;
   createdBy: string;
   createdAt: string;
@@ -198,7 +112,6 @@ class PrintService {
     const url = URL.createObjectURL(blob);
     const win = window.open(url);
     if (!win) {
-      // Fallback: let jsPDF open it via data URI
       doc.output('dataurlnewwindow');
     }
     setTimeout(() => URL.revokeObjectURL(url), 15_000);

@@ -21,10 +21,9 @@ import EmailReportButton from '../components/reports/EmailReportButton';
 import { useAuth } from '../contexts/AuthContext';
 import { useAutoNotification } from '../utils/useAutoNotification';
 import { formatDateTime, formatPlainDate } from '../utils/formatters';
-import { getExamTypeLabel, getSectionVisibility, isFirstTrimester, isFtTwins } from '../constants/examinationTypes';
+import { getExamTypeLabel } from '../constants/examinationTypes';
 import type { Examination } from '../types';
 import ExaminationSections from '../components/ExaminationSections';
-import { AutoCalcDot } from '../components/AutoCalcDot';
 
 // Sub-Task 1: Tile section title style — ALL CAPS, 0.875rem, weight 600, #161616
 const tileTitleStyle: React.CSSProperties = {
@@ -144,25 +143,26 @@ export default function ExaminationDetailPage() {
     );
   }
 
-  // ST-01: Derive exam type label for heading and breadcrumb
-  const examTypeLabel = examination.examinationType
-    ? (getExamTypeLabel(examination.examinationType) !== examination.examinationType
-        ? getExamTypeLabel(examination.examinationType)
-        : 'Examination')
-    : 'Examination';
+  // ST-07: Derive exam type label + fetus count composite
+  const fetusCount = examination.data?.fetuses?.length ?? 0;
+  const examTypeLabel = getExamTypeLabel(examination.examinationType ?? 'prenatal');
+  const fetusCountLabel = fetusCount > 1 ? ` — ${fetusCount} fetuses` : '';
+  const compositeTypeLabel = `${examTypeLabel}${fetusCountLabel}`;
 
-  // Derived values — sourced from stored data (no client-side percentile recomputation per KI-009)
-  const lmp = examination.data?.pregnancy_data?.last_menstrual_period;
+  // Derived values — sourced from stored data
+  const lmp = examination.data?.pregnancyData?.lastMenstrualPeriod;
   const edd = lmp ? calcEDD(lmp) : undefined;
 
-  // Type-driven section visibility
-  const isFt = isFirstTrimester(examination.examinationType);
-  const isFtTwinsExam = isFtTwins(examination.examinationType);
-  const visibility = getSectionVisibility(examination.examinationType);
-
-  // uzd-twins: detect twins exam type
-  const isTwins = examination.examinationType === 'ultrasound_prenatal_twins';
-
+  // GA from Bio — read from first fetus (or all fetuses if multiple)
+  const gaFromBioValues = (examination.data?.fetuses ?? [])
+    .map(f => f.gaFromBiometry?.value ?? '')
+    .filter(Boolean);
+  const gaFromBioDisplay = gaFromBioValues.length > 0
+    ? gaFromBioValues.join(' / ')
+    : '—';
+  const gaFromBioIsManual = (examination.data?.fetuses ?? []).some(
+    f => f.gaFromBiometry?.isManual
+  );
 
   const fieldBlock = (label: string, value: React.ReactNode, labelAdornment?: React.ReactNode) => (
     <div>
@@ -180,7 +180,7 @@ export default function ExaminationDetailPage() {
         <BreadcrumbItem href="/dashboard">Home</BreadcrumbItem>
         <BreadcrumbItem href="/examinations">Exams</BreadcrumbItem>
         <BreadcrumbItem isCurrentPage>
-          {examination.patientName} — {examTypeLabel} — {formatPlainDate(examination.examDate)}
+          {examination.patientName} — {compositeTypeLabel} — {formatPlainDate(examination.examDate)}
         </BreadcrumbItem>
       </Breadcrumb>
 
@@ -206,7 +206,7 @@ export default function ExaminationDetailPage() {
 
         {/* Header with actions */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-          <h1>{examTypeLabel} Details</h1>
+          <h1>{compositeTypeLabel} Details</h1>
           <Stack orientation="horizontal" gap={4} style={{ flexWrap: 'wrap' }}>
             <Button
               kind="tertiary"
@@ -252,7 +252,7 @@ export default function ExaminationDetailPage() {
           </Stack>
         </div>
 
-        {/* Sub-Task 2: Status Bar — three-column grid: Date | MRN | Status */}
+        {/* Status Bar — three-column grid: Date | MRN | Status */}
         <Tile style={{ backgroundColor: '#f4f4f4', padding: '1.5rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', alignItems: 'start' }}>
             {/* Cell 1: Examination Date + Type */}
@@ -265,7 +265,7 @@ export default function ExaminationDetailPage() {
               </div>
               {examination.examinationType && (
                 <div style={{ fontSize: '0.875rem', color: '#525252', marginTop: '0.25rem' }}>
-                  Type: {getExamTypeLabel(examination.examinationType)}
+                  Type: {compositeTypeLabel}
                 </div>
               )}
             </div>
@@ -284,7 +284,7 @@ export default function ExaminationDetailPage() {
           </div>
         </Tile>
 
-        {/* Sub-Task 4: Tile 2 — Patient Information */}
+        {/* Tile 2 — Patient Information */}
         <Tile>
           <div style={tileTitleStyle}>Patient Information</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
@@ -298,75 +298,52 @@ export default function ExaminationDetailPage() {
                 {examination.patientName}
               </Link>
             )}
-            {/* Sub-Task 4: Label changed from "Patient Age at Exam" to "Age at Examination" */}
             {fieldBlock('Age at Examination', examination.patientAgeAtExam !== undefined ? `${examination.patientAgeAtExam} years` : '—')}
           </div>
         </Tile>
 
-        {/* Sub-Task 3: Tile 3 — Pregnancy Data restructured */}
-        {visibility.pregnancyData && (
-          <Tile>
-            <div style={tileTitleStyle}>Pregnancy Data</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', textAlign: 'left' }}>
-              {/* Row 1: LMP Date | GA from LMP */}
-              {fieldBlock('LMP Date', lmp ? formatPlainDate(lmp) : '—')}
-              {fieldBlock('GA from LMP',
-                <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  {examination.gestationalAge || '—'}
-                  {examination.gestationalAgeIsManual && <AutoCalcDot size={5} />}
-                </span>
-              )}
-              {/* Row 2: Expected Delivery Date (highlighted) | GA from Bio (all exam types) */}
-              <div style={{ backgroundColor: '#e8f1ff', padding: '0.5rem', borderRadius: '2px', textAlign: 'left' }}>
-                <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem', textAlign: 'left' }}>
-                  Expected Delivery Date
-                </div>
-                <div style={{ fontSize: '1rem', fontWeight: 600, color: '#0f62fe', textAlign: 'left' }}>
-                  {edd || '—'}
-                </div>
-              </div>
-              {/* KI-009: "GA from Bio" — for FT exams, prefers stored gaFromBio (fallback to gaFromCrl). */}
-              {fieldBlock(
-                'GA from Bio',
-                <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  {isFt
-                    ? (isFtTwinsExam
-                        ? `${examination.data?.ft_biometry?.gaFromBio || examination.data?.ft_biometry?.gaFromCrl || '—'} / ${examination.data?.twin2_ft_biometry?.gaFromBio || examination.data?.twin2_ft_biometry?.gaFromCrl || '—'}`
-                        : examination.data?.ft_biometry?.gaFromBio || examination.data?.ft_biometry?.gaFromCrl || '—')
-                    : (isTwins
-                        ? `${examination.gestationalAgeFromBiometry || '—'} / ${examination.gestationalAgeFromBiometry2 || '—'}`
-                        : examination.gestationalAgeFromBiometry || '—')}
-                  {/* Sub-Task 5: check correct IsManual flags for all exam types and both twins */}
-                  {((isFt
-                    ? (examination.data?.ft_biometry?.gaFromBioIsManual || examination.data?.twin2_ft_biometry?.gaFromBioIsManual)
-                    : (examination.biometry?.gestationalAgeFromBiometryIsManual || examination.biometry2?.gestationalAgeFromBiometryIsManual))
-                  ) && <AutoCalcDot size={5} />}
-                </span>
-              )}
-              {/* Row 3: Obstetric History | Family History */}
-              {fieldBlock('Obstetric History', examination.data?.pregnancy_data?.obstetric_history || '—')}
-              {fieldBlock('Family History', examination.data?.pregnancy_data?.family_history || '—')}
-            </div>
-            {examination.gestationalAgeIsManual && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#525252', fontStyle: 'italic', marginTop: '0.75rem' }}>
-                <AutoCalcDot size={5} /> Value manually entered
-              </div>
+        {/* Tile 3 — Pregnancy Data */}
+        <Tile>
+          <div style={tileTitleStyle}>Pregnancy Data</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', textAlign: 'left' }}>
+            {/* Row 1: LMP Date | GA from LMP */}
+            {fieldBlock('LMP Date', lmp ? formatPlainDate(lmp) : '—')}
+            {fieldBlock('GA from LMP',
+              <span>
+                {examination.gestationalAge || '—'}
+                {examination.gestationalAgeIsManual && (
+                  <span style={{ color: '#f1c21b', marginLeft: '4px' }}>(manual)</span>
+                )}
+              </span>
             )}
-          </Tile>
-        )}
+            {/* Row 2: Expected Delivery Date | GA from Bio */}
+            <div style={{ backgroundColor: '#e8f1ff', padding: '0.5rem', borderRadius: '2px', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.25rem', textAlign: 'left' }}>
+                Expected Delivery Date
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 600, color: '#0f62fe', textAlign: 'left' }}>
+                {edd || '—'}
+              </div>
+            </div>
+            {fieldBlock(
+              'GA from Bio',
+              <span>
+                {gaFromBioDisplay}
+                {gaFromBioIsManual && (
+                  <span style={{ color: '#f1c21b', marginLeft: '4px' }}>(manual)</span>
+                )}
+              </span>
+            )}
+            {/* Row 3: Obstetric History | Family History */}
+            {fieldBlock('Obstetric History', examination.data?.pregnancyData?.obstetricHistory || '—')}
+            {fieldBlock('Family History', examination.data?.pregnancyData?.familyHistory || '—')}
+          </div>
+        </Tile>
 
         {/* Ultrasound Findings, Biometry, Anatomy, Doppler sections */}
-        {/* KI-009: biometryPercentiles and efwPercentile are no longer computed here;
-            ExaminationSections reads from stored examination.biometry.{field}Percentile */}
-        <ExaminationSections
-          examination={examination}
-          biometryPercentiles={undefined}
-          efwPercentile={undefined}
-          biometryPercentiles2={undefined}
-          efwPercentile2={undefined}
-        />
+        <ExaminationSections examination={examination} />
 
-        {/* Sub-Task 4: Tile 4 — Findings (renamed from "Clinical Information") */}
+        {/* Tile 4 — Findings */}
         <Tile>
           <div style={tileTitleStyle}>Findings</div>
           {examination.findings ? (
@@ -376,7 +353,7 @@ export default function ExaminationDetailPage() {
           )}
         </Tile>
 
-        {/* Sub-Task 4: Tile 5 — Comments */}
+        {/* Tile 5 — Comments */}
         <Tile>
           <div style={tileTitleStyle}>Comments</div>
           <div style={{ fontSize: '1rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
@@ -384,9 +361,7 @@ export default function ExaminationDetailPage() {
           </div>
         </Tile>
 
-        {/* KI-009: Notes tile removed */}
-
-        {/* Sub-Task 4: Tile 7 — Metadata */}
+        {/* Tile 7 — Metadata */}
         <Tile>
           <div style={tileTitleStyle}>Metadata</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>

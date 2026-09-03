@@ -141,6 +141,25 @@ export async function createTestExamination(patientId: string): Promise<Examinat
     // Generate an MRN at examination creation time using the patient name
     const mrn = await generateMRN(patientName);
 
+    // ST-04: Use new Observable fetus-array data model
+    const examinationData = {
+        fetuses: [
+            {
+                index: 0,
+                biometry: [
+                    { type: 'bpd', value: 70 },
+                    { type: 'hc', value: 250 },
+                    { type: 'ac', value: 220 },
+                    { type: 'fl', value: 50 }
+                ],
+                doppler: [
+                    { type: 'pi', value: 1.2 },
+                    { type: 'ri', value: 0.7 }
+                ]
+            }
+        ]
+    };
+
     const examinationEntity: Examination & { updatedBy: string } = {
         partitionKey: `PATIENT_${patientId}`,
         rowKey,
@@ -151,18 +170,10 @@ export async function createTestExamination(patientId: string): Promise<Examinat
         examDate: new Date().toISOString(),
         gestationalAge: '28w 3d',
         status: 'draft',
-        biometry: JSON.stringify({
-            bpd: 70,
-            hc: 250,
-            ac: 220,
-            fl: 50
-        }) as any,
-        doppler: JSON.stringify({
-            pi: 1.2,
-            ri: 0.7,
-        }) as any,
+        data: JSON.stringify(examinationData) as any,
         findings: 'Normal findings',
         notes: 'Test notes',
+        primaryRowKey: rowKey, // ST-02
         createdAt: now,
         updatedAt: now,
         createdBy: creator.user.userId,
@@ -193,17 +204,10 @@ export async function createTestExamination(patientId: string): Promise<Examinat
 
     trackedExaminations.push({ examinationId, patientId, rowKey, mrn } as any);
 
+    // ST-03: Deserialize data blob before returning
     return {
         ...lookupEntity,
-        biometry: JSON.parse(lookupEntity.biometry as any),
-        doppler: JSON.parse(lookupEntity.doppler as any),
-        // uzd-twins: parse Twin 2 fields if present
-        biometry2: lookupEntity.biometry2 && typeof lookupEntity.biometry2 === 'string'
-            ? JSON.parse(lookupEntity.biometry2 as any)
-            : lookupEntity.biometry2,
-        doppler2: lookupEntity.doppler2 && typeof lookupEntity.doppler2 === 'string'
-            ? JSON.parse(lookupEntity.doppler2 as any)
-            : lookupEntity.doppler2,
+        data: JSON.parse(lookupEntity.data as any)
     } as Examination & any;
 }
 

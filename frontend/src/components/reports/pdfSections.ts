@@ -1,11 +1,18 @@
 /**
- * pdfSections.ts — extracted from pdfDocument.ts (Sub-Task 0c).
- * Contains the pair-builder helpers and the per-fetus section renderers
- * (single-fetus and twin paths). Called by pdfDocument.ts via renderClinicalSections.
+ * pdfSections.ts — ST-08 rewrite.
+ * Replaced flat twin/FT model with FetusPdfViewModel pair-loop (§13.4).
+ *
+ * Exports:
+ *   - PdfDrawHelpers (TWIN_COL_W/T1_X/T2_X removed — layout passed via PairLayout)
+ *   - PairLayout — computed by computePairLayout
+ *   - chunkFetuses — splits fetuses into pairs (max 2 per page)
+ *   - computePairLayout — derives x positions and colW for 1 or 2 fetuses
+ *   - renderClinicalSectionsPair — renders one pair of fetuses
  */
 import type { jsPDF } from 'jspdf';
-import type { ExamPdfViewModel, BiometryViewModel, DopplerViewModel, FtBiometryViewModel, FtMarkersViewModel, FtUltrasoundViewModel, FtDopplerViewModel } from '../../services/print.service';
-import type { AnatomyViewModel } from '../../services/print.service';
+import type { ExamPdfViewModel, FetusPdfViewModel } from '../../services/print.service';
+
+// ─── PdfDrawHelpers ───────────────────────────────────────────────────────────
 
 export interface PdfDrawHelpers {
   rule: (doc: jsPDF, y: number) => void;
@@ -13,11 +20,15 @@ export interface PdfDrawHelpers {
   sectionHeadingAt: (doc: jsPDF, label: string, y: number, xStart: number, xEnd: number) => number;
   kvGrid: (doc: jsPDF, pairs: Array<[string, string | undefined]>, y: number, cols?: number) => number;
   kvGridAt: (doc: jsPDF, pairs: Array<[string, string | undefined]>, y: number, cols: number, xStart: number, colW: number, fontSize?: number) => number;
-  TWIN_COL_W: number;
-  TWIN_GUTTER: number;
-  T1_X: number;
-  T2_X: number;
   FONT_ID: string;
+}
+
+// ─── PairLayout ───────────────────────────────────────────────────────────────
+
+export interface PairLayout {
+  colW: number;               // width of each fetus column (always 88 mm)
+  xStart: number[];           // x left edge for each column in the pair
+  xEnd: number[];             // x right edge for each column in the pair
 }
 
 // ─── Colour constants (mirrors pdfDocument.ts) ───────────────────────────────
@@ -37,17 +48,54 @@ function setTextColor(doc: jsPDF, color: string) {
   doc.setTextColor(...hexColor(color));
 }
 
-// ─── Pair builders (still used by anatomy, ultrasound, FT sections) ──────────
+// ─── chunkFetuses ─────────────────────────────────────────────────────────────
 
-function mkUltraPairs(u: ExamPdfViewModel['ultrasound']): Array<[string, string | undefined]> {
-  return [
-    ['Presentation', u.presentation], ['Gender', u.gender],
-    ['FHR (bpm)', u.heartRate], ['Fetal Movement', u.fetalMovement],
-    ['Placenta', u.placenta], ['Umbilical Cord', u.umbilicalCord],
-  ];
+/**
+ * Split a FetusPdfViewModel array into groups of at most 2.
+ * chunkFetuses([F1, F2, F3]) === [[F1, F2], [F3]]
+ * chunkFetuses([F1])         === [[F1]]
+ */
+export function chunkFetuses(fetuses: FetusPdfViewModel[]): FetusPdfViewModel[][] {
+  const chunks: FetusPdfViewModel[][] = [];
+  for (let i = 0; i < fetuses.length; i += 2) {
+    chunks.push(fetuses.slice(i, i + 2));
+  }
+  // Guarantee at least one chunk even for empty arrays
+  if (chunks.length === 0) chunks.push([]);
+  return chunks;
 }
 
-function mkAnatomyPairs(a: ExamPdfViewModel['anatomy'] | AnatomyViewModel): Array<[string, string | undefined]> {
+// ─── computePairLayout ───────────────────────────────────────────────────────
+
+const MARGIN_L = 14;
+const COL_W_TWIN = 88;   // mm — each fetus column width (same as legacy TWIN_COL_W)
+const TWIN_GUTTER = 6;   // mm — gap between twin columns
+
+/**
+ * Compute x positions for a pair of 1 or 2 fetuses.
+ * Single fetus: xStart=[14], xEnd=[102] (colW=88 mm)
+ * Two fetuses:  xStart=[14, 108], xEnd=[102, 196] (88 mm each, 6 mm gutter)
+ */
+export function computePairLayout(pairSize: number): PairLayout {
+  const colW = COL_W_TWIN;
+  if (pairSize <= 1) {
+    return {
+      colW,
+      xStart: [MARGIN_L],
+      xEnd: [MARGIN_L + colW],
+    };
+  }
+  return {
+    colW,
+    xStart: [MARGIN_L, MARGIN_L + colW + TWIN_GUTTER],
+    xEnd: [MARGIN_L + colW, MARGIN_L + colW + TWIN_GUTTER + colW],
+  };
+}
+
+// ─── Anatomy pair builders ────────────────────────────────────────────────────
+
+function mkAnatomyPairs(a: FetusPdfViewModel['anatomy']): Array<[string, string | undefined]> {
+  if (!a) return [];
   return [
     ['Head', a.head], ['Brain', a.brain], ['Heart', a.heart], ['Abdomen', a.abdomen],
     ['Kidneys', a.kidneys], ['Limbs', a.limbs], ['Skeleton', a.skeleton],
@@ -55,192 +103,25 @@ function mkAnatomyPairs(a: ExamPdfViewModel['anatomy'] | AnatomyViewModel): Arra
   ];
 }
 
-// ─── FT Biometry: structured 3-column renderer ───────────────────────────────
-
-/**
- * Render FT biometry as a 3-column table: Measurement | Value | GA.
- * Sub-Task 4: col-3 header renamed from "GA from CRL" to "GA"; NT and NB rows gain per-measurement GA.
- * Column proportions: label ~40%, value ~35%, GA ~25% of colW.
- * Row pitch: 3.85 mm. Returns Y after all rows.
- */
-function renderFtBiometryBlock(
-  doc: jsPDF,
-  b: FtBiometryViewModel,
-  y: number,
-  xStart: number,
-  colW: number,
-  fontId: string,
-): number {
-  const PITCH = 3.85;
-  const labelW = colW * 0.40;
-  const valueW = colW * 0.35;
-  // const gaW = colW * 0.25; // GA col — not needed for positioning
-
-  const xValue = xStart + labelW;
-  const xGA    = xStart + labelW + valueW;
-
-  // Header row: "Measurement" | "Value" | "GA" (Sub-Task 4: renamed from "GA from CRL")
-  doc.setFont(fontId, 'normal');
-  doc.setFontSize(7);
-  setTextColor(doc, C_MID);
-  doc.text('Measurement', xStart, y);
-  doc.text('Value',       xValue, y);
-  doc.text('GA',          xGA,    y);
-  y += PITCH;
-
-  // Data rows: label, value, optional GA
-  // Sub-Task 4: NT and NB rows now show gaFromNt / gaFromNb (undefined until calculation wired)
-  type FtBioRow = { label: string; value: string | undefined; ga?: string };
-  const rows: FtBioRow[] = [
-    { label: 'CRL (mm)',         value: b.crl,  ga: b.gaFromCrl },
-    { label: 'NT (mm)',          value: b.nt,   ga: b.gaFromNt },
-    { label: 'NB (mm)',          value: b.nb,   ga: b.gaFromNb },
-    { label: 'Heart Rate (bpm)', value: b.puls },
-  ];
-
-  for (const row of rows) {
-    doc.setFont(fontId, 'normal');
-    doc.setFontSize(7.5);
-    setTextColor(doc, C_MID);
-    doc.text(row.label, xStart, y);
-
-    doc.setFont(fontId, 'bold');
-    doc.setFontSize(8);
-    setTextColor(doc, C_DARK);
-    doc.text(row.value || '—', xValue, y);
-
-    if (row.ga) {
-      doc.setFont(fontId, 'normal');
-      doc.setFontSize(7.5);
-      setTextColor(doc, C_MID);
-      doc.text(row.ga, xGA, y);
-    }
-
-    y += PITCH;
-  }
-
-  y -= PITCH/2;
-
-  return y;
-}
-
-/** Render FT markers one per line: label on the left, value to its right. Returns new Y. */
-function renderFtMarkersBlock(
-  doc: jsPDF,
-  m: FtMarkersViewModel,
-  y: number,
-  xStart: number,
-  fontId: string,
-): number {
-  const PITCH = 3.85;
-  const labelW = 52;
-  const xValue = xStart + labelW;
-
-  // Header row: "Marker" | "Value"
-  doc.setFont(fontId, 'normal');
-  doc.setFontSize(7.5);
-  setTextColor(doc, C_MID);
-  doc.text('Marker', xStart, y);
-  doc.text('Value', xValue, y);
-  y += PITCH;
-
-  const rows: Array<[string, string | undefined]> = [
-    ['Arrhythmia',                 m.arrhythmia],
-    ['Tricuspid Regurgitation',    m.tricuspidRegurgitation],
-    ['Abnormal D.Venosus Flow',    m.abnormalDvFlow],
-    ['Echogenic Cardiac Focus',    m.echogenicCardiacFocus],
-    ['Single Umbilical Artery',    m.singleUmbilicalArtery],
-    ['Choroid Plexus Cysts',       m.choroidPlexusCysts],
-    ['Exomphalos',                 m.exomphalos],
-    ['Megacystis',                 m.megacystis],
-    ['Placenta',                   m.placenta],
-    ['Cord Insertion',             m.cordInsertion],
-  ];
-
-  for (const [label, value] of rows) {
-    doc.setFont(fontId, 'normal');
-    doc.setFontSize(7.5);
-    setTextColor(doc, C_MID);
-    doc.text(label, xStart, y);
-    doc.setFont(fontId, 'bold');
-    doc.setFontSize(8);
-    setTextColor(doc, C_DARK);
-    doc.text(value || '—', xValue, y);
-    y += PITCH;
-  }
-  y -= PITCH/2;
-  return y;
-}
-
-function mkFtUltrasoundPairs(u: FtUltrasoundViewModel): Array<[string, string | undefined]> {
+function mkUltrasoundPairs(u: FetusPdfViewModel['ultrasound']): Array<[string, string | undefined]> {
+  if (!u) return [];
   return [
-    ['Placenta', u.placenta], ['FHR (bpm)', u.heartRate], ['Umbilical Cord', u.umbilicalCord],
+    ['Presentation', u.presentation], ['Gender', u.gender],
+    ['FHR (bpm)', u.heartRate], ['Fetal Movement', u.fetalMovement],
+    ['Placenta', u.placenta], ['Umbilical Cord', u.umbilicalCord],
   ];
 }
 
-/** Render FT doppler as a PI | RI table matching the form layout. Returns new Y. */
-function renderFtDopplerBlock(
-  doc: jsPDF,
-  d: FtDopplerViewModel,
-  y: number,
-  xStart: number,
-  colW: number,
-  fontId: string,
-): number {
-  const PITCH = 3.85;
-  const labelW = colW * 0.40;
-  const halfW  = (colW - labelW) / 2;
-  const xPI = xStart + labelW;
-  const xRI = xStart + labelW + halfW;
-
-  // Header row: "Vessel" | "PI" | "RI"
-  doc.setFont(fontId, 'normal');
-  doc.setFontSize(7.5);
-  setTextColor(doc, C_MID);
-  doc.text('Vessel', xStart, y);
-  doc.text('PI', xPI, y);
-  doc.text('RI', xRI, y);
-  y += PITCH;
-
-  const rows: Array<{ label: string; pi: string | undefined; ri: string | undefined }> = [
-    { label: 'A. ut. Dex.', pi: d.utADexPI, ri: d.utADexRI },
-    { label: 'A. ut. Sin.', pi: d.utASinPI, ri: d.utASinRI },
-  ];
-
-  for (const row of rows) {
-    doc.setFont(fontId, 'normal');
-    doc.setFontSize(7.5);
-    setTextColor(doc, C_MID);
-    doc.text(row.label, xStart, y);
-    doc.setFont(fontId, 'bold');
-    doc.setFontSize(8);
-    setTextColor(doc, C_DARK);
-    doc.text(row.pi || '—', xPI, y);
-    doc.text(row.ri || '—', xRI, y);
-    y += PITCH;
-  }
-  y -= PITCH/2;
-  return y;
-}
-
-// ─── Biometry: row-by-row renderer ───────────────────────────────────────────
+// ─── Biometry row-by-row renderer ─────────────────────────────────────────────
 
 /**
- * Render biometry measurements one row per measurement in vertical order.
- * Layout per row: Measurement | Value | Percentile | GA from Bio
- * Header row drawn first, then 15 data rows. Row pitch: 3.3 mm.
- * Returns Y after all rows.
- */
-/**
- * renderBiometryBlock — v2 update (Sub-Task 4):
- *   - EFW moved to row 8 (after FL); Sub-Task 1 order: BPD OFD HC TAD APAD AC FL EFW TCD Vp CM NF NB LA LC
- *   - Col-4 header renamed from "GA from Bio" to "GA"
- *   - Per-measurement GA shown on BPD, OFD, HC, TAD, APAD, AC, FL, EFW rows
- *   - Expanded percentile set: OFD, TAD, APAD join BPD, HC, AC, FL, EFW
+ * Render biometry measurements as a 4-column table:
+ *   Measurement | Value | Percentile | GA
+ * Rows come from fetus.biometry (ObservablePdfEntry[]).
  */
 function renderBiometryBlock(
   doc: jsPDF,
-  b: BiometryViewModel,
+  fetus: FetusPdfViewModel,
   y: number,
   xStart: number,
   colW: number,
@@ -255,7 +136,7 @@ function renderBiometryBlock(
   const xPct   = xStart + labelW + valueW;
   const xGA    = xStart + labelW + valueW + pctW;
 
-  // Header row: "Measurement" | "Value" | "Percentile" | "GA" (Sub-Task 4: renamed from "GA from Bio")
+  // Header row
   doc.setFont(fontId, 'normal');
   doc.setFontSize(7);
   setTextColor(doc, C_MID);
@@ -265,159 +146,167 @@ function renderBiometryBlock(
   doc.text('GA',          xGA,    y);
   y += PITCH;
 
-  // Sub-Task 4: Rows in v2 order (EFW at position 8, after FL)
-  // pct field: use persisted percentile from view model where available; falls back to '—' on undefined
-  // gaAppend: per-measurement GA string (undefined → no text drawn)
-  type BioRow = { label: string; value: string | undefined; pct?: string; gaAppend?: string };
-  const rows: BioRow[] = [
-    { label: 'BPD (mm)',    value: b.bpd,        pct: b.bpdPct,  gaAppend: b.bpdGa },
-    { label: 'OFD (mm)',    value: b.ofd,        pct: b.ofdPct,  gaAppend: b.ofdGa },
-    { label: 'HC (mm)',     value: b.hc,         pct: b.hcPct,   gaAppend: b.hcGa },
-    { label: 'TAD (mm)',    value: b.tad,        pct: b.tadPct,  gaAppend: b.tadGa },
-    { label: 'APAD (mm)',   value: b.apad,       pct: b.apadPct, gaAppend: b.apadGa },
-    { label: 'AC (mm)',     value: b.ac,         pct: b.acPct,   gaAppend: b.acGa },
-    { label: 'FL (mm)',     value: b.fl,         pct: b.flPct,   gaAppend: b.flGa },
-    { label: 'EFW (grams)', value: b.efw,        pct: b.efwPct,  gaAppend: b.efwGa },
-    { label: 'TCD (mm)',    value: b.tcd,        pct: b.tcdPct,  gaAppend: b.tcdGa },
-    { label: 'Vp',          value: b.vp },
-    { label: 'CM (mm)',     value: b.cm },
-    { label: 'NF (mm)',     value: b.nuchalFold },
-    { label: 'NB (mm)',     value: b.nb },
-    { label: 'LA',          value: b.la },
-    { label: 'LC (mm)',     value: b.lc },
-  ];
-
-  for (const row of rows) {
-    // Label — normal, 7.5pt, muted
-    doc.setFont(fontId, 'normal');
-    doc.setFontSize(7.5);
-    setTextColor(doc, C_MID);
-    doc.text(row.label, xStart, y);
-
-    // Value — bold, 8pt, dark
-    doc.setFont(fontId, 'bold');
-    doc.setFontSize(8);
-    setTextColor(doc, C_DARK);
-    doc.text(row.value || '—', xValue, y);
-
-    // Percentile — show value if present, otherwise "—"
-    doc.setFont(fontId, 'normal');
-    doc.setFontSize(7.5);
-    setTextColor(doc, C_MID);
-    doc.text(row.pct ?? '—', xPct, y);
-
-    // Per-measurement GA — draw only when value is present
-    if (row.gaAppend) {
-      doc.text(row.gaAppend, xGA, y);
-    }
-
-    y += PITCH;
-  }
-
-  y -= PITCH/2;
-  return y;
-}
-
-// ─── Doppler: vessel-table renderer ──────────────────────────────────────────
-
-/**
- * Render doppler as a vessel-table matching the detail view structure:
- *   Sub-grid A: header (Vessel | PI | RI) + 3 vessel rows
- *   Sub-grid B: header (Measurement | Value) + 4 single-field rows
- * Row pitch: 3.85 mm. Returns Y after all rows.
- */
-function renderDopplerBlock(
-  doc: jsPDF,
-  d: DopplerViewModel,
-  y: number,
-  xStart: number,
-  colW: number,
-  fontId: string,
-): number {
-  const PITCH = 3.85;
-  const labelW = colW * 0.35;
-  const halfW  = (colW - labelW) / 2; // PI col width = RI col width
-
-  const xPI = xStart + labelW;
-  const xRI = xStart + labelW + halfW;
-
-  // ── Sub-grid A: header row — "Vessel | PI | RI" ──────────────────────────────
-  doc.setFont(fontId, 'normal');
-  doc.setFontSize(7.5);
-  setTextColor(doc, C_MID);
-  doc.text('Vessel', xStart, y);
-  doc.text('PI', xPI, y);
-  doc.text('RI', xRI, y);
-  y += PITCH;
-
-  // ── Sub-grid A: vessel rows ───────────────────────────────────────────────────
-  type VesselRow = { label: string; pi: string | undefined; ri: string | undefined };
-  const vesselRows: VesselRow[] = [
-    { label: 'A. ut. Dex.', pi: d.utADexPI, ri: d.utADexRI },
-    { label: 'A. ut. Sin.', pi: d.utASinPI, ri: d.utASinRI },
-    { label: 'A. Umb.',     pi: d.pi,       ri: d.ri },
-  ];
-
-  for (const row of vesselRows) {
+  for (const entry of fetus.biometry) {
     // Label
     doc.setFont(fontId, 'normal');
     doc.setFontSize(7.5);
     setTextColor(doc, C_MID);
-    doc.text(row.label, xStart, y);
-
-    // PI value
-    doc.setFont(fontId, 'bold');
-    doc.setFontSize(8);
-    setTextColor(doc, C_DARK);
-    doc.text(row.pi || '—', xPI, y);
-
-    // RI value
-    doc.text(row.ri || '—', xRI, y);
-
-    y += PITCH;
-  }
-  y -= PITCH/2;
-
-  // ── Sub-grid B: header row — "Measurement | Value" ───────────────────────────
-  const xValue = xStart + labelW;
-  y += PITCH;
-
-  // ── Sub-grid B: single-field rows ────────────────────────────────────────────
-  type SingleRow = { label: string; value: string | undefined };
-  const singleRows: SingleRow[] = [
-    { label: 'CMA PI',    value: d.cma },
-    { label: 'PSV',       value: d.psv },
-    { label: 'CPR',       value: d.cpr },
-    { label: 'Duc. Ven.', value: d.ducVen },
-  ];
-
-  for (const row of singleRows) {
-    // Label
-    doc.setFont(fontId, 'normal');
-    doc.setFontSize(7.5);
-    setTextColor(doc, C_MID);
-    doc.text(row.label, xStart, y);
+    doc.text(entry.label, xStart, y);
 
     // Value
     doc.setFont(fontId, 'bold');
     doc.setFontSize(8);
     setTextColor(doc, C_DARK);
-    doc.text(row.value || '—', xValue, y);
+    doc.text(entry.value || '—', xValue, y);
+
+    // Percentile
+    doc.setFont(fontId, 'normal');
+    doc.setFontSize(7.5);
+    setTextColor(doc, C_MID);
+    doc.text(entry.percentile ?? '—', xPct, y);
+
+    // GA — only if present
+    if (entry.ga) {
+      doc.text(entry.ga, xGA, y);
+    }
 
     y += PITCH;
   }
-  
-  y -= PITCH/2;
-  
+
+  if (fetus.biometry.length > 0) y -= PITCH / 2;
   return y;
 }
 
+// ─── Doppler vessel-table renderer ────────────────────────────────────────────
 
-/**
- * Like kvGridAt but stacked: label on line y, value centred below it at y+3.5.
- * Row pitch: 7 mm. Used for twin anatomy sections where cells are too narrow for inline layout.
- * Returns new Y after the block.
- */
+function renderDopplerBlock(
+  doc: jsPDF,
+  fetus: FetusPdfViewModel,
+  y: number,
+  xStart: number,
+  colW: number,
+  fontId: string,
+): number {
+  if (fetus.doppler.length === 0) return y;
+
+  const PITCH = 3.85;
+  const labelW = colW * 0.35;
+  const halfW  = (colW - labelW) / 2;
+
+  const xPI = xStart + labelW;
+  const xRI = xStart + labelW + halfW;
+
+  // Sub-grid A: PI + RI vessel rows (pi, ri, utADex*, utASin*)
+  const vesselTypes = new Set(['pi', 'ri', 'utADexPI', 'utADexRI', 'utASinPI', 'utASinRI']);
+  const vesselEntries = fetus.doppler.filter(e => vesselTypes.has(e.type));
+  // Sub-grid B: single-value rows (cma, psv, cpr, ducVen)
+  const singleEntries = fetus.doppler.filter(e => !vesselTypes.has(e.type));
+
+  if (vesselEntries.length > 0) {
+    // Header: Vessel | PI | RI
+    doc.setFont(fontId, 'normal');
+    doc.setFontSize(7.5);
+    setTextColor(doc, C_MID);
+    doc.text('Vessel', xStart, y);
+    doc.text('PI', xPI, y);
+    doc.text('RI', xRI, y);
+    y += PITCH;
+
+    // Group by vessel (Umb., Dex., Sin.)
+    const groups: Record<string, { pi?: string; ri?: string }> = {};
+    for (const e of vesselEntries) {
+      const key = e.type.includes('Dex') ? 'A. ut. Dex.' :
+                  e.type.includes('Sin') ? 'A. ut. Sin.' : 'A. Umb.';
+      if (!groups[key]) groups[key] = {};
+      if (e.type === 'pi' || e.type.endsWith('PI')) groups[key].pi = e.value;
+      if (e.type === 'ri' || e.type.endsWith('RI')) groups[key].ri = e.value;
+    }
+    for (const [vesselLabel, vals] of Object.entries(groups)) {
+      doc.setFont(fontId, 'normal');
+      doc.setFontSize(7.5);
+      setTextColor(doc, C_MID);
+      doc.text(vesselLabel, xStart, y);
+      doc.setFont(fontId, 'bold');
+      doc.setFontSize(8);
+      setTextColor(doc, C_DARK);
+      doc.text(vals.pi || '—', xPI, y);
+      doc.text(vals.ri || '—', xRI, y);
+      y += PITCH;
+    }
+    y -= PITCH / 2;
+  }
+
+  if (singleEntries.length > 0) {
+    const xValue = xStart + labelW;
+    y += PITCH;
+
+    for (const e of singleEntries) {
+      doc.setFont(fontId, 'normal');
+      doc.setFontSize(7.5);
+      setTextColor(doc, C_MID);
+      doc.text(e.label, xStart, y);
+      doc.setFont(fontId, 'bold');
+      doc.setFontSize(8);
+      setTextColor(doc, C_DARK);
+      doc.text(e.value || '—', xValue, y);
+      y += PITCH;
+    }
+    y -= PITCH / 2;
+  }
+
+  return y;
+}
+
+// ─── Markers renderer (first trimester) ────────────────────────────────────────
+
+function renderMarkersBlock(
+  doc: jsPDF,
+  markers: NonNullable<FetusPdfViewModel['markers']>,
+  y: number,
+  xStart: number,
+  fontId: string,
+): number {
+  const PITCH = 3.85;
+  const labelW = 52;
+  const xValue = xStart + labelW;
+
+  doc.setFont(fontId, 'normal');
+  doc.setFontSize(7.5);
+  setTextColor(doc, C_MID);
+  doc.text('Marker', xStart, y);
+  doc.text('Value', xValue, y);
+  y += PITCH;
+
+  const rows: Array<[string, string | undefined]> = [
+    ['Arrhythmia',                 markers.arrhythmia],
+    ['Tricuspid Regurgitation',    markers.tricuspidRegurgitation],
+    ['Abnormal D.Venosus Flow',    markers.abnormalDvFlow],
+    ['Echogenic Cardiac Focus',    markers.echogenicCardiacFocus],
+    ['Single Umbilical Artery',    markers.singleUmbilicalArtery],
+    ['Choroid Plexus Cysts',       markers.choroidPlexusCysts],
+    ['Exomphalos',                 markers.exomphalos],
+    ['Megacystis',                 markers.megacystis],
+    ['Placenta',                   markers.placenta],
+    ['Cord Insertion',             markers.cordInsertion],
+  ];
+
+  for (const [label, value] of rows) {
+    doc.setFont(fontId, 'normal');
+    doc.setFontSize(7.5);
+    setTextColor(doc, C_MID);
+    doc.text(label, xStart, y);
+    doc.setFont(fontId, 'bold');
+    doc.setFontSize(8);
+    setTextColor(doc, C_DARK);
+    doc.text(value || '—', xValue, y);
+    y += PITCH;
+  }
+  y -= PITCH / 2;
+  return y;
+}
+
+// ─── kvGridAtStacked ─────────────────────────────────────────────────────────
+
 function kvGridAtStacked(
   doc: jsPDF,
   pairs: Array<[string, string | undefined]>,
@@ -436,19 +325,14 @@ function kvGridAtStacked(
 
   for (const [label, value] of visible) {
     const x = xStart + col * cW;
-
-    // Label — normal, 7 pt, muted, centred in cell
     doc.setFont(fontId, 'normal');
     doc.setFontSize(7);
     setTextColor(doc, C_MID);
     doc.text(label, x + cW / 2, rowY, { align: 'center', maxWidth: cW });
-
-    // Value — bold, 7.5 pt, dark, centred in cell
     doc.setFont(fontId, 'bold');
     doc.setFontSize(7.5);
     setTextColor(doc, C_DARK);
     doc.text(value, x + cW / 2, rowY + 3.5, { align: 'center', maxWidth: cW });
-
     col++;
     if (col >= cols) {
       col = 0;
@@ -459,229 +343,124 @@ function kvGridAtStacked(
   return col === 0 ? rowY : rowY + PITCH;
 }
 
-
-// ─── Main export ──────────────────────────────────────────────────────────────
-
-/*
- * Y-BUDGET ANALYSIS (Sub-Task 8) — all measurements in mm
- * ─────────────────────────────────────────────────────────────────────────────
- * Page budget:
- *   Header bar:            22 mm
- *   Patient block:        ~26 mm  (y starts at ~52 mm)
- *   Pregnancy Data:       ~29 mm  (3 rows × 8 mm + heading 5 mm)
- *   → y at ~81 mm after Pregnancy Data
- *   Footer reserved:       15 mm  (footer + sig line buffer)
- *   Available for clinical content: 297 - 81 - 15 = ~201 mm
- *
- * Path A single-fetus section heights (rule+heading = 9 mm per section):
- *   Ultrasound Findings:   heading 9 + 2 rows × 3.85 = ~17 mm
- *   Biometry:              heading 9 + header + 15 rows × 3.3 = ~60 mm  ← largest
- *   Anatomy:               heading 9 + 2 rows × 3.85 = ~17 mm
- *   Doppler (A+B):         heading 9 + header + 3 rows + header + 4 rows = ~37 mm
- *   Total clinical A:      ~131 mm + Clinical Information + Signature (~53 mm) = ~184 mm ✓ fits
- *
- * Path B single-fetus section heights:
- *   Ultrasound Findings:   heading 9 + 1 row × 3.85 = ~13 mm
- *   Biometry:              heading 9 + header + 4 rows × 3.85 = ~28 mm
- *   Markers:               heading 9 + header + 10 rows × 3.85 = ~48 mm
- *   Anatomy:               heading 9 + 2 rows × 3.85 = ~17 mm
- *   Doppler:               heading 9 + header + 2 rows × 3.85 = ~20 mm
- *   Total clinical B:      ~126 mm + Clinical Information + Signature (~53 mm) = ~179 mm ✓ fits
- *
- * Both paths fit within the ~201 mm available budget. PITCH values remain at
- * PITCH=3.3 mm (Biometry) and PITCH=3.85 mm (Doppler/Markers/FT-Biometry).
- * If overflow is detected at runtime (sigYIdeal > SIG_MAX in pdfDocument.ts),
- * reduce Biometry PITCH to 3.0 and Doppler/Markers PITCH to 3.5 per Sub-Task 8.
- */
+// ─── renderClinicalSectionsPair ───────────────────────────────────────────────
 
 /**
- * Render all clinical sections (UF → Bio → Anatomy → Doppler) for single-fetus
- * or twins exam. Returns updated Y position after all sections are drawn.
+ * Render all clinical sections for one pair of fetuses (1 or 2).
+ * Section order: Ultrasound Findings → Biometry → Anatomy → Doppler [→ Markers if FT]
+ * Returns updated Y after all sections.
  */
-export function renderClinicalSections(
+export function renderClinicalSectionsPair(
   doc: jsPDF,
   vm: ExamPdfViewModel,
+  pair: FetusPdfViewModel[],
+  layout: PairLayout,
   y: number,
-  visibility: ReturnType<typeof import('../../constants/examinationTypes').getSectionVisibility>,
-  isTwins: boolean,
   helpers: PdfDrawHelpers,
-  isFt = false,
-  isFtTwins = false,
 ): number {
-  const { rule, sectionHeading, sectionHeadingAt, kvGrid, kvGridAt, TWIN_COL_W, T1_X, T2_X, FONT_ID } = helpers;
+  const { rule, sectionHeadingAt, kvGridAt, FONT_ID } = helpers;
+  const { colW, xStart, xEnd } = layout;
+  const isFt = vm.examinationType === 'first_trimester';
 
-  // ── UZPT single-fetus FT layout ──────────────────────────────────────────────
-  if (isFt && !isFtTwins) {
-    const emptyU: FtUltrasoundViewModel = {};
-    const emptyB: FtBiometryViewModel   = {};
-    const emptyM: FtMarkersViewModel    = {};
-    const emptyA: AnatomyViewModel      = {};
-    const emptyD: FtDopplerViewModel    = {};
-
+  // Helper: render a section for each fetus in the pair side-by-side
+  const renderPairSection = (
+    label: string,
+    renderFn: (fetus: FetusPdfViewModel, xS: number, xE: number) => number,
+  ) => {
     rule(doc, y); y += 4;
-    y = sectionHeading(doc, 'Ultrasound', y);
-    y = kvGrid(doc, mkFtUltrasoundPairs(vm.ftUltrasound ?? emptyU), y, 3);
-    y += 1;
+    const yStart = y;
+    let maxY = yStart;
 
-    rule(doc, y); y += 4;
-    y = sectionHeading(doc, 'Biometry', y);
-    y = renderFtBiometryBlock(doc, vm.ftBiometry ?? emptyB, y, T1_X, TWIN_COL_W, FONT_ID);
-    y += 1;
-
-    rule(doc, y); y += 4;
-    y = sectionHeading(doc, 'Markers', y);
-    y = renderFtMarkersBlock(doc, vm.ftMarkers ?? emptyM, y, 14, FONT_ID);
-    y += 1;
-
-    rule(doc, y); y += 4;
-    y = sectionHeading(doc, 'Anatomy', y);
-    y = kvGrid(doc, mkAnatomyPairs(vm.ftAnatomy ?? emptyA), y, 6);
-    y += 1;
-
-    rule(doc, y); y += 4;
-    y = sectionHeading(doc, 'Doppler', y);
-    y = renderFtDopplerBlock(doc, vm.ftDoppler ?? emptyD, y, T1_X, TWIN_COL_W, FONT_ID);
-    y += 1;
-
-    return y;
-  }
-
-  // ── UZPT twins FT layout ─────────────────────────────────────────────────────
-  if (isFtTwins) {
-    const T1_XEND = T1_X + TWIN_COL_W;
-    const T2_XEND = T2_X + TWIN_COL_W;
-
-    const emptyU: FtUltrasoundViewModel = {};
-    const emptyB: FtBiometryViewModel   = {};
-    const emptyM: FtMarkersViewModel    = {};
-    const emptyA: AnatomyViewModel      = {};
-    const emptyD: FtDopplerViewModel    = {};
-
-    const renderFtTwinSection = (
-      label: string,
-      pairs1: Array<[string, string | undefined]>,
-      pairs2: Array<[string, string | undefined]>,
-      cols = 2,
-    ) => {
-      const yStart = y;
-      y = sectionHeadingAt(doc, label, y, T1_X, T1_XEND);
-      const y1after = kvGridAt(doc, pairs1, y, cols, T1_X, TWIN_COL_W, 8);
-      const yH2 = sectionHeadingAt(doc, label, yStart, T2_X, T2_XEND);
-      const y2after = kvGridAt(doc, pairs2, yH2, cols, T2_X, TWIN_COL_W, 8);
-      y = Math.max(y1after, y2after) + 1;
-    };
-
-    rule(doc, y); y += 4;
-    renderFtTwinSection('Ultrasound', mkFtUltrasoundPairs(vm.ftUltrasound ?? emptyU), mkFtUltrasoundPairs(vm.twin2FtUltrasound ?? emptyU));
-
-    rule(doc, y); y += 4;
-    {
-      const yStart = y;
-      y = sectionHeadingAt(doc, 'Biometry', y, T1_X, T1_XEND);
-      const y1after = renderFtBiometryBlock(doc, vm.ftBiometry ?? emptyB, y, T1_X, TWIN_COL_W, FONT_ID);
-      const yH2 = sectionHeadingAt(doc, 'Biometry', yStart, T2_X, T2_XEND);
-      const y2after = renderFtBiometryBlock(doc, vm.twin2FtBiometry ?? emptyB, yH2, T2_X, TWIN_COL_W, FONT_ID);
-      y = Math.max(y1after, y2after) + 1;
+    for (let i = 0; i < pair.length; i++) {
+      const y1 = sectionHeadingAt(doc, pair.length > 1 ? `${label} — Fetus ${pair[i].index + 1}` : label, yStart, xStart[i], xEnd[i]);
+      const yAfter = renderFn(pair[i], xStart[i], xEnd[i]);
+      if (yAfter > maxY) maxY = yAfter;
+      y = y1; // y is only used to start rendering in renderFn; maxY tracks real bottom
     }
 
-    rule(doc, y); y += 4;
-    {
-      const yStart = y;
-      y = sectionHeadingAt(doc, 'Markers', y, T1_X, T1_XEND);
-      const y1after = renderFtMarkersBlock(doc, vm.ftMarkers ?? emptyM, y, T1_X, FONT_ID);
-      const yH2 = sectionHeadingAt(doc, 'Markers', yStart, T2_X, T2_XEND);
-      const y2after = renderFtMarkersBlock(doc, vm.twin2FtMarkers ?? emptyM, yH2, T2_X, FONT_ID);
-      y = Math.max(y1after, y2after) + 1;
-    }
+    y = maxY + 1;
+  };
 
-    rule(doc, y); y += 4;
-    {
-      const yStart = y;
-      y = sectionHeadingAt(doc, 'Anatomy', y, T1_X, T1_XEND);
-      const y1after = kvGridAtStacked(doc, mkAnatomyPairs(vm.ftAnatomy ?? emptyA), y, 6, T1_X, TWIN_COL_W, FONT_ID);
-      const yH2 = sectionHeadingAt(doc, 'Anatomy', yStart, T2_X, T2_XEND);
-      const y2after = kvGridAtStacked(doc, mkAnatomyPairs(vm.twin2FtAnatomy ?? emptyA), yH2, 6, T2_X, TWIN_COL_W, FONT_ID);
-      y = Math.max(y1after, y2after) + 1;
-    }
-
-    rule(doc, y); y += 4;
-    {
-      const yStart = y;
-      y = sectionHeadingAt(doc, 'Doppler', y, T1_X, T1_XEND);
-      const y1after = renderFtDopplerBlock(doc, vm.ftDoppler ?? emptyD, y, T1_X, TWIN_COL_W, FONT_ID);
-      const yH2 = sectionHeadingAt(doc, 'Doppler', yStart, T2_X, T2_XEND);
-      const y2after = renderFtDopplerBlock(doc, vm.twin2FtDoppler ?? emptyD, yH2, T2_X, TWIN_COL_W, FONT_ID);
-      y = Math.max(y1after, y2after) + 1;
-    }
-    return y;
-  }
-
-  if (!isTwins) {
-    // ── Single-fetus layout — HF-1 order: UF → Bio → Anatomy → Doppler ────────
-    if (visibility.ultrasoundFindings) {
-      rule(doc, y); y += 4;
-      y = sectionHeading(doc, 'Ultrasound Findings', y);
-      y = kvGrid(doc, mkUltraPairs(vm.ultrasound), y, 3);
-      y += 1;
-    }
-    if (visibility.biometry) {
-      rule(doc, y); y += 4;
-      y = sectionHeading(doc, 'Biometry Measurements', y);
-      y = renderBiometryBlock(doc, vm.biometry, y, T1_X, TWIN_COL_W, FONT_ID);
-      y += 1;
-    }
-    if (visibility.anatomy) {
-      rule(doc, y); y += 4;
-      y = sectionHeading(doc, 'Anatomy', y);
-      y = kvGrid(doc, mkAnatomyPairs(vm.anatomy), y, 6);
-      y += 1;
-    }
-    if (visibility.doppler) {
-      rule(doc, y); y += 4;
-      y = sectionHeading(doc, 'Doppler Measurements', y);
-      y = renderDopplerBlock(doc, vm.doppler, y, T1_X, TWIN_COL_W, FONT_ID);
-      y += 1;
-    }
+  // ── Ultrasound Findings ──────────────────────────────────────────────────────
+  const hasUF = pair.some(f => f.ultrasound && Object.values(f.ultrasound).some(Boolean));
+  if (hasUF) {
+    renderPairSection('Ultrasound Findings', (fetus, xS) => {
+      const pairs = mkUltrasoundPairs(fetus.ultrasound);
+      return kvGridAt(doc, pairs, sectionHeadingAt(doc, '', y + 4, xS, xS + colW) - 5 + 5, 2, xS, colW, 7);
+    });
   } else {
-    // ── uzd-twins: two-column layout — HF-1 order: UF → Bio → Anatomy → Doppler
-    const T1_XEND = T1_X + TWIN_COL_W;
-    const T2_XEND = T2_X + TWIN_COL_W;
-
-    if (visibility.ultrasoundFindings && vm.ultrasound2) {
-      const yStart = y+3;
-      y = sectionHeadingAt(doc, 'Ultrasound', yStart, T1_X, T1_XEND);
-      const y1after = kvGridAt(doc, mkUltraPairs(vm.ultrasound), y, 2, T1_X, TWIN_COL_W, 7);
-      const yH2 = sectionHeadingAt(doc, 'Ultrasound', yStart, T2_X, T2_XEND);
-      const y2after = kvGridAt(doc, mkUltraPairs(vm.ultrasound2), yH2, 2, T2_X, TWIN_COL_W, 7);
-      y = Math.max(y1after, y2after) + 1;
+    // Render with empty fields
+    rule(doc, y); y += 4;
+    const yStart = y;
+    let maxY = yStart;
+    for (let i = 0; i < pair.length; i++) {
+      const heading = pair.length > 1 ? `Ultrasound Findings — Fetus ${pair[i].index + 1}` : 'Ultrasound Findings';
+      const y1 = sectionHeadingAt(doc, heading, yStart, xStart[i], xEnd[i]);
+      const ySec = kvGridAt(doc, mkUltrasoundPairs(pair[i].ultrasound), y1, 2, xStart[i], colW, 7);
+      if (ySec > maxY) maxY = ySec;
     }
-    if (visibility.biometry && vm.biometry2) {
-      // Twin biometry: render side-by-side using renderBiometryBlock
-      const yStart = y+3;
-      y = sectionHeadingAt(doc, 'Biometry', yStart, T1_X, T1_XEND);
-      const y1after = renderBiometryBlock(doc, vm.biometry, y, T1_X, TWIN_COL_W, FONT_ID);
-      const yH2 = sectionHeadingAt(doc, 'Biometry', yStart, T2_X, T2_XEND);
-      const y2after = renderBiometryBlock(doc, vm.biometry2, yH2, T2_X, TWIN_COL_W, FONT_ID);
-      y = Math.max(y1after, y2after) + 1;
-    }
-    if (visibility.anatomy && vm.anatomy2) {
-      const yStart = y+3;
-      y = sectionHeadingAt(doc, 'Anatomy', yStart, T1_X, T1_XEND);
-      const y1after = kvGridAtStacked(doc, mkAnatomyPairs(vm.anatomy), y, 6, T1_X, TWIN_COL_W, FONT_ID);
-      const yH2 = sectionHeadingAt(doc, 'Anatomy', yStart, T2_X, T2_XEND);
-      const y2after = kvGridAtStacked(doc, mkAnatomyPairs(vm.anatomy2), yH2, 6, T2_X, TWIN_COL_W, FONT_ID);
-      y = Math.max(y1after, y2after) + 1;
-    }
-    if (visibility.doppler && vm.doppler2) {
-      // Twin doppler: render side-by-side using renderDopplerBlock
-      const yStart = y;
-      y = sectionHeadingAt(doc, 'Doppler', yStart, T1_X, T1_XEND);
-      const y1after = renderDopplerBlock(doc, vm.doppler, y, T1_X, TWIN_COL_W, FONT_ID);
-      const yH2 = sectionHeadingAt(doc, 'Doppler', yStart, T2_X, T2_XEND);
-      const y2after = renderDopplerBlock(doc, vm.doppler2, yH2, T2_X, TWIN_COL_W, FONT_ID);
-      y = Math.max(y1after, y2after) + 1;
-    }
+    y = maxY + 1;
   }
+
+  // ── Biometry ─────────────────────────────────────────────────────────────────
+  {
+    rule(doc, y); y += 4;
+    const yStart = y;
+    let maxY = yStart;
+    for (let i = 0; i < pair.length; i++) {
+      const label = pair.length > 1 ? `Biometry — Fetus ${pair[i].index + 1}` : 'Biometry Measurements';
+      const y1 = sectionHeadingAt(doc, label, yStart, xStart[i], xEnd[i]);
+      const yAfter = renderBiometryBlock(doc, pair[i], y1, xStart[i], colW, FONT_ID);
+      if (yAfter > maxY) maxY = yAfter;
+    }
+    y = maxY + 1;
+  }
+
+  // ── Markers (first trimester only) ───────────────────────────────────────────
+  if (isFt) {
+    rule(doc, y); y += 4;
+    const yStart = y;
+    let maxY = yStart;
+    for (let i = 0; i < pair.length; i++) {
+      const label = pair.length > 1 ? `Markers — Fetus ${pair[i].index + 1}` : 'Markers';
+      const y1 = sectionHeadingAt(doc, label, yStart, xStart[i], xEnd[i]);
+      const markers = pair[i].markers ?? {};
+      const yAfter = renderMarkersBlock(doc, markers, y1, xStart[i], FONT_ID);
+      if (yAfter > maxY) maxY = yAfter;
+    }
+    y = maxY + 1;
+  }
+
+  // ── Anatomy ───────────────────────────────────────────────────────────────────
+  {
+    rule(doc, y); y += 4;
+    const yStart = y;
+    let maxY = yStart;
+    for (let i = 0; i < pair.length; i++) {
+      const label = pair.length > 1 ? `Anatomy — Fetus ${pair[i].index + 1}` : 'Anatomy';
+      const y1 = sectionHeadingAt(doc, label, yStart, xStart[i], xEnd[i]);
+      const yAfter = kvGridAtStacked(doc, mkAnatomyPairs(pair[i].anatomy), y1, 6, xStart[i], colW, FONT_ID);
+      if (yAfter > maxY) maxY = yAfter;
+    }
+    y = maxY + 1;
+  }
+
+  // ── Doppler ───────────────────────────────────────────────────────────────────
+  {
+    rule(doc, y); y += 4;
+    const yStart = y;
+    let maxY = yStart;
+    for (let i = 0; i < pair.length; i++) {
+      const label = pair.length > 1 ? `Doppler — Fetus ${pair[i].index + 1}` : 'Doppler Measurements';
+      const y1 = sectionHeadingAt(doc, label, yStart, xStart[i], xEnd[i]);
+      const yAfter = renderDopplerBlock(doc, pair[i], y1, xStart[i], colW, FONT_ID);
+      if (yAfter > maxY) maxY = yAfter;
+    }
+    y = maxY + 1;
+  }
+
+  // Single-fetus convenience — use full-width kvGrid for anatomy/ultrasound
+  // (already handled above via sectionHeadingAt with same xStart/xEnd for single)
 
   return y;
 }

@@ -1,6 +1,13 @@
 /**
  * Type definitions for the prenatal ultrasound documentation system
  * These interfaces represent entities stored in Azure Table Storage
+ *
+ * ST-04: Replaced flat BiometryData/DopplerData/FtBiometry/FtDoppler/FtMarkers/FtUltrasoundFindings
+ *         and the legacy ExaminationData with the Observable fetus-array model.
+ *        Removed top-level biometry/doppler/biometry2/doppler2/gestationalAgeFromBiometry fields
+ *        from Examination — all measurement data now lives in data.fetuses[].
+ * ST-02: Added primaryRowKey? to Examination.
+ * ST-03: Added ExaminationCreateRequest and ExaminationUpdateRequest.
  */
 
 /**
@@ -71,9 +78,103 @@ export interface MRNLookup extends BaseEntity {
     patientId?: string; // Denormalized for context
 }
 
+// ── Observable Fetus-Array Data Model (ST-04) ─────────────────────────────────
+
 /**
- * Clinical sub-data for pregnancy, ultrasound findings, and anatomy
+ * A single ultrasound measurement with all its derived quantities co-located.
+ * §14.2 authoritative definition.
  */
+export interface Observable {
+    type: string;              // canonical measurement key: "bpd", "hc", "crl", "pi", etc.
+    value: number | string;    // raw measurement value; string for free-text (vp, la)
+    isManual?: boolean;        // ONLY set on EFW — true when user typed EFW directly
+    percentile?: {
+        value: number;         // integer [1–99]
+        isManual?: boolean;    // true when user overrode; absent/false when auto-calculated
+    };
+    ga?: {
+        value: string;         // "Xw Yd" — GA derived from this single measurement
+        isManual?: boolean;    // true when user overrode; absent/false when auto-calculated
+    };
+}
+
+/**
+ * Fetus-level composite GA — summarises all biometry observables for this fetus.
+ */
+export interface GaFromBiometry {
+    value: string;       // "Xw Yd"
+    isManual?: boolean;  // true when user manually set; absent/false when auto-calculated
+}
+
+/**
+ * Clinical sub-data for a single fetus.
+ * Shared structure for both prenatal and first-trimester exams.
+ */
+export interface FetusSectionData {
+    index: number;
+    gaFromBiometry?: GaFromBiometry;
+    biometry?: Observable[];                               // type set per exam type (§14.3)
+    doppler?: Observable[];                                // type set per exam type (§14.3)
+    ultrasoundFindings?: Record<string, string | number>; // purely descriptive
+    anatomy?: Record<string, string>;                     // purely descriptive free-text
+    markers?: Record<string, string>;                     // first_trimester only: soft markers
+}
+
+/**
+ * Top-level clinical data container for an examination.
+ * All measurement data lives inside fetuses[].
+ */
+export interface ExaminationData {
+    pregnancyData?: {
+        lastMenstrualPeriod?: string;  // YYYY-MM-DD
+        obstetricHistory?: string;
+        familyHistory?: string;
+    };
+    comments?: string;
+    fetuses: FetusSectionData[];       // length = fetus count; index 0 = fetus 1, etc.
+}
+
+// ── Examination Request Types (ST-03) ─────────────────────────────────────────
+
+/**
+ * Request body for POST /v1/examinations
+ * Moved from local scope in CreateExamination.ts (ST-03: §4.4).
+ */
+export interface ExaminationCreateRequest {
+    patientId: string;
+    examDate: string;
+    gestationalAge?: string;
+    gestationalAgeIsManual?: boolean;
+    status: string;
+    examinationType?: string;
+    findings?: string;
+    notes?: string;
+    data?: ExaminationData;
+    patientAgeAtExam?: number;
+    etag?: never; // client must not provide etag on create
+}
+
+/**
+ * Request body for PUT /v1/examinations/{id}
+ * Moved from local scope in UpdateExamination.ts (ST-03: §4.4).
+ * etag is required for optimistic concurrency.
+ */
+export interface ExaminationUpdateRequest {
+    mrn?: never;            // immutable — rejected on update
+    examDate?: string;
+    gestationalAge?: string;
+    gestationalAgeIsManual?: boolean;
+    status?: string;
+    examinationType?: string;
+    findings?: string;
+    notes?: string;
+    data?: ExaminationData;
+    patientAgeAtExam?: number;
+    etag: string;           // required for optimistic concurrency
+}
+
+// ── Clinical sub-data — pregnancy / ultrasound / anatomy ──────────────────────
+
 export interface PregnancyData {
     last_menstrual_period?: string; // YYYY-MM-DD
     obstetric_history?: string;     // e.g. "G1P0"
@@ -104,157 +205,14 @@ export interface AnatomyFindings {
     thorax?: string;
 }
 
-// UZPT — First Trimester examination interfaces
-export interface FtBiometry {
-    crl?: number;        // Crown-Rump Length, mm
-    gaFromCrl?: string;  // "Xw Yd" — GA calculated from CRL (storage key; display label = "GA from Bio")
-    gaFromCrlIsManual?: boolean;
-    nt?: number;         // Nuchal Translucency, mm
-    nb?: number;         // Nasal Bone, mm
-    puls?: number;       // Fetal heart rate (Puls), bpm
-    // Sub-Task 3: Per-measurement GA fields for first-trimester measurements
-    ntGa?:  string;  // GA derived from NT (placeholder; calculation deferred)
-    nbGa?:  string;  // GA derived from NB (placeholder; calculation deferred)
-    crlGa?: string;  // GA derived from CRL (alias; gaFromCrl is the legacy field, keep both)
-    // KI-009: GA from biometry composite field for first-trimester common section
-    gaFromBio?: string;  // "Xw Yd" — composite GA from Bio, populated reactively from CRL
-}
-
-export interface FtMarkers {
-    arrhythmia?: string;
-    tricuspidRegurgitation?: string;
-    abnormalDvFlow?: string;
-    echogenicCardiacFocus?: string;
-    singleUmbilicalArtery?: string;
-    choroidPlexusCysts?: string;
-    exomphalos?: string;
-    megacystis?: string;
-    placenta?: string;        // free-text placenta description
-    cordInsertion?: string;   // free-text cord insertion
-}
-
-export interface FtUltrasoundFindings {
-    placenta?: string;
-    heartRate?: number;    // СЧП, bpm
-    umbilicalCord?: string;
-}
-
-export interface FtDoppler {
-    utADexPI?: number;
-    utADexRI?: number;
-    utASinPI?: number;
-    utASinRI?: number;
-}
-
-export interface ExaminationData {
-    pregnancy_data?: PregnancyData;
-    ultrasound_findings?: UltrasoundFindings;
-    anatomy?: AnatomyFindings;
-    twin2_ultrasound_findings?: UltrasoundFindings; // uzd-twins: Twin 2
-    twin2_anatomy?: AnatomyFindings;                // uzd-twins: Twin 2
-    // UZPT — First Trimester fields
-    ft_biometry?: FtBiometry;
-    ft_markers?: FtMarkers;
-    ft_ultrasound?: FtUltrasoundFindings;
-    ft_anatomy?: AnatomyFindings;       // reuses existing type
-    ft_doppler?: FtDoppler;
-    twin2_ft_biometry?: FtBiometry;
-    twin2_ft_markers?: FtMarkers;
-    twin2_ft_ultrasound?: FtUltrasoundFindings;
-    twin2_ft_anatomy?: AnatomyFindings;
-    twin2_ft_doppler?: FtDoppler;
-    comments?: string;
-}
-
-/**
- * Biometry measurements for ultrasound examination.
- *
- * Sub-Task 3 reserved field conventions:
- *   Per-measurement GA: {measurementKey}Ga  (string "Xw Yd" | undefined)
- *   Persisted percentile: {measurementKey}Percentile  (number | undefined)
- *   gestationalAgeFromBiometry is retained for backward compatibility.
- */
-export interface BiometryData {
-    bpd?: number; // Biparietal Diameter (float, mm)
-    hc?: number;  // Head Circumference (float, mm)
-    ac?: number;  // Abdominal Circumference (float, mm)
-    fl?: number;  // Femur Length (float, mm)
-    efw?: number; // Estimated Fetal Weight (float, grams)
-    efwIsManual?: boolean;
-    // TASK-034: Extended biometry parameters
-    ofd?: number;         // Occipito-frontal Diameter (float, mm)
-    vp?: string;          // Vermis (free-text string, migrated from float)
-    tcd?: number;         // Transcerebellar Diameter (float, mm)
-    cm?: number;          // Cisterna Magna (float, mm)
-    nuchalFold?: number;  // Nuchal Fold (float, mm)
-    nb?: number;          // Nasal Bone (float, mm)
-    apad?: number;        // Antero-Posterior Abdominal Diameter (float, mm)
-    tad?: number;         // Transverse Abdominal Diameter (float, mm)
-    // TASK-035: LA and LC
-    la?: string;          // Left Atrium (free-text string, migrated from float)
-    lc?: number;          // Left Cardiac (float, mm)
-    // Sub-Task 3: Per-measurement GA fields ("Xw Yd" strings)
-    bpdGa?:   string;   // GA derived from BPD
-    ofdGa?:   string;   // GA derived from OFD
-    hcGa?:    string;   // GA derived from HC
-    tadGa?:   string;   // GA derived from TAD
-    apadGa?:  string;   // GA derived from APAD
-    acGa?:    string;   // GA derived from AC
-    flGa?:    string;   // GA derived from FL
-    efwGa?:   string;   // GA derived from EFW
-    tcdGa?:   string;   // GA derived from TCD
-    // Sub-Task 3: Persisted percentile fields (v2 expanded set)
-    bpdPercentile?:   number;   // BPD percentile
-    ofdPercentile?:   number;   // OFD percentile (NEW — v2)
-    hcPercentile?:    number;   // HC percentile
-    tadPercentile?:   number;   // TAD percentile (NEW — v2)
-    apadPercentile?:  number;   // APAD percentile (NEW — v2)
-    acPercentile?:    number;   // AC percentile
-    flPercentile?:    number;   // FL percentile
-    efwPercentile?:   number;   // EFW percentile
-    tcdPercentile?:   number;   // TCD percentile
-    // KI-009: IsManual flags (true when user overrode the auto-calculated value)
-    bpdPercentileIsManual?:   boolean;
-    hcPercentileIsManual?:    boolean;
-    acPercentileIsManual?:    boolean;
-    flPercentileIsManual?:    boolean;
-    ofdPercentileIsManual?:   boolean;
-    tadPercentileIsManual?:   boolean;
-    apadPercentileIsManual?:  boolean;
-    efwPercentileIsManual?:   boolean;
-    tcdPercentileIsManual?:   boolean;
-    bpdGaIsManual?:   boolean;
-    hcGaIsManual?:    boolean;
-    acGaIsManual?:    boolean;
-    flGaIsManual?:    boolean;
-    ofdGaIsManual?:   boolean;
-    tadGaIsManual?:   boolean;
-    apadGaIsManual?:  boolean;
-    efwGaIsManual?:   boolean;
-    tcdGaIsManual?:   boolean;
-}
-
-/**
- * Doppler measurements for ultrasound examination
- */
-export interface DopplerData {
-    pi?: number;     // Pulsatility Index (float)
-    ri?: number;     // Resistance Index (float)
-    // TASK-036: Extended vascular parameters (HF-3: vessel removed)
-    utADexPI?: number;  // A.ut. Dex PI
-    utADexRI?: number;  // A.ut. Dex RI
-    utASinPI?: number;  // A.ut. Sin PI
-    utASinRI?: number;  // A.ut. Sin RI
-    cma?: number;       // CMA
-    psv?: number;       // PSV
-    cpr?: number;       // CPR
-    ducVen?: string;    // Duc.Ven (free-text)
-}
-
 /**
  * Examination entity
- * PartitionKey: "PATIENT_{patientId}"
- * RowKey: "{reverseTicks}_{examinationId}"
+ * PartitionKey: "PATIENT_{patientId}" (primary) or "EXAM" (lookup)
+ * RowKey: "{reverseTicks}_{examinationId}" (primary) or examinationId (lookup)
+ *
+ * ST-04: Removed top-level biometry/doppler/biometry2/doppler2/gestationalAgeFromBiometry*
+ *         fields — all measurement data now lives in data.fetuses[].
+ * ST-02: Added primaryRowKey for O(1) primary entity lookup during updates.
  */
 export interface Examination extends BaseEntity {
     examinationId: string;
@@ -264,19 +222,13 @@ export interface Examination extends BaseEntity {
     examDate: string; // ISO 8601 date string
     gestationalAge?: string; // e.g., "28w 3d" — GA from LMP
     gestationalAgeIsManual?: boolean;
-    gestationalAgeFromBiometry?: string; // e.g., "28w 3d" — GA derived from biometry
     status: 'draft' | 'completed' | 'reviewed';
-    examinationType?: string; // TASK-033: e.g. "ultrasound_prenatal"
-    biometry?: BiometryData;
-    doppler?: DopplerData;
-    // uzd-twins: Twin 2 fields (absent on single-fetus exams)
-    biometry2?: BiometryData;
-    doppler2?: DopplerData;
-    gestationalAgeFromBiometry2?: string; // e.g., "28w 3d" — GA from biometry for Twin 2
+    examinationType?: string; // "prenatal" | "first_trimester"
     notes?: string;
     findings?: string;
-    data?: ExaminationData; // nested clinical sub-data (serialized as JSON in Table Storage)
-    patientAgeAtExam?: number; // TASK-037: patient age (whole years) at exam date
+    data?: ExaminationData; // all clinical measurement data (serialized as JSON in Table Storage)
+    patientAgeAtExam?: number; // patient age (whole years) at exam date
+    primaryRowKey?: string;    // ST-02: row key of the primary PATIENT_ entity for O(1) lookup
     createdAt: string;
     updatedAt: string;
     createdBy: string; // userId
@@ -296,7 +248,7 @@ export interface AuditLog extends BaseEntity {
     userId: string;
     username?: string; // Denormalized for readability
     actionTimestamp: string; // ISO 8601 timestamp (renamed to avoid conflict with BaseEntity.timestamp)
-    details: Record<string, any> | string; // Additional context (no sensitive data), serialized for Table Storage persistence when needed
+    details: Record<string, any> | string; // Additional context (no sensitive data)
     ipAddress?: string;
     userAgent?: string;
 }

@@ -4,6 +4,7 @@ import { handleError } from '../utils/errorHandler';
 import { successResponse, unauthorizedResponse, errorResponse } from '../utils/responseHelpers';
 import { ensureTableExists, queryEntities, getEntity } from '../utils/tableClient';
 import { normalizePatientName, getSearchPartitionKey } from '../utils/patientUtils';
+import { logAuditEvent } from '../utils/auditService';
 import { BaseEntity, Patient } from '../types';
 
 const PATIENTS_TABLE = 'Patients';
@@ -54,6 +55,11 @@ export async function searchPatients(request: HttpRequest, context: InvocationCo
                 patients.push(patient);
             }
         }
+
+        await logAuditEvent('PATIENT_SEARCH', user.userId, {
+            searchTerm: normalizedSearch,
+            resultCount: patients.length
+        });
 
         context.log('Patient search completed:', {
             searchTerm: normalizedSearch,

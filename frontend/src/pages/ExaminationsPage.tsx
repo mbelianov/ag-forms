@@ -415,18 +415,23 @@ export default function ExaminationsPage() {
     : `${N} ${examWord} loaded`;
 
   // ── Table rows ────────────────────────────────────────────────────────────
-  const allRows = examinations.map((exam) => ({
-    id: exam.examinationId,
-    patientName: exam.patientName,
-    patientId: exam.patientId,
-    mrn: exam.mrn,
-    examDate: formatDateShort(exam.examDate.includes('T') ? exam.examDate : exam.examDate + 'T00:00:00'),
-    examinationType: getExamTypeLabel(exam.examinationType ?? 'ultrasound_prenatal'),
-    gestationalAge: exam.gestationalAge || '—',
-    status: exam.status,
-    createdBy: exam.createdByName || exam.createdBy,
-    actions: exam.examinationId,
-  }));
+  const allRows = examinations.map((exam) => {
+    const typeLabel = getExamTypeLabel(exam.examinationType ?? 'prenatal');
+    const fetusCount = exam.data?.fetuses?.length ?? 0;
+    const fetusCountSuffix = fetusCount > 1 ? ` (×${fetusCount})` : '';
+    return {
+      id: exam.examinationId,
+      patientName: exam.patientName,
+      patientId: exam.patientId,
+      mrn: exam.mrn,
+      examDate: formatDateShort(exam.examDate.includes('T') ? exam.examDate : exam.examDate + 'T00:00:00'),
+      examinationType: `${typeLabel}${fetusCountSuffix}`,
+      gestationalAge: exam.gestationalAge || '—',
+      status: exam.status,
+      createdBy: exam.createdByName || exam.createdBy,
+      actions: exam.examinationId,
+    };
+  });
 
   const totalItems = allRows.length;
   const startIndex = (page - 1) * pageSize;

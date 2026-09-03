@@ -1,123 +1,135 @@
 /**
- * DopplerSection — generic per-fetus doppler form section.
- * HF-3: Vessel-table layout. `vessel` field removed. Labels renamed.
- * Parameterised by `prefix` so DOM ids remain unique when two instances coexist.
+ * DopplerSection — renders the doppler measurement inputs for one fetus.
+ *
+ * Two sub-grids:
+ *   Vessel grid  — vesselConfigs entries taken in pairs (PI + RI per vessel row).
+ *                  Each pair shares a row: [PI label+input] [RI label+input].
+ *   Single grid  — singleConfigs entries, one per row, full width.
  */
-import { TextInput, FormGroup, Stack } from '@carbon/react';
-
-export interface DopplerSectionFormData {
-  pi: string;
-  ri: string;
-  ducVen: string;
-  utADexPI: string;
-  utADexRI: string;
-  utASinPI: string;
-  utASinRI: string;
-  cma: string;
-  psv: string;
-  cpr: string;
-}
+import React from 'react';
+import { TextInput } from '@carbon/react';
+import type { ObservableFormMap, ObservableFormFieldState, AutoCalcValue } from '../../types/formData';
+import type { ObservableTypeConfig } from '../../constants/examinationTypes';
 
 interface DopplerSectionProps {
-  prefix: string; // e.g. "t1" or "t2"
-  data: DopplerSectionFormData;
-  errors: Record<string, string>;
-  onChange: (field: string, value: string) => void;
-  isSubmitting: boolean;
+  fetusIndex: number;
+  vesselConfigs: readonly ObservableTypeConfig[];
+  singleConfigs: readonly ObservableTypeConfig[];
+  data: ObservableFormMap;
+  disabled?: boolean;
+  onFieldChange: (
+    fetusIndex: number,
+    sectionKey: 'biometry' | 'doppler',
+    type: string,
+    field: keyof ObservableFormFieldState,
+    next: AutoCalcValue<string>,
+  ) => void;
 }
 
-export default function DopplerSection({ prefix, data, errors, onChange, isSubmitting }: DopplerSectionProps) {
-  const p = (field: string) => `${prefix}_${field}`;
+const sectionTitleStyle: React.CSSProperties = {
+  fontSize: '0.875rem',
+  fontWeight: 600,
+  color: '#161616',
+  marginBottom: '0.75rem',
+  marginTop: '1.5rem',
+};
 
-  // Sub-grid A: vessel label | PI input | RI input  (3 rows × 3 cols = 9 cells)
-  const gridA: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: '8rem 1fr 1fr',
-    gap: '0.5rem',
-    alignItems: 'end',
+const colHeaderStyle: React.CSSProperties = {
+  fontSize: '0.75rem',
+  color: '#525252',
+  fontWeight: 600,
+  paddingBottom: '0.25rem',
+};
+
+export const DopplerSection: React.FC<DopplerSectionProps> = React.memo(({
+  fetusIndex,
+  vesselConfigs,
+  singleConfigs,
+  data,
+  disabled = false,
+  onFieldChange,
+}) => {
+  const handleChange = (type: string, value: string) => {
+    onFieldChange(fetusIndex, 'doppler', type, 'value', { value, isManual: value.trim() !== '' });
   };
 
-  // Sub-grid B: vessel label | single input  (4 rows × 2 cols = 8 cells)
-  const gridB: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: '8rem 1fr',
-    gap: '0.5rem',
-    alignItems: 'end',
-  };
+  // Pair vessel configs: [0,1], [2,3], [4,5] ...
+  const vesselPairs: [ObservableTypeConfig, ObservableTypeConfig][] = [];
+  for (let i = 0; i + 1 < vesselConfigs.length; i += 2) {
+    vesselPairs.push([vesselConfigs[i], vesselConfigs[i + 1]]);
+  }
 
-  const labelStyle: React.CSSProperties = {
-    fontSize: '0.875rem',
-    color: '#525252',
-    paddingBottom: '0.5rem',
-    textAlign: 'left',
-  };
+  const hasVessels = vesselPairs.length > 0;
+  const hasSingle = singleConfigs.length > 0;
+
+  if (!hasVessels && !hasSingle) return null;
 
   return (
-    <FormGroup legendText="">
-      <Stack gap={4}>
-        {/* Sub-grid A: PI / RI vessel table */}
-        <div style={gridA}>
-          {/* Header row */}
-          <div />
-          <div style={labelStyle}>PI</div>
-          <div style={labelStyle}>RI</div>
-          {/* A. ut. Dex. row */}
-          <div style={labelStyle}>A. ut. Dex.</div>
-          <TextInput id={p('utADexPI')} labelText="" placeholder="e.g., 0.0"
-            value={data.utADexPI} onChange={(e) => onChange(p('utADexPI'), e.target.value)}
-            invalid={!!errors[p('utADexPI')]} invalidText={errors[p('utADexPI')]}
-            disabled={isSubmitting} autoComplete="off" />
-          <TextInput id={p('utADexRI')} labelText="" placeholder="e.g., 0.0"
-            value={data.utADexRI} onChange={(e) => onChange(p('utADexRI'), e.target.value)}
-            invalid={!!errors[p('utADexRI')]} invalidText={errors[p('utADexRI')]}
-            disabled={isSubmitting} autoComplete="off" />
-          {/* A. ut. Sin. row */}
-          <div style={labelStyle}>A. ut. Sin.</div>
-          <TextInput id={p('utASinPI')} labelText="" placeholder="e.g., 0.0"
-            value={data.utASinPI} onChange={(e) => onChange(p('utASinPI'), e.target.value)}
-            invalid={!!errors[p('utASinPI')]} invalidText={errors[p('utASinPI')]}
-            disabled={isSubmitting} autoComplete="off" />
-          <TextInput id={p('utASinRI')} labelText="" placeholder="e.g., 0.0"
-            value={data.utASinRI} onChange={(e) => onChange(p('utASinRI'), e.target.value)}
-            invalid={!!errors[p('utASinRI')]} invalidText={errors[p('utASinRI')]}
-            disabled={isSubmitting} autoComplete="off" />
-          {/* A. Umb. row */}
-          <div style={labelStyle}>A. Umb.</div>
-          <TextInput id={p('pi')} labelText="" placeholder="e.g., 1.25"
-            value={data.pi} onChange={(e) => onChange(p('pi'), e.target.value)}
-            invalid={!!errors[p('pi')]} invalidText={errors[p('pi')]}
-            disabled={isSubmitting} autoComplete="off" />
-          <TextInput id={p('ri')} labelText="" placeholder="e.g., 0.65"
-            value={data.ri} onChange={(e) => onChange(p('ri'), e.target.value)}
-            invalid={!!errors[p('ri')]} invalidText={errors[p('ri')]}
-            disabled={isSubmitting} autoComplete="off" />
-        </div>
+    <div>
+      <h5 style={sectionTitleStyle}>Doppler</h5>
 
-        {/* Sub-grid B: single-field rows */}
-        <div style={gridB}>
-          <div style={labelStyle}>CMA PI</div>
-          <TextInput id={p('cma')} labelText="" placeholder="e.g., 0.0"
-            value={data.cma} onChange={(e) => onChange(p('cma'), e.target.value)}
-            invalid={!!errors[p('cma')]} invalidText={errors[p('cma')]}
-            disabled={isSubmitting} autoComplete="off" />
-          <div style={labelStyle}>PSV</div>
-          <TextInput id={p('psv')} labelText="" placeholder="e.g., 0.0"
-            value={data.psv} onChange={(e) => onChange(p('psv'), e.target.value)}
-            invalid={!!errors[p('psv')]} invalidText={errors[p('psv')]}
-            disabled={isSubmitting} autoComplete="off" />
-          <div style={labelStyle}>CPR</div>
-          <TextInput id={p('cpr')} labelText="" placeholder="e.g., 0.0"
-            value={data.cpr} onChange={(e) => onChange(p('cpr'), e.target.value)}
-            invalid={!!errors[p('cpr')]} invalidText={errors[p('cpr')]}
-            disabled={isSubmitting} autoComplete="off" />
-          <div style={labelStyle}>Duc. Ven.</div>
-          <TextInput id={p('ducVen')} labelText="" placeholder="e.g., normal"
-            value={data.ducVen} onChange={(e) => onChange(p('ducVen'), e.target.value)}
-            disabled={isSubmitting} autoComplete="off" />
+      {/* Vessel sub-grid */}
+      {hasVessels && (
+        <div style={{ marginBottom: hasSingle ? '1rem' : 0 }}>
+          {/* Column headers */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.25rem' }}>
+            <span style={colHeaderStyle}>PI</span>
+            <span style={colHeaderStyle}>RI</span>
+          </div>
+          {vesselPairs.map(([piConfig, riConfig]) => {
+            const piVal = data[piConfig.type]?.value?.value ?? '';
+            const riVal = data[riConfig.type]?.value?.value ?? '';
+            return (
+              <div
+                key={piConfig.type}
+                style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.5rem' }}
+              >
+                <TextInput
+                  id={`f${fetusIndex}_dop_${piConfig.type}`}
+                  labelText={piConfig.label}
+                  placeholder="e.g., 0.0"
+                  value={piVal}
+                  disabled={disabled}
+                  onChange={(e) => handleChange(piConfig.type, e.target.value)}
+                  size="sm"
+                />
+                <TextInput
+                  id={`f${fetusIndex}_dop_${riConfig.type}`}
+                  labelText={riConfig.label}
+                  placeholder="e.g., 0.0"
+                  value={riVal}
+                  disabled={disabled}
+                  onChange={(e) => handleChange(riConfig.type, e.target.value)}
+                  size="sm"
+                />
+              </div>
+            );
+          })}
         </div>
-      </Stack>
-    </FormGroup>
+      )}
+
+      {/* Single-value sub-grid */}
+      {hasSingle && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {singleConfigs.map((config) => {
+            const val = data[config.type]?.value?.value ?? '';
+            return (
+              <TextInput
+                key={config.type}
+                id={`f${fetusIndex}_dop_${config.type}`}
+                labelText={config.label}
+                placeholder="e.g., 0.0"
+                value={val}
+                disabled={disabled}
+                onChange={(e) => handleChange(config.type, e.target.value)}
+                size="sm"
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
-}
+});
 
-// Made with Bob
+DopplerSection.displayName = 'DopplerSection';

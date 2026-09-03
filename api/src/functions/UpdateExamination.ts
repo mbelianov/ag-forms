@@ -1,12 +1,12 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { odata } from '@azure/data-tables';
 import { requireAuth, requireRole } from '../utils/authMiddleware';
 import { handleError } from '../utils/errorHandler';
 import { successResponse, unauthorizedResponse, forbiddenResponse, errorResponse } from '../utils/responseHelpers';
-import { getEntity, updateEntity, ensureTableExists, getTableClient } from '../utils/tableClient';
+import { getEntity, updateEntity, ensureTableExists } from '../utils/tableClient';
 import { validateExamination } from '../utils/validation';
 import { logExaminationUpdated } from '../utils/auditService';
-import { Examination, Patient } from '../types';
+import { serializeExaminationData, deserializeExaminationData } from '../utils/examinationSerializer';
+import { Examination, Patient, ExaminationUpdateRequest } from '../types';
 
 const EXAMINATIONS_TABLE = 'Examinations';
 const PATIENTS_TABLE = 'Patients';
@@ -31,55 +31,19 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             return errorResponse('Examination ID is required', 400);
         }
 
-        interface ExaminationBody {
-            mrn?: never;
-            examDate?: string;
-            gestationalAge?: string;
-            gestationalAgeIsManual?: boolean;
-            gestationalAgeFromBiometry?: string;
-            biometry?: any;
-            doppler?: any;
-            // uzd-twins: Twin 2 fields
-            biometry2?: any;
-            doppler2?: any;
-            gestationalAgeFromBiometry2?: string;
-            findings?: string;
-            notes?: string;
-            status?: string;
-            data?: any;
-            etag?: string;
-            examinationType?: string;
-            patientAgeAtExam?: number;
-        }
-        const body = await request.json() as ExaminationBody;
+        const body = await request.json() as ExaminationUpdateRequest;
         // Strip any client-supplied mrn — MRN is immutable once assigned
-        const { mrn: _discardedMrn, examDate, gestationalAge, gestationalAgeIsManual, gestationalAgeFromBiometry, biometry, doppler, biometry2, doppler2, gestationalAgeFromBiometry2, findings, notes, status, data, etag, examinationType, patientAgeAtExam } = body;
+        const {
+            mrn: _discardedMrn, examDate, gestationalAge, gestationalAgeIsManual,
+            findings, notes, status, data, etag, examinationType, patientAgeAtExam
+        } = body;
 
         // Require ETag for optimistic concurrency
         if (!etag) {
             return errorResponse('ETag is required for updates', 400);
         }
 
-        // Validate update data (partial validation)
-        const updateData: any = {};
-        if (examDate !== undefined) updateData.examDate = examDate;
-        if (gestationalAge !== undefined) updateData.gestationalAge = gestationalAge;
-        if (gestationalAgeIsManual !== undefined) updateData.gestationalAgeIsManual = gestationalAgeIsManual;
-        if (gestationalAgeFromBiometry !== undefined) updateData.gestationalAgeFromBiometry = gestationalAgeFromBiometry;
-        if (biometry !== undefined) updateData.biometry = biometry;
-        if (doppler !== undefined) updateData.doppler = doppler;
-        // uzd-twins: Twin 2 fields
-        if (biometry2 !== undefined) updateData.biometry2 = biometry2;
-        if (doppler2 !== undefined) updateData.doppler2 = doppler2;
-        if (gestationalAgeFromBiometry2 !== undefined) updateData.gestationalAgeFromBiometry2 = gestationalAgeFromBiometry2;
-        if (findings !== undefined) updateData.findings = findings;
-        if (notes !== undefined) updateData.notes = notes;
-        if (status !== undefined) updateData.status = status;
-        if (data !== undefined) updateData.data = data;
-        if (examinationType !== undefined) updateData.examinationType = examinationType;
-        if (patientAgeAtExam !== undefined) updateData.patientAgeAtExam = patientAgeAtExam;
-
-        // Add required fields for validation
+        // Fetch the lookup entity (EXAM partition) — always available via direct key lookup
         const existingExam = await getEntity<Examination>(
             EXAMINATIONS_TABLE,
             'EXAM',
@@ -113,27 +77,13 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             }
         }
 
-        // Validate with patientId from existing exam.
-        // existingExam.biometry/doppler are stored as JSON strings in Table Storage —
-        // parse them before validation so Joi receives objects, not strings.
-        const parseBioOrDoppler = (v: any) => {
-            if (!v) return undefined;
-            if (typeof v === 'string') { try { return JSON.parse(v); } catch { return undefined; } }
-            return v;
-        };
+        // Validate with merged data
         const validationData = {
             patientId: existingExam.patientId,
             examDate: examDate || existingExam.examDate,
             status: status || existingExam.status,
             gestationalAge: gestationalAge !== undefined ? gestationalAge : existingExam.gestationalAge,
             gestationalAgeIsManual: gestationalAgeIsManual !== undefined ? gestationalAgeIsManual : existingExam.gestationalAgeIsManual,
-            gestationalAgeFromBiometry: gestationalAgeFromBiometry !== undefined ? gestationalAgeFromBiometry : existingExam.gestationalAgeFromBiometry,
-            biometry: biometry !== undefined ? biometry : parseBioOrDoppler(existingExam.biometry),
-            doppler: doppler !== undefined ? doppler : parseBioOrDoppler(existingExam.doppler),
-            // uzd-twins: Twin 2 fields
-            biometry2: biometry2 !== undefined ? biometry2 : parseBioOrDoppler(existingExam.biometry2),
-            doppler2: doppler2 !== undefined ? doppler2 : parseBioOrDoppler(existingExam.doppler2),
-            gestationalAgeFromBiometry2: gestationalAgeFromBiometry2 !== undefined ? gestationalAgeFromBiometry2 : existingExam.gestationalAgeFromBiometry2,
             findings: findings !== undefined ? findings : existingExam.findings,
             notes: notes !== undefined ? notes : existingExam.notes,
             data: data !== undefined ? data : undefined,
@@ -169,33 +119,6 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             updatedLookupEntity.gestationalAgeIsManual = gestationalAgeIsManual;
             changedFields.push('gestationalAgeIsManual');
         }
-        if (gestationalAgeFromBiometry !== undefined && gestationalAgeFromBiometry !== existingExam.gestationalAgeFromBiometry) {
-            updatedLookupEntity.gestationalAgeFromBiometry = gestationalAgeFromBiometry;
-            changedFields.push('gestationalAgeFromBiometry');
-        }
-        if (biometry !== undefined) {
-            // Serialize to JSON string for Azure Table Storage
-            updatedLookupEntity.biometry = (typeof biometry === 'string' ? biometry : JSON.stringify(biometry)) as any;
-            changedFields.push('biometry');
-        }
-        if (doppler !== undefined) {
-            // Serialize to JSON string for Azure Table Storage
-            updatedLookupEntity.doppler = (typeof doppler === 'string' ? doppler : JSON.stringify(doppler)) as any;
-            changedFields.push('doppler');
-        }
-        // uzd-twins: Twin 2 fields
-        if (biometry2 !== undefined) {
-            updatedLookupEntity.biometry2 = (typeof biometry2 === 'string' ? biometry2 : JSON.stringify(biometry2)) as any;
-            changedFields.push('biometry2');
-        }
-        if (doppler2 !== undefined) {
-            updatedLookupEntity.doppler2 = (typeof doppler2 === 'string' ? doppler2 : JSON.stringify(doppler2)) as any;
-            changedFields.push('doppler2');
-        }
-        if (gestationalAgeFromBiometry2 !== undefined && gestationalAgeFromBiometry2 !== existingExam.gestationalAgeFromBiometry2) {
-            updatedLookupEntity.gestationalAgeFromBiometry2 = gestationalAgeFromBiometry2;
-            changedFields.push('gestationalAgeFromBiometry2');
-        }
         if (findings !== undefined && findings !== existingExam.findings) {
             updatedLookupEntity.findings = findings;
             changedFields.push('findings');
@@ -209,8 +132,8 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
             changedFields.push('status');
         }
         if (data !== undefined) {
-            // Serialize to JSON string for Azure Table Storage
-            updatedLookupEntity.data = (typeof data === 'string' ? data : JSON.stringify(data)) as any;
+            // ST-03: Serialize using the shared utility
+            updatedLookupEntity.data = serializeExaminationData(data) as any;
             changedFields.push('data');
         }
         if (examinationType !== undefined && examinationType !== existingExam.examinationType) {
@@ -228,42 +151,32 @@ export async function updateExamination(request: HttpRequest, context: Invocatio
         // Update lookup entity
         await updateEntity(EXAMINATIONS_TABLE, updatedLookupEntity);
 
-        // Also update primary entity (PATIENT_{patientId} partition)
-        // The primary entity has rowKey = "${reverseTicks}_${examinationId}" — query to find it
-        const tableClient = getTableClient(EXAMINATIONS_TABLE);
-        let primaryEntity: (Examination & any) | null = null;
-        for await (const ent of tableClient.listEntities<Examination>({
-            queryOptions: {
-                filter: odata`PartitionKey eq ${'PATIENT_' + existingExam.patientId} and examinationId eq ${examinationId}`
+        // ST-02: Use primaryRowKey for O(1) direct lookup of the primary entity —
+        //        replaces the old for-await partition scan.
+        if (existingExam.primaryRowKey) {
+            const primaryEntity = await getEntity<Examination>(
+                EXAMINATIONS_TABLE,
+                `PATIENT_${existingExam.patientId}`,
+                existingExam.primaryRowKey
+            );
+
+            if (primaryEntity) {
+                const updatedPrimaryEntity: Examination & { updatedBy: string } = {
+                    ...primaryEntity,
+                    examDate: updatedLookupEntity.examDate,
+                    gestationalAge: updatedLookupEntity.gestationalAge,
+                    findings: updatedLookupEntity.findings,
+                    notes: updatedLookupEntity.notes,
+                    status: updatedLookupEntity.status,
+                    examinationType: updatedLookupEntity.examinationType,
+                    data: updatedLookupEntity.data,
+                    patientAgeAtExam: updatedLookupEntity.patientAgeAtExam,
+                    updatedAt: now,
+                    updatedBy: user.userId
+                };
+
+                await updateEntity(EXAMINATIONS_TABLE, updatedPrimaryEntity);
             }
-        })) {
-            primaryEntity = ent;
-            break;
-        }
-
-        if (primaryEntity) {
-            const updatedPrimaryEntity: Examination & { updatedBy: string } = {
-                ...primaryEntity,
-                examDate: updatedLookupEntity.examDate,
-                gestationalAge: updatedLookupEntity.gestationalAge,
-                gestationalAgeFromBiometry: updatedLookupEntity.gestationalAgeFromBiometry,
-                biometry: updatedLookupEntity.biometry,
-                doppler: updatedLookupEntity.doppler,
-                // uzd-twins: Twin 2 fields synced to primary entity
-                biometry2: updatedLookupEntity.biometry2,
-                doppler2: updatedLookupEntity.doppler2,
-                gestationalAgeFromBiometry2: updatedLookupEntity.gestationalAgeFromBiometry2,
-                findings: updatedLookupEntity.findings,
-                notes: updatedLookupEntity.notes,
-                status: updatedLookupEntity.status,
-                examinationType: updatedLookupEntity.examinationType,
-                data: updatedLookupEntity.data,
-                patientAgeAtExam: updatedLookupEntity.patientAgeAtExam,
-                updatedAt: now,
-                updatedBy: user.userId
-            };
-
-            await updateEntity(EXAMINATIONS_TABLE, updatedPrimaryEntity);
         }
 
         await logExaminationUpdated(user.userId, examinationId, changedFields);

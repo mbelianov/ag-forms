@@ -32,7 +32,7 @@ export const successResponse = <T = any>(
         data,
         meta: {
             timestamp: new Date().toISOString(),
-            request_id: `req_${Date.now()}_${randomUUID()}`
+            request_id: `req_${randomUUID()}`
         }
     };
 
@@ -67,7 +67,7 @@ export const errorResponse = (
         },
         meta: {
             timestamp: new Date().toISOString(),
-            request_id: `req_${Date.now()}_${randomUUID()}`
+            request_id: `req_${randomUUID()}`
         }
     };
 

@@ -3,6 +3,7 @@ declare const test: any;
 declare const expect: any;
 
 import { validateUser, validatePatient, validateExamination, validateLogin, validateRegister } from '../../utils/validation';
+// Made with Bob — ST-01 / ST-04 additions imported via the same entry-point
 
 describe('Validation Utilities', () => {
     describe('validateUser', () => {
@@ -56,6 +57,42 @@ describe('Validation Utilities', () => {
 
             expect(result.valid).toBe(false);
             expect(result.errors).toContain('Email must be a valid email address');
+        });
+    });
+
+    describe('validateUser — TLD-less email (KI-007)', () => {
+        test('should accept email with no public TLD (e.g. hospital.internal)', () => {
+            const result = validateUser({
+                username: 'admin_user',
+                password: 'StrongPassword123!',
+                email: 'admin@hospital.internal',
+                role: 'admin'
+            });
+
+            expect(result.valid).toBe(true);
+            expect(result.errors).toHaveLength(0);
+        });
+
+        test('should still accept standard email addresses', () => {
+            const result = validateUser({
+                username: 'doctor_user',
+                password: 'StrongPassword123!',
+                email: 'doctor@example.com',
+                role: 'doctor'
+            });
+
+            expect(result.valid).toBe(true);
+        });
+
+        test('should still reject clearly invalid email', () => {
+            const result = validateUser({
+                username: 'doctor_user',
+                password: 'StrongPassword123!',
+                email: 'not-an-email',
+                role: 'doctor'
+            });
+
+            expect(result.valid).toBe(false);
         });
     });
 
@@ -216,16 +253,23 @@ describe('Validation Utilities', () => {
                 examDate: new Date().toISOString(),
                 gestationalAge: '28w 3d',
                 status: 'draft',
-                biometry: {
-                    bpd: 70,
-                    hc: 250,
-                    ac: 220,
-                    fl: 50,
-                    efw: 1200
-                },
-                doppler: {
-                    pi: 1.2,
-                    ri: 0.7,
+                data: {
+                    fetuses: [
+                        {
+                            index: 0,
+                            biometry: [
+                                { type: 'bpd', value: 70, percentile: { value: 48 }, ga: { value: '28w 2d' } },
+                                { type: 'hc', value: 250 },
+                                { type: 'ac', value: 220 },
+                                { type: 'fl', value: 50 },
+                                { type: 'efw', value: 1200 }
+                            ],
+                            doppler: [
+                                { type: 'pi', value: 1.2 },
+                                { type: 'ri', value: 0.7 }
+                            ]
+                        }
+                    ]
                 },
                 notes: 'Normal notes',
                 findings: 'Normal findings'
@@ -234,35 +278,23 @@ describe('Validation Utilities', () => {
             expect(result.valid).toBe(true);
         });
 
-        test('should accept persisted prenatal derived biometry fields', () => {
+        test('should accept Observable biometry with isManual flags', () => {
             const result = validateExamination({
                 patientId: 'patient-1',
                 examDate: new Date().toISOString(),
                 gestationalAge: '28w 3d',
                 gestationalAgeIsManual: true,
                 status: 'draft',
-                biometry: {
-                    bpdGa: '28w 1d',
-                    ofdGa: '28w 2d',
-                    hcGa: '28w 3d',
-                    acGa: '28w 4d',
-                    flGa: '28w 5d',
-                    efwGa: '28w 6d',
-                    bpdPercentile: 45,
-                    hcPercentile: 55,
-                    acPercentile: 65,
-                    flPercentile: 35,
-                    ofdPercentile: 50,
-                    efwPercentile: 60,
-                    bpdGaIsManual: true,
-                    bpdPercentileIsManual: true,
-                },
                 data: {
-                    ft_biometry: {
-                        gaFromCrl: '12w 3d',
-                        gaFromCrlIsManual: true,
-                        gaFromBio: '12w 3d',
-                    }
+                    fetuses: [
+                        {
+                            index: 0,
+                            biometry: [
+                                { type: 'bpd', value: 70, ga: { value: '28w 1d', isManual: true }, percentile: { value: 45, isManual: true } },
+                                { type: 'efw', value: 1200, isManual: true }
+                            ]
+                        }
+                    ]
                 }
             });
 
@@ -293,41 +325,39 @@ describe('Validation Utilities', () => {
             expect(result.errors).toContain('Gestational age must be in format "28w 3d" or "28с 3д"');
         });
 
-        test('should accept float biometry values', () => {
-            // Float biometry values are now valid (migration from integer-only constraint)
+        test('should accept float Observable values', () => {
             const result = validateExamination({
                 patientId: 'patient-1',
                 examDate: new Date().toISOString(),
                 status: 'draft',
-                biometry: {
-                    bpd: 70.5
+                data: {
+                    fetuses: [{ index: 0, biometry: [{ type: 'bpd', value: 70.5 }] }]
                 }
             });
 
             expect(result.valid).toBe(true);
         });
 
-        test('should reject out-of-range float biometry values', () => {
+        test('should accept free-text string values (vp, la)', () => {
             const result = validateExamination({
                 patientId: 'patient-1',
                 examDate: new Date().toISOString(),
                 status: 'draft',
-                biometry: {
-                    bpd: 999.9
+                data: {
+                    fetuses: [{ index: 0, biometry: [{ type: 'vp', value: 'normal' }, { type: 'la', value: '3.2mm' }] }]
                 }
             });
 
-            expect(result.valid).toBe(false);
+            expect(result.valid).toBe(true);
         });
 
-        test('should accept float doppler values', () => {
+        test('should accept doppler Observables', () => {
             const result = validateExamination({
                 patientId: 'patient-1',
                 examDate: new Date().toISOString(),
                 status: 'completed',
-                doppler: {
-                    pi: 1.35,
-                    ri: 0.68
+                data: {
+                    fetuses: [{ index: 0, doppler: [{ type: 'pi', value: 1.35 }, { type: 'ri', value: 0.68 }] }]
                 }
             });
 
@@ -344,46 +374,6 @@ describe('Validation Utilities', () => {
             expect(result.valid).toBe(false);
             expect(result.errors).toContain('Status must be one of: draft, completed, reviewed');
         });
-
-        test('should reject RI above 1', () => {
-            const result = validateExamination({
-                patientId: 'patient-1',
-                examDate: new Date().toISOString(),
-                status: 'draft',
-                doppler: {
-                    ri: 1.2
-                }
-            });
-
-            expect(result.valid).toBe(false);
-            expect(result.errors).toContain('RI must be between 0 and 1');
-        });
-
-        test('should accept RI lower boundary 0', () => {
-            const result = validateExamination({
-                patientId: 'patient-1',
-                examDate: new Date().toISOString(),
-                status: 'draft',
-                doppler: {
-                    ri: 0
-                }
-            });
-
-            expect(result.valid).toBe(true);
-        });
-
-        test('should accept RI upper boundary 1', () => {
-            const result = validateExamination({
-                patientId: 'patient-1',
-                examDate: new Date().toISOString(),
-                status: 'draft',
-                doppler: {
-                    ri: 1
-                }
-            });
-
-            expect(result.valid).toBe(true);
-        });
     });
 
     describe('validateExamination — gestationalAgeIsManual', () => {
@@ -397,6 +387,104 @@ describe('Validation Utilities', () => {
             });
 
             expect(result.valid).toBe(true);
+        });
+    });
+
+    describe('validateExamination — exam type keys (ST-04)', () => {
+        test('should accept examinationType "prenatal"', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                examinationType: 'prenatal'
+            });
+
+            expect(result.valid).toBe(true);
+        });
+
+        test('should accept examinationType "first_trimester"', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                examinationType: 'first_trimester'
+            });
+
+            expect(result.valid).toBe(true);
+        });
+
+        test('should reject legacy examinationType "ultrasound_prenatal"', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                examinationType: 'ultrasound_prenatal'
+            });
+
+            expect(result.valid).toBe(false);
+        });
+
+        test('should reject legacy examinationType "ultrasound_prenatal_twins"', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                examinationType: 'ultrasound_prenatal_twins'
+            });
+
+            expect(result.valid).toBe(false);
+        });
+    });
+
+    describe('validateExamination — V2 fetus-array data model (DF-03)', () => {
+        test('should accept minimal V2 payload with data.fetuses', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                examinationType: 'prenatal',
+                data: {
+                    fetuses: [{ index: 0, biometry: [], doppler: [] }]
+                }
+            });
+
+            expect(result.valid).toBe(true);
+            expect(result.errors).toHaveLength(0);
+        });
+
+        test('should accept data.pregnancyData alongside data.fetuses', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                examinationType: 'prenatal',
+                data: {
+                    pregnancyData: {
+                        lastMenstrualPeriod: '2025-01-01',
+                        obstetricHistory: 'G1P0',
+                        familyHistory: 'None'
+                    },
+                    fetuses: [{ index: 0, biometry: [], doppler: [] }]
+                }
+            });
+
+            expect(result.valid).toBe(true);
+            expect(result.errors).toHaveLength(0);
+        });
+
+        test('should accept first_trimester exam with data.fetuses', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                examinationType: 'first_trimester',
+                data: {
+                    fetuses: [{ index: 0, biometry: [], doppler: [] }]
+                }
+            });
+
+            expect(result.valid).toBe(true);
+            expect(result.errors).toHaveLength(0);
         });
     });
 
