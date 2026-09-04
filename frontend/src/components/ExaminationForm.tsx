@@ -21,6 +21,8 @@ import {
   DatePicker,
   DatePickerInput,
   NumberInput,
+  RadioButtonGroup,
+  RadioButton,
 } from '@carbon/react';
 import { EXAM_TYPES, getExamTypeLabel } from '../constants/examinationTypes';
 import { autoSuffix } from './AutoCalcHelpers';
@@ -250,24 +252,42 @@ export default function ExaminationForm(props: ExaminationFormProps) {
         {examConfig.markerTypes.length > 0 && (
           <div style={{ marginTop: '1.5rem' }}>
             <h5 className="observable-section-title">First Trimester Markers</h5>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
-              {examConfig.markerTypes.map(({ key, label }) => (
-                <Select
-                  key={key}
-                  id={`${prefix}_mkr_${key}`}
-                  labelText={label}
-                  value={markers[key] ?? ''}
-                  onChange={(e) => handleFetusDescriptorChange(fi, 'markers', key, e.target.value)}
-                  disabled={isSubmitting}
-                  size="sm"
-                >
-                  <SelectItem value="" text="Select" />
-                  <SelectItem value="absent" text="Absent" />
-                  <SelectItem value="present" text="Present" />
-                  <SelectItem value="normal" text="Normal" />
-                  <SelectItem value="abnormal" text="Abnormal" />
-                </Select>
-              ))}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+              {examConfig.markerTypes.map(({ key, label, inputType }) => {
+                const value = markers[key] ?? '';
+                if (inputType === 'text') {
+                  return (
+                    <TextInput
+                      key={key}
+                      id={`${prefix}_mkr_${key}`}
+                      labelText={label}
+                      value={value}
+                      onChange={(e) => handleFetusDescriptorChange(fi, 'markers', key, e.target.value)}
+                      disabled={isSubmitting}
+                      size="sm"
+                    />
+                  );
+                }
+                // boolean — Yes / No radio group with clear
+                return (
+                  <div key={key}>
+                    <RadioButtonGroup
+                      legendText={label}
+                      name={`${prefix}_mkr_${key}`}
+                      valueSelected={value || 'none'}
+                      onChange={(val: string) =>
+                        handleFetusDescriptorChange(fi, 'markers', key, val === 'none' ? '' : val)
+                      }
+                      disabled={isSubmitting}
+                      orientation="horizontal"
+                    >
+                      <RadioButton labelText="Yes" value="yes" id={`${prefix}_mkr_${key}_yes`} />
+                      <RadioButton labelText="No"  value="no"  id={`${prefix}_mkr_${key}_no`}  />
+                      <RadioButton labelText="—"   value="none" id={`${prefix}_mkr_${key}_none`} />
+                    </RadioButtonGroup>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -512,14 +532,6 @@ export default function ExaminationForm(props: ExaminationFormProps) {
           labelText="Comments"
           value={formData.comments}
           onChange={(e) => handleChange('comments', e.target.value)}
-          rows={3}
-          disabled={isSubmitting}
-        />
-        <TextArea
-          id="clinicalNotes"
-          labelText="Notes"
-          value={formData.clinicalNotes}
-          onChange={(e) => handleChange('clinicalNotes', e.target.value)}
           rows={3}
           disabled={isSubmitting}
         />

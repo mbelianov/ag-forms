@@ -349,3 +349,22 @@ For an FT twins exam, the same blob also carries `twin2_ft_biometry`, `twin2_ft_
   - In `pdfSections.ts`: import `EXAM_TYPE_CONFIG` and iterate `markerTypes` to build the label/value rows for the markers PDF block instead of the hardcoded `[label, value]` array.
 - **Priority:** P3 · Low — no current user impact; becomes a real bug the moment any marker definition changes
 - **Status:** Deferred — to be handled after current V2 stabilisation sprint
+
+---
+
+## KI-012 · `clinicalNotes` / `notes` field retained in data model but removed from input form
+
+- **Files:**
+  - `frontend/src/hooks/useExaminationForm.ts` — `clinicalNotes` field in `ExaminationFormData` state; mapped to `notes` in the submit payload
+  - `frontend/src/types/formData.ts` — `clinicalNotes: string` on `ExaminationFormData`
+  - `api/src/types/index.ts` — `notes?: string` on `Examination` entity
+  - `api/src/functions/CreateExamination.ts` / `UpdateExamination.ts` — accept and store `notes`
+  - `frontend/src/pages/ExaminationDetailPage.tsx` — may render `notes` on the detail page
+  - `frontend/src/components/reports/pdfSections.ts` — may include `notes` in the PDF
+- **Symptom:** None — the Notes `<TextArea>` was intentionally removed from `ExaminationForm.tsx` because Findings and Comments are sufficient. No user-visible regression.
+- **Residual state:** `clinicalNotes` remains in `ExaminationFormData` and is still sent in the create/update payload as `notes: formData.clinicalNotes` (always empty string for new exams). Existing records that previously had `notes` data are unaffected — the field is still stored and returned by the API.
+- **Decision needed:**
+  - **Option A — Full removal:** Delete `clinicalNotes` from `ExaminationFormData`, remove `notes` from the create/update payload, remove `notes` rendering from the detail page and PDF. Requires a decision on whether existing records with non-empty `notes` should be migrated (copy to `findings` or `comments`) or silently dropped from display.
+  - **Option B — Keep in model, hide in form (current state):** Leave the field in the data model and API layer. Existing notes are preserved and still visible on the detail page/PDF if present. New exams simply have an empty `notes` field. No migration needed.
+- **Priority:** P3 · Low — no functional or clinical impact; purely a housekeeping decision
+- **Status:** Deferred — Option B is the current state. Revisit when deciding whether to fully retire the `notes` field.

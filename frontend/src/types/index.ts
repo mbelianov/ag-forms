@@ -76,8 +76,9 @@ export interface ObservableTypeConfig {
 }
 
 export interface MarkerTypeConfig {
-  key: string;    // storage key: "arrhythmia", "cordInsertion", etc.
-  label: string;  // display label
+  key: string;                    // storage key: "arrhythmia", "cordInsertion", etc.
+  label: string;                  // display label
+  inputType: 'boolean' | 'text'; // 'boolean' → Yes/No radios; 'text' → plain TextInput
 }
 
 export interface ExamTypeConfig {
