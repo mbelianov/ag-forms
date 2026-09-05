@@ -9,6 +9,7 @@ import {
   calcEDD,
   fmtBiometry,
 } from '../utils/calculations';
+import { EXAM_TYPE_CONFIG } from '../constants/examinationTypes';
 import type { Examination, Observable, FetusSectionData } from '../types';
 import type { ExamPdfViewModel, FetusPdfViewModel, ObservablePdfEntry } from './print.service';
 
@@ -121,61 +122,79 @@ function buildObservablePdfEntry(obs: Observable): ObservablePdfEntry {
 
 function buildFetusPdfViewModel(
   fetus: FetusSectionData,
-  isFt: boolean,
+  examType: string,
 ): FetusPdfViewModel {
+  const config = EXAM_TYPE_CONFIG[examType] ?? EXAM_TYPE_CONFIG['prenatal'];
   const result: FetusPdfViewModel = {
     index: fetus.index,
     biometry: (fetus.biometry ?? []).map(buildObservablePdfEntry),
     doppler: (fetus.doppler ?? []).map(buildObservablePdfEntry),
   };
 
-  // Ultrasound findings
+  // Ultrasound findings — config-driven
   const uf = fetus.ultrasoundFindings;
   if (uf) {
-    result.ultrasound = {
-      presentation: uf['presentation'] as string | undefined,
-      gender: uf['gender'] as string | undefined,
-      heartRate: uf['heart_rate'] != null ? `${uf['heart_rate']} bpm` : undefined,
-      fetalMovement: uf['fetal_movement'] as string | undefined,
-      placenta: uf['placenta'] as string | undefined,
-      umbilicalCord: uf['umbilical_cord'] as string | undefined,
-    };
+    const ufResult: Record<string, string | undefined> = {};
+    for (const tc of config.ultrasoundFindingTypes) {
+      const raw = uf[tc.key];
+      if (raw != null && raw !== '') {
+        const opt = tc.options?.find(o => o.value === raw);
+        if (opt) {
+          ufResult[tc.key] = opt.label;
+        } else {
+          const s = String(raw);
+          const capitalized = s.charAt(0).toUpperCase() + s.slice(1);
+          ufResult[tc.key] = tc.unit && !s.includes(tc.unit) ? `${capitalized} ${tc.unit}` : capitalized;
+        }
+      } else {
+        ufResult[tc.key] = undefined;
+      }
+    }
+    // Set explicit named aliases
+    ufResult.presentation = ufResult['presentation'];
+    ufResult.gender = ufResult['gender'];
+    ufResult.heartRate = ufResult['heart_rate'];
+    ufResult.fetalMovement = ufResult['fetal_movement'];
+    ufResult.placenta = ufResult['placenta'];
+    ufResult.umbilicalCord = ufResult['umbilical_cord'];
+    result.ultrasound = ufResult as any;
   }
 
-  // Anatomy
+  // Anatomy — config-driven
   const an = fetus.anatomy;
   if (an) {
-    result.anatomy = {
-      head: an['head'],
-      brain: an['brain'],
-      heart: an['heart'],
-      abdomen: an['abdomen'],
-      kidneys: an['kidneys'],
-      limbs: an['limbs'],
-      skeleton: an['skeleton'],
-      face: an['face'],
-      neckSkin: an['neckSkin'],
-      spine: an['spine'],
-      thorax: an['thorax'],
-    };
+    const anResult: Record<string, string | undefined> = {};
+    for (const tc of config.anatomyTypes) {
+      const raw = an[tc.key];
+      anResult[tc.key] = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : undefined;
+    }
+    anResult.head = anResult['head'];
+    anResult.brain = anResult['brain'];
+    anResult.heart = anResult['heart'];
+    anResult.abdomen = anResult['abdomen'];
+    anResult.kidneys = anResult['kidneys'];
+    anResult.limbs = anResult['limbs'];
+    anResult.skeleton = anResult['skeleton'];
+    anResult.face = anResult['face'];
+    anResult.neckSkin = anResult['neckSkin'];
+    anResult.spine = anResult['spine'];
+    anResult.thorax = anResult['thorax'];
+    result.anatomy = anResult as any;
   }
 
-  // Markers — first trimester only
-  if (isFt && fetus.markers) {
+  // Markers — config-driven (KI-011 fix)
+  if (config.markerTypes.length > 0 && fetus.markers) {
     const mk = fetus.markers;
-    const yn = (v: string | undefined) => v === 'yes' ? 'Yes' : v === 'no' ? 'No' : v;
-    result.markers = {
-      arrhythmia:             yn(mk['arrhythmia']),
-      tricuspidRegurgitation: yn(mk['tricuspidRegurgitation']),
-      abnormalDvFlow:         yn(mk['abnormalDvFlow']),
-      echogenicCardiacFocus:  yn(mk['echogenicCardiacFocus']),
-      singleUmbilicalArtery:  yn(mk['singleUmbilicalArtery']),
-      choroidPlexusCysts:     yn(mk['choroidPlexusCysts']),
-      exomphalos:             yn(mk['exomphalos']),
-      megacystis:             yn(mk['megacystis']),
-      placenta:               mk['placenta'],
-      cordInsertion:          mk['cordInsertion'],
-    };
+    const mkResult: Record<string, string | undefined> = {};
+    for (const mt of config.markerTypes) {
+      const val = mk[mt.key];
+      if (mt.inputType === 'boolean') {
+        mkResult[mt.key] = val === 'yes' || val === 'true' ? 'Yes' : val === 'no' || val === 'false' ? 'No' : val;
+      } else {
+        mkResult[mt.key] = val || undefined;
+      }
+    }
+    result.markers = mkResult as any;
   }
 
   // GA from biometry composite
@@ -193,7 +212,8 @@ function buildFetusPdfViewModel(
 
 export function buildViewModel(exam: Examination): ExamPdfViewModel {
   const lmp = exam.data?.pregnancyData?.lastMenstrualPeriod;
-  const isFt = exam.examinationType === 'first_trimester';
+  const examType = exam.examinationType ?? 'prenatal';
+  const isFt = examType === 'first_trimester';
   const fetuses = exam.data?.fetuses ?? [];
 
   // Notes: citations + always-static dagger footnote (§13.4 R-11)
@@ -211,7 +231,7 @@ export function buildViewModel(exam: Examination): ExamPdfViewModel {
     gestationalAge: withManualMarker(exam.gestationalAge, exam.gestationalAgeIsManual),
     expectedDeliveryDate: lmp ? calcEDD(lmp) : undefined,
 
-    fetuses: fetuses.map(f => buildFetusPdfViewModel(f, isFt)),
+    fetuses: fetuses.map(f => buildFetusPdfViewModel(f, examType)),
 
     pregnancy: {
       lmp: lmp ? fmtDate(lmp) : undefined,

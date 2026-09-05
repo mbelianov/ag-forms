@@ -40,17 +40,17 @@ export interface ObservableCalculationDescriptor {
 export const OBSERVABLE_CALC_REGISTRY: Record<string, ObservableCalculationDescriptor> = {
   // Prenatal standard biometry
   bpd: { calcGa: calcGAFromBPD, calcPercentile: calcBPDPercentile,
-         validRange: { min: 20, max: 110 }, sourceTag: 'Hadlock' },
+         validRange: { min: 23.8, max: 97.6 }, sourceTag: 'Hadlock' },
   hc:  { calcGa: calcGAFromHC,  calcPercentile: calcHCPercentile,
-         validRange: { min: 60, max: 360 }, sourceTag: 'Hadlock' },
+         validRange: { min: 89.4, max: 345.5 }, sourceTag: 'Hadlock' },
   ac:  { calcGa: calcGAFromAC,  calcPercentile: calcACPercentile,
-         validRange: { min: 60, max: 380 }, sourceTag: 'Hadlock' },
+         validRange: { min: 75.2, max: 360.8 }, sourceTag: 'Hadlock' },
   fl:  { calcGa: calcGAFromFL,  calcPercentile: calcFLPercentile,
-         validRange: { min: 10, max: 80 },  sourceTag: 'Hadlock' },
+         validRange: { min: 13.6, max: 78.2 },  sourceTag: 'Hadlock' },
   ofd: { calcGa: calcGAFromOFD, calcPercentile: calcOFDPercentile,
-         validRange: { min: 20, max: 120 }, sourceTag: 'Hadlock' },
+         validRange: { min: 35.5, max: 123.7 }, sourceTag: 'Hadlock' },
   tcd: { calcGa: calcGAFromTCD, calcPercentile: calcTCDPercentile,
-         validRange: { min: 10, max: 60 },  sourceTag: 'Chitty' },
+         validRange: { min: 11.1, max: 51.3 },  sourceTag: 'Chitty' },
   // First trimester
   crl: { calcGa: calcGAFromCRL,
          validRange: { min: 10, max: 65 },  sourceTag: 'Robinson' },
@@ -176,23 +176,24 @@ export function computeObservableDerivedFields(
 }
 
 /**
- * Compute the composite GA from biometry (from BPD/HC/AC/FL for prenatal; from CRL for FT).
+ * Compute the composite GA from biometry.
+ * First trimester: Robinson formula from CRL.
+ * Prenatal: Hadlock composite from BPD/HC/AC/FL.
  * Returns a string like "28w 3d" or '' if cannot be computed.
  */
-export function computeGaFromBiometry(biometry: ObservableFormMap): string {
+export function computeGaFromBiometry(
+  biometry: ObservableFormMap,
+  examType: 'prenatal' | 'first_trimester',
+): string {
+  if (examType === 'first_trimester') {
+    const crl = parseFloat(biometry['crl']?.value?.value ?? '') || undefined;
+    const crlGa = crl ? OBSERVABLE_CALC_REGISTRY['crl']?.calcGa?.(crl) : undefined;
+    return crlGa ?? '';
+  }
   const bpd = parseFloat(biometry['bpd']?.value?.value ?? '') || undefined;
   const hc  = parseFloat(biometry['hc']?.value?.value  ?? '') || undefined;
   const ac  = parseFloat(biometry['ac']?.value?.value  ?? '') || undefined;
   const fl  = parseFloat(biometry['fl']?.value?.value  ?? '') || undefined;
-  // CRL for FT
-  const crl = parseFloat(biometry['crl']?.value?.value ?? '') || undefined;
-
-  if (crl) {
-    // FT: GA from CRL
-    const crlGa = OBSERVABLE_CALC_REGISTRY['crl']?.calcGa?.(crl);
-    return crlGa ?? '';
-  }
-  // Prenatal: composite from BPD/HC/AC/FL
   return calcGAFromBiometry(bpd, hc, ac, fl) ?? '';
 }
 

@@ -11,7 +11,7 @@
  * Entity-level fields (examDate, status, LMP, gestationalAge, etc.) use the
  * existing `handleChange(field, value)` signature unchanged.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type {
   Examination,
   CreateExaminationRequest,
@@ -183,7 +183,7 @@ export function useExaminationForm({
 
       // Also compute gaFromBiometry if not manual
       const newGaBio = (!fetus.gaFromBiometry.isManual)
-        ? computeGaFromBiometry({ ...fetus.biometry, ...biometryUpdates })
+        ? computeGaFromBiometry({ ...fetus.biometry, ...biometryUpdates }, formData.examinationType)
         : null;
 
       const gaChanged = newGaBio !== null && newGaBio !== fetus.gaFromBiometry.value;
@@ -220,7 +220,7 @@ export function useExaminationForm({
   const patientAge = calculateAgeAtDate(selectedPatient?.birthDate ?? '', formData.examinationDate);
 
   // ── Entity-level handleChange ────────────────────────────────────────────────
-  const handleChange = (field: string, value: string) => {
+  const handleChange = useCallback((field: string, value: string) => {
     setFormData(prev => {
       if (field === 'gestationalAge') {
         return { ...prev, gestationalAge: autoCalc(value, value !== '') };
@@ -237,17 +237,16 @@ export function useExaminationForm({
       }
       return { ...prev, [field]: value };
     });
-    if (errors[field]) {
-      setErrors(prev => {
-        const next = { ...prev };
-        delete next[field];
-        return next;
-      });
-    }
-  };
+    setErrors(prev => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }, [isEdit]);
 
   // ── Per-fetus observable handleFetusChange ───────────────────────────────────
-  const handleFetusChange = (
+  const handleFetusChange = useCallback((
     index: number,
     section: 'biometry' | 'doppler',
     type: string,
@@ -260,6 +259,41 @@ export function useExaminationForm({
       const sectionMap = { ...fetus[section] };
       const existing = sectionMap[type] ?? { value: autoCalc('') };
       sectionMap[type] = { ...existing, [field]: next };
+
+      // REQ-9 (§4.2): when the raw measurement value changes, reset sibling derived
+      // field isManual flags so the reactive auto-calc effect overwrites them.
+      if (section === 'biometry' && field === 'value' && type !== 'efw') {
+        const current = sectionMap[type];
+        const isDeleted = next.value.trim() === '';
+        sectionMap[type] = {
+          ...current,
+          ...(current?.percentile ? { percentile: isDeleted ? autoCalc('', false) : { ...current.percentile, isManual: false } } : {}),
+          ...(current?.ga         ? { ga:         isDeleted ? autoCalc('', false) : { ...current.ga,         isManual: false } } : {}),
+        };
+
+        // REQ-9 for EFW: BPD/HC/AC/FL are EFW source measurements.
+        // Reset efw.value.isManual so the Hadlock formula can recompute it.
+        if (['bpd', 'hc', 'ac', 'fl'].includes(type)) {
+          const efwEntry = sectionMap['efw'];
+          if (efwEntry) {
+            sectionMap['efw'] = {
+              ...efwEntry,
+              value:      isDeleted ? autoCalc('', false) : { ...efwEntry.value,     isManual: false },
+              percentile: isDeleted ? autoCalc('', false) : { ...efwEntry.percentile, isManual: false },
+              ga:         isDeleted ? autoCalc('', false) : { ...efwEntry.ga,         isManual: false },
+            };
+          }
+        }
+
+        // REQ-9 for gaFromBiometry: source measurement changed, let composite GA recompute.
+        // gaFromBiometry sources: BPD/HC/AC/FL (prenatal) or CRL (first trimester).
+        if (['bpd', 'hc', 'ac', 'fl', 'crl'].includes(type)) {
+          fetus.gaFromBiometry = isDeleted
+            ? autoCalc('', false)
+            : { ...fetus.gaFromBiometry, isManual: false };
+        }        
+      }
+
       fetus[section] = sectionMap;
 
       // EFW cascade: if user manually enters EFW value, force percentile & GA isManual = true
@@ -281,10 +315,10 @@ export function useExaminationForm({
       newFetuses[index] = fetus;
       return { ...prev, fetuses: newFetuses };
     });
-  };
+  }, []);
 
   // ── Per-fetus descriptor (anatomy/ultrasoundFindings/markers/gaFromBiometry) ──
-  const handleFetusDescriptorChange = (
+  const handleFetusDescriptorChange = useCallback((
     index: number,
     section: 'ultrasoundFindings' | 'anatomy' | 'markers' | 'gaFromBiometry',
     field: string,
@@ -303,10 +337,10 @@ export function useExaminationForm({
       newFetuses[index] = fetus;
       return { ...prev, fetuses: newFetuses };
     });
-  };
+  }, []);
 
   // ── handleFetusCountChange (create form only) ────────────────────────────────
-  const handleFetusCountChange = (newCount: number) => {
+  const handleFetusCountChange = useCallback((newCount: number) => {
     if (isEdit) return; // locked on edit
     const count = Math.max(1, Math.min(newCount, 10)); // sensible bounds
     setFormData(prev => {
@@ -326,7 +360,7 @@ export function useExaminationForm({
       }
       return { ...prev, fetusCount: count, fetuses: newFetuses };
     });
-  };
+  }, [isEdit]);
 
   // ── Validation ───────────────────────────────────────────────────────────────
   const validateGA = (raw: string): string | undefined =>
@@ -443,12 +477,15 @@ export function useExaminationForm({
     }
   };
 
+  const clearSubmitError = useCallback(() => setSubmitError(null), []);
+
   return {
     formData,
     setFormData,
     errors,
     isSubmitting,
     submitError,
+    clearSubmitError,
     edd,
     examConfig,
     selectedPatient,

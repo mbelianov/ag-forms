@@ -30,6 +30,8 @@ import { ObservableSection } from './sections/ObservableSection';
 import { DopplerSection } from './sections/DopplerSection';
 import { useExaminationForm } from '../hooks/useExaminationForm';
 import type { ExaminationFormProps } from '../hooks/useExaminationForm';
+import type { ExamTypeConfig } from '../types';
+import type { FetusSectionFormData, ObservableFormFieldState, AutoCalcValue } from '../types/formData';
 
 export type { ExaminationFormProps };
 
@@ -51,6 +53,235 @@ function todayDisplayDate(): string {
   return toDisplayDate(toISODate(new Date()));
 }
 
+// ── Module-scope styles ───────────────────────────────────────────────────────
+
+const styleRow3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' };
+const styleRow4: React.CSSProperties = { display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr 1fr', gap: '0.75rem' };
+
+const styleFetusSectionContainer: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'row',
+  flexWrap: 'nowrap',
+  gap: '1.5rem',
+  width: '100%',
+  overflowX: 'auto',
+};
+
+const styleFetusColumn: React.CSSProperties = {
+  minWidth: '480px',
+  flex: '0 0 calc(50% - 0.75rem)',
+};
+
+const styleFetusHeader: React.CSSProperties = { marginBottom: '1rem', fontWeight: 600, fontSize: '1rem' };
+const styleUFSection: React.CSSProperties = { marginBottom: '1rem' };
+const styleUFGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' };
+const styleAnatomySection: React.CSSProperties = { marginTop: '1.5rem' };
+const styleAnatomyGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' };
+const styleMarkersSection: React.CSSProperties = { marginTop: '1.5rem' };
+const styleMarkersGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' };
+
+// ── FetusSection ──────────────────────────────────────────────────────────────
+
+interface FetusSectionProps {
+  fi: number;
+  fetus: FetusSectionFormData;
+  fetusCount: number;
+  examConfig: ExamTypeConfig;
+  errors: Record<string, string>;
+  isSubmitting: boolean;
+  onFetusChange: (
+    index: number,
+    section: 'biometry' | 'doppler',
+    type: string,
+    field: keyof ObservableFormFieldState,
+    next: AutoCalcValue<string>,
+  ) => void;
+  onFetusDescriptorChange: (
+    index: number,
+    section: 'ultrasoundFindings' | 'anatomy' | 'markers' | 'gaFromBiometry',
+    field: string,
+    value: string,
+  ) => void;
+}
+
+const FetusSection = React.memo(function FetusSection({
+  fi,
+  fetus,
+  fetusCount,
+  examConfig,
+  errors,
+  isSubmitting,
+  onFetusChange,
+  onFetusDescriptorChange,
+}: FetusSectionProps) {
+  const uf = fetus.ultrasoundFindings as Record<string, string>;
+  const anat = fetus.anatomy as Record<string, string>;
+  const markers = fetus.markers as Record<string, string>;
+  const prefix = `f${fi}`;
+
+  return (
+    <div style={styleFetusColumn}>
+      {/* Column header — only when multiple fetuses */}
+      {fetusCount > 1 && (
+        <h3 style={styleFetusHeader}>
+          Fetus {fi + 1}
+        </h3>
+      )}
+
+      {/* Ultrasound Findings */}
+      {examConfig.ultrasoundFindingTypes.length > 0 && (
+        <div style={styleUFSection}>
+          <h5 className="observable-section-title">Ultrasound Findings</h5>
+          <div style={styleUFGrid}>
+            {examConfig.ultrasoundFindingTypes.map((tc) => {
+              const val = uf[tc.key] ?? '';
+              const label = tc.unit && tc.inputType === 'text' && tc.key === 'heart_rate' ? 'FHR (bpm)' : tc.label;
+              if (tc.inputType === 'select' && tc.options) {
+                return (
+                  <Select
+                    key={tc.key}
+                    id={`${prefix}_uf_${tc.key}`}
+                    labelText={label}
+                    value={val}
+                    onChange={(e) => onFetusDescriptorChange(fi, 'ultrasoundFindings', tc.key, e.target.value)}
+                    disabled={isSubmitting}
+                    size="sm"
+                  >
+                    <SelectItem value="" text="Select" />
+                    {tc.options.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value} text={opt.label} />
+                    ))}
+                  </Select>
+                );
+              }
+              return (
+                <TextInput
+                  key={tc.key}
+                  id={`${prefix}_uf_${tc.key}`}
+                  labelText={label}
+                  placeholder={tc.placeholder}
+                  value={val}
+                  onChange={(e) => onFetusDescriptorChange(fi, 'ultrasoundFindings', tc.key, e.target.value)}
+                  invalid={tc.key === 'heart_rate' ? !!errors[`${prefix}_hr`] : undefined}
+                  invalidText={tc.key === 'heart_rate' ? errors[`${prefix}_hr`] : undefined}
+                  disabled={isSubmitting}
+                  size="sm"
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <h5 className="observable-section-title">Biometry</h5>
+      {/* GA from Biometry */}
+      <TextInput
+        id={`${prefix}_gaFromBio`}
+        labelText={
+          <>
+            GA from Biometry {autoSuffix(
+              fetus.gaFromBiometry.isManual, 
+              examConfig.trimester === 'first' ? 'Robinson' : 'Hadlock', 
+              !!fetus.gaFromBiometry.value)}
+          </>
+        }
+        placeholder="auto"
+        value={fetus.gaFromBiometry.value}
+        onChange={(e) => onFetusDescriptorChange(fi, 'gaFromBiometry', '', e.target.value)}
+        invalid={!!errors[`${prefix}_gaFromBio`]}
+        invalidText={errors[`${prefix}_gaFromBio`]}
+        disabled={isSubmitting}
+        style={{ marginBottom: '1rem' }}
+      />
+
+      {/* Biometry section */}
+      <ObservableSection
+        title="Measurements"
+        fetusIndex={fi}
+        sectionKey="biometry"
+        typeConfigs={examConfig.biometryTypes}
+        data={fetus.biometry}
+        disabled={isSubmitting}
+        onFieldChange={onFetusChange}
+      />
+
+      {/* Doppler section */}
+      <DopplerSection
+        fetusIndex={fi}
+        vesselConfigs={examConfig.dopplerVessels}
+        singleConfigs={examConfig.dopplerSingle}
+        data={fetus.doppler}
+        disabled={isSubmitting}
+        onFieldChange={onFetusChange}
+      />
+
+      {/* Anatomy */}
+      {examConfig.anatomyTypes.length > 0 && (
+        <div style={styleAnatomySection}>
+          <h5 className="observable-section-title">Anatomy</h5>
+          <div style={styleAnatomyGrid}>
+            {examConfig.anatomyTypes.map(({ key, label }) => (
+              <TextInput
+                key={key}
+                id={`${prefix}_anat_${key}`}
+                labelText={label}
+                value={anat[key] ?? ''}
+                onChange={(e) => onFetusDescriptorChange(fi, 'anatomy', key, e.target.value)}
+                disabled={isSubmitting}
+                size="sm"
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Markers — config-driven, only rendered when markerTypes is non-empty */}
+      {examConfig.markerTypes.length > 0 && (
+        <div style={styleMarkersSection}>
+          <h5 className="observable-section-title">First Trimester Markers</h5>
+          <div style={styleMarkersGrid}>
+            {examConfig.markerTypes.map(({ key, label, inputType }) => {
+              const value = markers[key] ?? '';
+              if (inputType === 'text') {
+                return (
+                  <TextInput
+                    key={key}
+                    id={`${prefix}_mkr_${key}`}
+                    labelText={label}
+                    value={value}
+                    onChange={(e) => onFetusDescriptorChange(fi, 'markers', key, e.target.value)}
+                    disabled={isSubmitting}
+                    size="sm"
+                  />
+                );
+              }
+              // boolean — Yes / No radio group with clear
+              return (
+                <div key={key}>
+                  <RadioButtonGroup
+                    legendText={label}
+                    name={`${prefix}_mkr_${key}`}
+                    valueSelected={value || 'none'}
+                    onChange={(val: string) =>
+                      onFetusDescriptorChange(fi, 'markers', key, val === 'none' ? '' : val)
+                    }
+                    disabled={isSubmitting}
+                    orientation="horizontal"
+                  >
+                    <RadioButton labelText="Yes" value="yes" id={`${prefix}_mkr_${key}_yes`} />
+                    <RadioButton labelText="No"  value="no"  id={`${prefix}_mkr_${key}_no`}  />
+                    <RadioButton labelText="—"   value="none" id={`${prefix}_mkr_${key}_none`} />
+                  </RadioButtonGroup>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ExaminationForm(props: ExaminationFormProps) {
@@ -59,6 +290,7 @@ export default function ExaminationForm(props: ExaminationFormProps) {
     errors,
     isSubmitting,
     submitError,
+    clearSubmitError,
     edd,
     examConfig,
     patientAge,
@@ -71,244 +303,22 @@ export default function ExaminationForm(props: ExaminationFormProps) {
 
   const { examination, patients, preselectedPatientId, onCancel, isEdit = false } = props;
 
-  // Dismiss submit error helper (not exposed from hook, managed locally)
-  const [localSubmitError, setLocalSubmitError] = React.useState<string | null>(null);
-  React.useEffect(() => {
-    setLocalSubmitError(submitError);
-  }, [submitError]);
-
   const fetusCount = formData.fetuses.length;
-
-  // Layout helpers
-  const row3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' };
-  const row4: React.CSSProperties = { display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr 1fr', gap: '0.75rem' };
-
-  // Fetus section container (§13.3)
-  const fetusSectionContainerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'row',
-    flexWrap: 'nowrap',
-    gap: '1.5rem',
-    width: '100%',
-    overflowX: 'auto',
-  };
-
-  const fetusColumnStyle: React.CSSProperties = {
-    minWidth: '480px',
-    flex: '0 0 calc(50% - 0.75rem)',
-  };
-
-  const renderFetusSections = (fi: number) => {
-    const fetus = formData.fetuses[fi];
-    if (!fetus) return null;
-    const config = examConfig;
-    const uf = fetus.ultrasoundFindings as Record<string, string>;
-    const anat = fetus.anatomy as Record<string, string>;
-    const markers = fetus.markers as Record<string, string>;
-    const prefix = `f${fi}`;
-
-    return (
-      <div key={fi} style={fetusColumnStyle}>
-        {/* Column header — only when multiple fetuses */}
-        {fetusCount > 1 && (
-          <h3 style={{ marginBottom: '1rem', fontWeight: 600, fontSize: '1rem' }}>
-            Fetus {fi + 1}
-          </h3>
-        )}
-
-        {/* Ultrasound Findings */}
-        <div style={{ marginBottom: '1rem' }}>
-          <h5 className="observable-section-title">Ultrasound Findings</h5>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
-            <Select
-              id={`${prefix}_uf_presentation`}
-              labelText="Presentation"
-              value={uf.presentation ?? ''}
-              onChange={(e) => handleFetusDescriptorChange(fi, 'ultrasoundFindings', 'presentation', e.target.value)}
-              disabled={isSubmitting}
-              size="sm"
-            >
-              <SelectItem value="" text="Select" />
-              <SelectItem value="cephalic" text="Cephalic" />
-              <SelectItem value="breech" text="Breech" />
-              <SelectItem value="transverse" text="Transverse" />
-              <SelectItem value="oblique" text="Oblique" />
-            </Select>
-            <Select
-              id={`${prefix}_uf_gender`}
-              labelText="Gender"
-              value={uf.gender ?? ''}
-              onChange={(e) => handleFetusDescriptorChange(fi, 'ultrasoundFindings', 'gender', e.target.value)}
-              disabled={isSubmitting}
-              size="sm"
-            >
-              <SelectItem value="" text="Select" />
-              <SelectItem value="male" text="Male" />
-              <SelectItem value="female" text="Female" />
-              <SelectItem value="unknown" text="Unknown" />
-            </Select>
-            <TextInput
-              id={`${prefix}_uf_heart_rate`}
-              labelText="FHR (bpm)"
-              placeholder="e.g. 145"
-              value={uf.heart_rate ?? ''}
-              onChange={(e) => handleFetusDescriptorChange(fi, 'ultrasoundFindings', 'heart_rate', e.target.value)}
-              invalid={!!errors[`${prefix}_hr`]}
-              invalidText={errors[`${prefix}_hr`]}
-              disabled={isSubmitting}
-              size="sm"
-            />
-            <Select
-              id={`${prefix}_uf_fetal_movement`}
-              labelText="Fetal Movement"
-              value={uf.fetal_movement ?? ''}
-              onChange={(e) => handleFetusDescriptorChange(fi, 'ultrasoundFindings', 'fetal_movement', e.target.value)}
-              disabled={isSubmitting}
-              size="sm"
-            >
-              <SelectItem value="" text="Select" />
-              <SelectItem value="active" text="Active" />
-              <SelectItem value="present" text="Present" />
-              <SelectItem value="reduced" text="Reduced" />
-              <SelectItem value="absent" text="Absent" />
-            </Select>
-            <TextInput
-              id={`${prefix}_uf_placenta`}
-              labelText="Placenta"
-              value={uf.placenta ?? ''}
-              onChange={(e) => handleFetusDescriptorChange(fi, 'ultrasoundFindings', 'placenta', e.target.value)}
-              disabled={isSubmitting}
-              size="sm"
-            />
-            <TextInput
-              id={`${prefix}_uf_umbilical_cord`}
-              labelText="Umbilical Cord"
-              value={uf.umbilical_cord ?? ''}
-              onChange={(e) => handleFetusDescriptorChange(fi, 'ultrasoundFindings', 'umbilical_cord', e.target.value)}
-              disabled={isSubmitting}
-              size="sm"
-            />
-          </div>
-        </div>
-
-        <h5 className="observable-section-title">Biometry</h5>
-        {/* GA from Biometry */}
-        <TextInput
-          id={`${prefix}_gaFromBio`}
-          labelText={
-            <>
-              GA from Biometry {autoSuffix(fetus.gaFromBiometry.isManual, undefined, !!fetus.gaFromBiometry.value)}
-            </>
-          }
-          placeholder="auto"
-          value={fetus.gaFromBiometry.value}
-          onChange={(e) => handleFetusDescriptorChange(fi, 'gaFromBiometry', '', e.target.value)}
-          invalid={!!errors[`${prefix}_gaFromBio`]}
-          invalidText={errors[`${prefix}_gaFromBio`]}
-          disabled={isSubmitting}
-          style={{ marginBottom: '1rem' }}
-        />
-
-        {/* Biometry section */}
-        <ObservableSection
-          title="Measurements"
-          fetusIndex={fi}
-          sectionKey="biometry"
-          typeConfigs={config.biometryTypes}
-          data={fetus.biometry}
-          disabled={isSubmitting}
-          onFieldChange={handleFetusChange}
-        />
-
-        {/* Doppler section */}
-        <DopplerSection
-          fetusIndex={fi}
-          vesselConfigs={config.dopplerVessels}
-          singleConfigs={config.dopplerSingle}
-          data={fetus.doppler}
-          disabled={isSubmitting}
-          onFieldChange={handleFetusChange}
-        />
-
-        {/* Anatomy */}
-        <div style={{ marginTop: '1.5rem' }}>
-          <h5 className="observable-section-title">Anatomy</h5>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
-            {['head','brain','heart','abdomen','kidneys','limbs','skeleton','face','neckSkin','spine','thorax'].map(key => (
-              <TextInput
-                key={key}
-                id={`${prefix}_anat_${key}`}
-                labelText={key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}
-                value={anat[key] ?? ''}
-                onChange={(e) => handleFetusDescriptorChange(fi, 'anatomy', key, e.target.value)}
-                disabled={isSubmitting}
-                size="sm"
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Markers — config-driven, only rendered when markerTypes is non-empty */}
-        {examConfig.markerTypes.length > 0 && (
-          <div style={{ marginTop: '1.5rem' }}>
-            <h5 className="observable-section-title">First Trimester Markers</h5>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-              {examConfig.markerTypes.map(({ key, label, inputType }) => {
-                const value = markers[key] ?? '';
-                if (inputType === 'text') {
-                  return (
-                    <TextInput
-                      key={key}
-                      id={`${prefix}_mkr_${key}`}
-                      labelText={label}
-                      value={value}
-                      onChange={(e) => handleFetusDescriptorChange(fi, 'markers', key, e.target.value)}
-                      disabled={isSubmitting}
-                      size="sm"
-                    />
-                  );
-                }
-                // boolean — Yes / No radio group with clear
-                return (
-                  <div key={key}>
-                    <RadioButtonGroup
-                      legendText={label}
-                      name={`${prefix}_mkr_${key}`}
-                      valueSelected={value || 'none'}
-                      onChange={(val: string) =>
-                        handleFetusDescriptorChange(fi, 'markers', key, val === 'none' ? '' : val)
-                      }
-                      disabled={isSubmitting}
-                      orientation="horizontal"
-                    >
-                      <RadioButton labelText="Yes" value="yes" id={`${prefix}_mkr_${key}_yes`} />
-                      <RadioButton labelText="No"  value="no"  id={`${prefix}_mkr_${key}_no`}  />
-                      <RadioButton labelText="—"   value="none" id={`${prefix}_mkr_${key}_none`} />
-                    </RadioButtonGroup>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   return (
     <Form onSubmit={handleSubmit} autoComplete="off">
       <Stack gap={4}>
-        {localSubmitError && (
+        {submitError && (
           <InlineNotification
             kind="error"
             title="Error"
-            subtitle={localSubmitError.includes('\n') ? '' : localSubmitError}
-            onCloseButtonClick={() => setLocalSubmitError(null)}
+            subtitle={submitError.includes('\n') ? '' : submitError}
+            onCloseButtonClick={clearSubmitError}
             lowContrast
           >
-            {localSubmitError.includes('\n') && (
+            {submitError.includes('\n') && (
               <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
-                {localSubmitError.split('\n').map((line, i) => (
+                {submitError.split('\n').map((line, i) => (
                   <li key={i}>{line.startsWith('• ') ? line.slice(2) : line}</li>
                 ))}
               </ul>
@@ -343,7 +353,7 @@ export default function ExaminationForm(props: ExaminationFormProps) {
         )}
 
         {/* Exam type | Fetus count | Exam date | Status | Patient age */}
-        <div style={row4}>
+        <div style={styleRow4}>
           {isEdit ? (
             <TextInput
               id="examinationType"
@@ -465,14 +475,15 @@ export default function ExaminationForm(props: ExaminationFormProps) {
                   labelText={
                     <>
                       Gestational Age from LMP
-                      {autoSuffix(formData.gestationalAge.isManual, undefined, !!formData.gestationalAge.value)}
+                      {autoSuffix(formData.gestationalAge.isManual, '+280days', !!formData.gestationalAge.value)}
                     </>
                   }
                   placeholder="auto"
                   value={formData.gestationalAge.value}
-                  onChange={(e) => handleChange('gestationalAge', e.target.value)}
-                  invalid={!!errors.gestationalAge}
-                  invalidText={errors.gestationalAge}
+                  readOnly
+                  //onChange={(e) => handleChange('gestationalAge', e.target.value)}
+                  //invalid={!!errors.gestationalAge}
+                  //invalidText={errors.gestationalAge}
                   disabled={isSubmitting}
                 />
               </div>
@@ -480,13 +491,13 @@ export default function ExaminationForm(props: ExaminationFormProps) {
                 <TextInput
                   id="edd"
                   labelText="Expected Delivery Date (EDD)"
-                  value={edd ?? '—'}
+                  value={edd ?? 'auto'}
                   readOnly
                   disabled
                 />
               </div>
             </div>
-            <div style={row3}>
+            <div style={styleRow3}>
               <TextInput
                 id="obstetric_history"
                 labelText="Obstetric History"
@@ -513,8 +524,20 @@ export default function ExaminationForm(props: ExaminationFormProps) {
             Clinical Measurements
             {fetusCount > 1 ? ` (${fetusCount} fetuses)` : ''}
           </h4>
-          <div style={fetusSectionContainerStyle}>
-            {formData.fetuses.map((_, fi) => renderFetusSections(fi))}
+          <div style={styleFetusSectionContainer}>
+            {formData.fetuses.map((fetus, fi) => (
+              <FetusSection
+                key={fi}
+                fi={fi}
+                fetus={fetus}
+                fetusCount={fetusCount}
+                examConfig={examConfig}
+                errors={errors}
+                isSubmitting={isSubmitting}
+                onFetusChange={handleFetusChange}
+                onFetusDescriptorChange={handleFetusDescriptorChange}
+              />
+            ))}
           </div>
         </div>
 

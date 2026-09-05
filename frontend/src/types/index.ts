@@ -75,6 +75,20 @@ export interface ObservableTypeConfig {
   sourceTag?: string;       // attribution label (e.g. "Hadlock") — from registry
 }
 
+export interface DescriptorOption {
+  value: string; // Stored value, e.g. "cephalic"
+  label: string; // User-facing label, e.g. "Cephalic"
+}
+
+export interface DescriptorTypeConfig {
+  key: string;                           // Storage key: "presentation", "gender", "head", "heart_rate"
+  label: string;                         // Display title: "Presentation", "FHR (bpm)", "Head"
+  inputType?: 'select' | 'text';         // UI control type (default: 'text')
+  options?: readonly DescriptorOption[]; // Allowed dropdown options (when inputType === 'select')
+  unit?: string;                         // Optional unit suffix: "bpm", etc.
+  placeholder?: string;                  // Optional placeholder text: "e.g. 145"
+}
+
 export interface MarkerTypeConfig {
   key: string;                    // storage key: "arrhythmia", "cordInsertion", etc.
   label: string;                  // display label
@@ -87,6 +101,8 @@ export interface ExamTypeConfig {
   biometryTypes: readonly ObservableTypeConfig[];
   dopplerVessels: readonly ObservableTypeConfig[]; // PI+RI pairs — rendered 2-per-row
   dopplerSingle: readonly ObservableTypeConfig[];  // single-value rows (CMA PI, PSV, CPR, DucVen)
+  ultrasoundFindingTypes: readonly DescriptorTypeConfig[];
+  anatomyTypes: readonly DescriptorTypeConfig[];
   markerTypes: readonly MarkerTypeConfig[];        // empty for prenatal; defined for first_trimester
   // fetusSectionCount is NOT here — runtime state
 }

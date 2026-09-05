@@ -170,7 +170,7 @@ export default function ExaminationDetailPage() {
         <span>{label}</span>
         {labelAdornment}
       </div>
-      <div style={{ fontSize: '1rem', fontWeight: 500 }}>{value}</div>
+      <div style={{ fontSize: '1rem', fontWeight: 500, textAlign: 'left' }}>{value}</div>
     </div>
   );
 

@@ -18,7 +18,7 @@ export interface FetusPdfViewModel {
   index: number;          // 0-based fetus index
   biometry: ObservablePdfEntry[];
   doppler: ObservablePdfEntry[];
-  ultrasound?: {
+  ultrasound?: Record<string, string | undefined> & {
     presentation?: string;
     gender?: string;
     heartRate?: string;
@@ -26,7 +26,7 @@ export interface FetusPdfViewModel {
     placenta?: string;
     umbilicalCord?: string;
   };
-  anatomy?: {
+  anatomy?: Record<string, string | undefined> & {
     head?: string;
     brain?: string;
     heart?: string;
@@ -39,7 +39,7 @@ export interface FetusPdfViewModel {
     spine?: string;
     thorax?: string;
   };
-  markers?: {
+  markers?: Record<string, string | undefined> & {
     arrhythmia?: string;
     tricuspidRegurgitation?: string;
     abnormalDvFlow?: string;

@@ -10,6 +10,7 @@
  *   - renderClinicalSectionsPair — renders one pair of fetuses
  */
 import type { jsPDF } from 'jspdf';
+import { EXAM_TYPE_CONFIG } from '../../constants/examinationTypes';
 import type { ExamPdfViewModel, FetusPdfViewModel } from '../../services/print.service';
 
 // ─── PdfDrawHelpers ───────────────────────────────────────────────────────────
@@ -92,24 +93,22 @@ export function computePairLayout(pairSize: number): PairLayout {
   };
 }
 
-// ─── Anatomy pair builders ────────────────────────────────────────────────────
+// ─── Anatomy & Ultrasound pair builders (Config-driven) ───────────────────────
 
-function mkAnatomyPairs(a: FetusPdfViewModel['anatomy']): Array<[string, string | undefined]> {
+function mkAnatomyPairs(a: FetusPdfViewModel['anatomy'], examType = 'prenatal'): Array<[string, string | undefined]> {
   if (!a) return [];
-  return [
-    ['Head', a.head], ['Brain', a.brain], ['Heart', a.heart], ['Abdomen', a.abdomen],
-    ['Kidneys', a.kidneys], ['Limbs', a.limbs], ['Skeleton', a.skeleton],
-    ['Face', a.face], ['Neck/Skin', a.neckSkin], ['Spine', a.spine], ['Thorax', a.thorax],
-  ];
+  const config = EXAM_TYPE_CONFIG[examType] ?? EXAM_TYPE_CONFIG['prenatal'];
+  return config.anatomyTypes.map(tc => [tc.label, a[tc.key] ?? (a as any)[tc.key]]);
 }
 
-function mkUltrasoundPairs(u: FetusPdfViewModel['ultrasound']): Array<[string, string | undefined]> {
+function mkUltrasoundPairs(u: FetusPdfViewModel['ultrasound'], examType = 'prenatal'): Array<[string, string | undefined]> {
   if (!u) return [];
-  return [
-    ['Presentation', u.presentation], ['Gender', u.gender],
-    ['FHR (bpm)', u.heartRate], ['Fetal Movement', u.fetalMovement],
-    ['Placenta', u.placenta], ['Umbilical Cord', u.umbilicalCord],
-  ];
+  const config = EXAM_TYPE_CONFIG[examType] ?? EXAM_TYPE_CONFIG['prenatal'];
+  return config.ultrasoundFindingTypes.map(tc => {
+    const val = u[tc.key] ?? (u as any)[tc.key];
+    const label = tc.unit && tc.inputType === 'text' && tc.key === 'heart_rate' ? 'FHR (bpm)' : tc.label;
+    return [label, val];
+  });
 }
 
 // ─── Biometry row-by-row renderer ─────────────────────────────────────────────
@@ -186,6 +185,7 @@ function renderDopplerBlock(
   xStart: number,
   colW: number,
   fontId: string,
+  examType = 'prenatal',
 ): number {
   if (fetus.doppler.length === 0) return y;
 
@@ -195,14 +195,16 @@ function renderDopplerBlock(
 
   const xPI = xStart + labelW;
   const xRI = xStart + labelW + halfW;
+  const config = EXAM_TYPE_CONFIG[examType] ?? EXAM_TYPE_CONFIG['prenatal'];
+  const dopplerMap = new Map<string, string | undefined>(fetus.doppler.map(d => [d.type, d.value]));
 
-  // Sub-grid A: PI + RI vessel rows (pi, ri, utADex*, utASin*)
-  const vesselTypes = new Set(['pi', 'ri', 'utADexPI', 'utADexRI', 'utASinPI', 'utASinRI']);
-  const vesselEntries = fetus.doppler.filter(e => vesselTypes.has(e.type));
-  // Sub-grid B: single-value rows (cma, psv, cpr, ducVen)
-  const singleEntries = fetus.doppler.filter(e => !vesselTypes.has(e.type));
+  // Pair vessel configs in chunks of 2: [PI, RI]
+  const vesselPairs: [import('../../types').ObservableTypeConfig, import('../../types').ObservableTypeConfig][] = [];
+  for (let i = 0; i + 1 < config.dopplerVessels.length; i += 2) {
+    vesselPairs.push([config.dopplerVessels[i], config.dopplerVessels[i + 1]]);
+  }
 
-  if (vesselEntries.length > 0) {
+  if (vesselPairs.length > 0) {
     // Header: Vessel | PI | RI
     doc.setFont(fontId, 'normal');
     doc.setFontSize(7.5);
@@ -212,16 +214,11 @@ function renderDopplerBlock(
     doc.text('RI', xRI, y);
     y += PITCH;
 
-    // Group by vessel (Umb., Dex., Sin.)
-    const groups: Record<string, { pi?: string; ri?: string }> = {};
-    for (const e of vesselEntries) {
-      const key = e.type.includes('Dex') ? 'A. ut. Dex.' :
-                  e.type.includes('Sin') ? 'A. ut. Sin.' : 'A. Umb.';
-      if (!groups[key]) groups[key] = {};
-      if (e.type === 'pi' || e.type.endsWith('PI')) groups[key].pi = e.value;
-      if (e.type === 'ri' || e.type.endsWith('RI')) groups[key].ri = e.value;
-    }
-    for (const [vesselLabel, vals] of Object.entries(groups)) {
+    for (const [piConfig, riConfig] of vesselPairs) {
+      const piVal = dopplerMap.get(piConfig.type) || '—';
+      const riVal = dopplerMap.get(riConfig.type) || '—';
+      const vesselLabel = piConfig.label.replace(/\s*PI$/i, '').trim();
+
       doc.setFont(fontId, 'normal');
       doc.setFontSize(7.5);
       setTextColor(doc, C_MID);
@@ -229,26 +226,29 @@ function renderDopplerBlock(
       doc.setFont(fontId, 'bold');
       doc.setFontSize(8);
       setTextColor(doc, C_DARK);
-      doc.text(vals.pi || '—', xPI, y);
-      doc.text(vals.ri || '—', xRI, y);
+      doc.text(piVal, xPI, y);
+      doc.text(riVal, xRI, y);
       y += PITCH;
     }
     y -= PITCH / 2;
   }
 
+  const singleEntries = config.dopplerSingle;
+
   if (singleEntries.length > 0) {
     const xValue = xStart + labelW;
     y += PITCH;
 
-    for (const e of singleEntries) {
+    for (const tc of singleEntries) {
+      const val = dopplerMap.get(tc.type) || '—';
       doc.setFont(fontId, 'normal');
       doc.setFontSize(7.5);
       setTextColor(doc, C_MID);
-      doc.text(e.label, xStart, y);
+      doc.text(tc.label, xStart, y);
       doc.setFont(fontId, 'bold');
       doc.setFontSize(8);
       setTextColor(doc, C_DARK);
-      doc.text(e.value || '—', xValue, y);
+      doc.text(val, xValue, y);
       y += PITCH;
     }
     y -= PITCH / 2;
@@ -265,10 +265,12 @@ function renderMarkersBlock(
   y: number,
   xStart: number,
   fontId: string,
+  examType = 'first_trimester',
 ): number {
   const PITCH = 3.85;
   const labelW = 52;
   const xValue = xStart + labelW;
+  const config = EXAM_TYPE_CONFIG[examType] ?? EXAM_TYPE_CONFIG['first_trimester'];
 
   doc.setFont(fontId, 'normal');
   doc.setFontSize(7.5);
@@ -277,18 +279,10 @@ function renderMarkersBlock(
   doc.text('Value', xValue, y);
   y += PITCH;
 
-  const rows: Array<[string, string | undefined]> = [
-    ['Arrhythmia',                 markers.arrhythmia],
-    ['Tricuspid Regurgitation',    markers.tricuspidRegurgitation],
-    ['Abnormal D.Venosus Flow',    markers.abnormalDvFlow],
-    ['Echogenic Cardiac Focus',    markers.echogenicCardiacFocus],
-    ['Single Umbilical Artery',    markers.singleUmbilicalArtery],
-    ['Choroid Plexus Cysts',       markers.choroidPlexusCysts],
-    ['Exomphalos',                 markers.exomphalos],
-    ['Megacystis',                 markers.megacystis],
-    ['Placenta',                   markers.placenta],
-    ['Cord Insertion',             markers.cordInsertion],
-  ];
+  const rows: Array<[string, string | undefined]> = config.markerTypes.map(mt => [
+    mt.label,
+    markers[mt.key] ?? (markers as any)[mt.key],
+  ]);
 
   for (const [label, value] of rows) {
     doc.setFont(fontId, 'normal');
@@ -396,7 +390,7 @@ export function renderClinicalSectionsPair(
     for (let i = 0; i < pair.length; i++) {
       const heading = pair.length > 1 ? `Ultrasound Findings — Fetus ${pair[i].index + 1}` : 'Ultrasound Findings';
       const y1 = sectionHeadingAt(doc, heading, yStart, xStart[i], xEnd[i]);
-      const ySec = kvGridAt(doc, mkUltrasoundPairs(pair[i].ultrasound), y1, 2, xStart[i], colW, 7);
+      const ySec = kvGridAt(doc, mkUltrasoundPairs(pair[i].ultrasound, vm.examinationType), y1, 2, xStart[i], colW, 7);
       if (ySec > maxY) maxY = ySec;
     }
     y = maxY + 1;
@@ -425,7 +419,7 @@ export function renderClinicalSectionsPair(
       const label = pair.length > 1 ? `Markers — Fetus ${pair[i].index + 1}` : 'Markers';
       const y1 = sectionHeadingAt(doc, label, yStart, xStart[i], xEnd[i]);
       const markers = pair[i].markers ?? {};
-      const yAfter = renderMarkersBlock(doc, markers, y1, xStart[i], FONT_ID);
+      const yAfter = renderMarkersBlock(doc, markers, y1, xStart[i], FONT_ID, vm.examinationType);
       if (yAfter > maxY) maxY = yAfter;
     }
     y = maxY + 1;
@@ -439,7 +433,7 @@ export function renderClinicalSectionsPair(
     for (let i = 0; i < pair.length; i++) {
       const label = pair.length > 1 ? `Anatomy — Fetus ${pair[i].index + 1}` : 'Anatomy';
       const y1 = sectionHeadingAt(doc, label, yStart, xStart[i], xEnd[i]);
-      const yAfter = kvGridAtStacked(doc, mkAnatomyPairs(pair[i].anatomy), y1, 6, xStart[i], colW, FONT_ID);
+      const yAfter = kvGridAtStacked(doc, mkAnatomyPairs(pair[i].anatomy, vm.examinationType), y1, 6, xStart[i], colW, FONT_ID);
       if (yAfter > maxY) maxY = yAfter;
     }
     y = maxY + 1;
@@ -453,7 +447,7 @@ export function renderClinicalSectionsPair(
     for (let i = 0; i < pair.length; i++) {
       const label = pair.length > 1 ? `Doppler — Fetus ${pair[i].index + 1}` : 'Doppler Measurements';
       const y1 = sectionHeadingAt(doc, label, yStart, xStart[i], xEnd[i]);
-      const yAfter = renderDopplerBlock(doc, pair[i], y1, xStart[i], colW, FONT_ID);
+      const yAfter = renderDopplerBlock(doc, pair[i], y1, xStart[i], colW, FONT_ID, vm.examinationType);
       if (yAfter > maxY) maxY = yAfter;
     }
     y = maxY + 1;

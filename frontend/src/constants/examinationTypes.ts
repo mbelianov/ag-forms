@@ -8,10 +8,10 @@
  *       to avoid a circular dependency with observableRegistry.ts.
  */
 import { enrichTypeConfig } from '../utils/observableRegistry';
-import type { ObservableTypeConfig, ExamTypeConfig, MarkerTypeConfig } from '../types';
+import type { ObservableTypeConfig, ExamTypeConfig, MarkerTypeConfig, DescriptorTypeConfig, DescriptorOption } from '../types';
 
 // Re-export for convenience so callers can import from a single place
-export type { ObservableTypeConfig, ExamTypeConfig, MarkerTypeConfig };
+export type { ObservableTypeConfig, ExamTypeConfig, MarkerTypeConfig, DescriptorTypeConfig, DescriptorOption };
 
 // ── Examination type list (2 entries) ─────────────────────────────────────────
 
@@ -27,6 +27,94 @@ export const EXAM_TYPE_KEYS: ReadonlyArray<string> = EXAM_TYPES.map(t => t.key);
 export function getExamTypeLabel(key: string): string {
   return EXAM_TYPE_CONFIG[key]?.label ?? key;
 }
+
+// ── Shared Descriptor Configurations ──────────────────────────────────────────
+
+export const COMMON_ANATOMY_CONFIG: readonly DescriptorTypeConfig[] = [
+  { key: 'head',     label: 'Head',       inputType: 'text' },
+  { key: 'brain',    label: 'Brain',      inputType: 'text' },
+  { key: 'heart',    label: 'Heart',      inputType: 'text' },
+  { key: 'abdomen',  label: 'Abdomen',    inputType: 'text' },
+  { key: 'kidneys',  label: 'Kidneys',    inputType: 'text' },
+  { key: 'limbs',    label: 'Limbs',      inputType: 'text' },
+  { key: 'skeleton', label: 'Skeleton',   inputType: 'text' },
+  { key: 'face',     label: 'Face',       inputType: 'text' },
+  { key: 'neckSkin', label: 'Neck/Skin',  inputType: 'text' },
+  { key: 'spine',    label: 'Spine',      inputType: 'text' },
+  { key: 'thorax',   label: 'Thorax',     inputType: 'text' },
+];
+
+export const PRENATAL_UF_CONFIG: readonly DescriptorTypeConfig[] = [
+  {
+    key: 'presentation',
+    label: 'Presentation',
+    inputType: 'select',
+    options: [
+      { value: 'cephalic',   label: 'Cephalic' },
+      { value: 'breech',     label: 'Breech' },
+      { value: 'transverse', label: 'Transverse' },
+      { value: 'oblique',    label: 'Oblique' },
+    ],
+  },
+  {
+    key: 'gender',
+    label: 'Gender',
+    inputType: 'select',
+    options: [
+      { value: 'male',    label: 'Male' },
+      { value: 'female',  label: 'Female' },
+      { value: 'unknown', label: 'Unknown' },
+    ],
+  },
+  {
+    key: 'heart_rate',
+    label: 'FHR',
+    inputType: 'text',
+    unit: 'bpm',
+    placeholder: 'e.g. 145',
+  },
+  {
+    key: 'fetal_movement',
+    label: 'Fetal Movement',
+    inputType: 'select',
+    options: [
+      { value: 'active',  label: 'Active' },
+      { value: 'present', label: 'Present' },
+      { value: 'reduced', label: 'Reduced' },
+      { value: 'absent',  label: 'Absent' },
+    ],
+  },
+  {
+    key: 'placenta',
+    label: 'Placenta',
+    inputType: 'text',
+  },
+  {
+    key: 'umbilical_cord',
+    label: 'Umbilical Cord',
+    inputType: 'text',
+  },
+];
+
+export const FT_UF_CONFIG: readonly DescriptorTypeConfig[] = [
+  {
+    key: 'placenta',
+    label: 'Placenta',
+    inputType: 'text',
+  },
+  {
+    key: 'heart_rate',
+    label: 'FHR',
+    inputType: 'text',
+    unit: 'bpm',
+    placeholder: 'e.g. 160',
+  },
+  {
+    key: 'umbilical_cord',
+    label: 'Umbilical Cord',
+    inputType: 'text',
+  },
+];
 
 // ── EXAM_TYPE_CONFIG ───────────────────────────────────────────────────────────
 
@@ -65,6 +153,8 @@ export const EXAM_TYPE_CONFIG: Record<string, ExamTypeConfig> = {
       enrichTypeConfig({ type: 'cpr',    label: 'CPR',       unit: '', hasPercentile: false, hasGa: false }),
       enrichTypeConfig({ type: 'ducVen', label: 'Duc. Ven.', unit: '', hasPercentile: false, hasGa: false }),
     ],
+    ultrasoundFindingTypes: PRENATAL_UF_CONFIG,
+    anatomyTypes: COMMON_ANATOMY_CONFIG,
     markerTypes: [],
   },
 
@@ -84,6 +174,8 @@ export const EXAM_TYPE_CONFIG: Record<string, ExamTypeConfig> = {
       enrichTypeConfig({ type: 'utASinRI', label: 'A.ut.Sin RI', unit: '', hasPercentile: false, hasGa: false }),
     ],
     dopplerSingle: [],
+    ultrasoundFindingTypes: FT_UF_CONFIG,
+    anatomyTypes: COMMON_ANATOMY_CONFIG,
     markerTypes: [
       { key: 'arrhythmia',             label: 'Arrhythmia',              inputType: 'boolean' as const },
       { key: 'tricuspidRegurgitation', label: 'Tricuspid Regurgitation', inputType: 'boolean' as const },

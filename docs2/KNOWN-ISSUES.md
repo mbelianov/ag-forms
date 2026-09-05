@@ -348,7 +348,7 @@ For an FT twins exam, the same blob also carries `twin2_ft_biometry`, `twin2_ft_
   - In `viewModelBuilders.ts`: import `EXAM_TYPE_CONFIG` and iterate `EXAM_TYPE_CONFIG['first_trimester'].markerTypes` to build the `result.markers` object dynamically instead of hardcoding each key.
   - In `pdfSections.ts`: import `EXAM_TYPE_CONFIG` and iterate `markerTypes` to build the label/value rows for the markers PDF block instead of the hardcoded `[label, value]` array.
 - **Priority:** P3 · Low — no current user impact; becomes a real bug the moment any marker definition changes
-- **Status:** Deferred — to be handled after current V2 stabilisation sprint
+- **Status:** ✅ Resolved — `viewModelBuilders.ts` and `pdfSections.ts` now dynamically iterate `EXAM_TYPE_CONFIG` for all markers, ultrasound findings, anatomy, and doppler vessel pairings.
 
 ---
 

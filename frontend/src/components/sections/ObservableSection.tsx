@@ -38,7 +38,7 @@ export const ObservableSection: React.FC<ObservableSectionProps> = React.memo(({
   return (
     <div className="observable-section">
       <h5 className="observable-section-title">{title}</h5>
-      <div className="observable-section-rows">
+      <div className="observable-section-rows" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {typeConfigs.map((config) => {
           const fieldState = data[config.type] ?? {
             value: { value: '' },
