@@ -115,7 +115,7 @@ export interface FetusSectionData {
     gaFromBiometry?: GaFromBiometry;
     biometry?: Observable[];                               // type set per exam type (§14.3)
     doppler?: Observable[];                                // type set per exam type (§14.3)
-    ultrasoundFindings?: Record<string, string | number>; // purely descriptive
+    ultrasoundFindings?: Record<string, string>; // purely descriptive
     anatomy?: Record<string, string>;                     // purely descriptive free-text
     markers?: Record<string, string>;                     // first_trimester only: soft markers
 }
@@ -181,14 +181,6 @@ export interface PregnancyData {
     family_history?: string;
 }
 
-export interface UltrasoundFindings {
-    presentation?: string;   // e.g. "cephalic"
-    gender?: string;         // e.g. "female" | "male" | "unknown"
-    heart_rate?: number;     // integer, bpm
-    fetal_movement?: string; // e.g. "active"
-    placenta?: string;       // e.g. "anterior, grade 1"
-    umbilical_cord?: string; // e.g. "3 vessels"
-}
 
 export interface AnatomyFindings {
     head?: string;

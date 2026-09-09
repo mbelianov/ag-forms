@@ -488,6 +488,172 @@ describe('Validation Utilities', () => {
         });
     });
 
+    describe('validateExamination — Ultrasound Findings string-only contract (ST-03)', () => {
+        test('should accept prenatal string-valued ultrasoundFindings', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                examinationType: 'prenatal',
+                data: {
+                    fetuses: [{
+                        index: 0,
+                        ultrasoundFindings: {
+                            presentation: 'cephalic',
+                            gender: 'female',
+                            heart_rate: '145',
+                            fetal_movement: 'active',
+                            placenta: 'anterior',
+                            umbilical_cord: '3 vessels'
+                        }
+                    }]
+                }
+            });
+
+            expect(result.valid).toBe(true);
+            expect(result.errors).toHaveLength(0);
+        });
+
+        test('should accept first_trimester string-valued ultrasoundFindings', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                examinationType: 'first_trimester',
+                data: {
+                    fetuses: [{
+                        index: 0,
+                        ultrasoundFindings: {
+                            placenta: 'posterior',
+                            heart_rate: '162',
+                            umbilical_cord: '3 vessels'
+                        }
+                    }]
+                }
+            });
+
+            expect(result.valid).toBe(true);
+            expect(result.errors).toHaveLength(0);
+        });
+
+        test('should accept empty string ultrasoundFindings values', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                examinationType: 'prenatal',
+                data: {
+                    fetuses: [{
+                        index: 0,
+                        ultrasoundFindings: {
+                            presentation: '',
+                            heart_rate: ''
+                        }
+                    }]
+                }
+            });
+
+            expect(result.valid).toBe(true);
+            expect(result.errors).toHaveLength(0);
+        });
+
+        test('should reject numeric ultrasoundFindings values', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                examinationType: 'prenatal',
+                data: {
+                    fetuses: [{
+                        index: 0,
+                        ultrasoundFindings: {
+                            heart_rate: 145 as any
+                        }
+                    }]
+                }
+            });
+
+            expect(result.valid).toBe(false);
+        });
+
+        test('should reject boolean ultrasoundFindings values', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                examinationType: 'prenatal',
+                data: {
+                    fetuses: [{
+                        index: 0,
+                        ultrasoundFindings: {
+                            presentation: true as any
+                        }
+                    }]
+                }
+            });
+
+            expect(result.valid).toBe(false);
+        });
+
+        test('should reject object ultrasoundFindings values', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                examinationType: 'prenatal',
+                data: {
+                    fetuses: [{
+                        index: 0,
+                        ultrasoundFindings: {
+                            presentation: { nested: 'value' } as any
+                        }
+                    }]
+                }
+            });
+
+            expect(result.valid).toBe(false);
+        });
+
+        test('should reject array ultrasoundFindings values', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                examinationType: 'prenatal',
+                data: {
+                    fetuses: [{
+                        index: 0,
+                        ultrasoundFindings: {
+                            presentation: ['cephalic'] as any
+                        }
+                    }]
+                }
+            });
+
+            expect(result.valid).toBe(false);
+        });
+
+        test('should accept first_trimester puls observable with numeric value', () => {
+            const result = validateExamination({
+                patientId: 'patient-1',
+                examDate: new Date().toISOString(),
+                status: 'draft',
+                examinationType: 'first_trimester',
+                data: {
+                    fetuses: [{
+                        index: 0,
+                        biometry: [{ type: 'puls', value: 162 }]
+                    }]
+                }
+            });
+
+            expect(result.valid).toBe(true);
+            expect(result.errors).toHaveLength(0);
+        });
+    });
+
+
+
     describe('validateLogin', () => {
         test('should accept valid login payload', () => {
             const result = validateLogin({

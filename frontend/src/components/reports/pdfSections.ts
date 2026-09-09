@@ -98,14 +98,14 @@ export function computePairLayout(pairSize: number): PairLayout {
 function mkAnatomyPairs(a: FetusPdfViewModel['anatomy'], examType = 'prenatal'): Array<[string, string | undefined]> {
   if (!a) return [];
   const config = EXAM_TYPE_CONFIG[examType] ?? EXAM_TYPE_CONFIG['prenatal'];
-  return config.anatomyTypes.map(tc => [tc.label, a[tc.key] ?? (a as any)[tc.key]]);
+  return config.anatomyTypes.map(tc => [tc.label, a[tc.key]]);
 }
 
 function mkUltrasoundPairs(u: FetusPdfViewModel['ultrasound'], examType = 'prenatal'): Array<[string, string | undefined]> {
   if (!u) return [];
   const config = EXAM_TYPE_CONFIG[examType] ?? EXAM_TYPE_CONFIG['prenatal'];
   return config.ultrasoundFindingTypes.map(tc => {
-    const val = u[tc.key] ?? (u as any)[tc.key];
+    const val = u[tc.key];
     const label = tc.unit && tc.inputType === 'text' && tc.key === 'heart_rate' ? 'FHR (bpm)' : tc.label;
     return [label, val];
   });
@@ -281,7 +281,7 @@ function renderMarkersBlock(
 
   const rows: Array<[string, string | undefined]> = config.markerTypes.map(mt => [
     mt.label,
-    markers[mt.key] ?? (markers as any)[mt.key],
+    markers[mt.key],
   ]);
 
   for (const [label, value] of rows) {

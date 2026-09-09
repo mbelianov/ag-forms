@@ -162,8 +162,6 @@ const FetusSection = React.memo(function FetusSection({
                   placeholder={tc.placeholder}
                   value={val}
                   onChange={(e) => onFetusDescriptorChange(fi, 'ultrasoundFindings', tc.key, e.target.value)}
-                  invalid={tc.key === 'heart_rate' ? !!errors[`${prefix}_hr`] : undefined}
-                  invalidText={tc.key === 'heart_rate' ? errors[`${prefix}_hr`] : undefined}
                   disabled={isSubmitting}
                   size="sm"
                 />

@@ -143,7 +143,7 @@ export interface FetusSectionData {
   gaFromBiometry?: GaFromBiometry;
   biometry?: Observable[];
   doppler?: Observable[];
-  ultrasoundFindings?: Record<string, string | number>;
+  ultrasoundFindings?: Record<string, string>;
   anatomy?: Record<string, string>;
   markers?: Record<string, string>;  // first_trimester only
 }

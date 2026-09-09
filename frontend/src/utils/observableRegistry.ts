@@ -312,7 +312,7 @@ export function buildSubmitPayload(formData: ExaminationFormData): ExaminationDa
         doppler: serializeMap(f.doppler),
       };
       if (Object.keys(f.ultrasoundFindings).length > 0) {
-        fetus.ultrasoundFindings = f.ultrasoundFindings as Record<string, string | number>;
+        fetus.ultrasoundFindings = f.ultrasoundFindings;
       }
       if (Object.keys(f.anatomy).length > 0) {
         fetus.anatomy = f.anatomy as Record<string, string>;

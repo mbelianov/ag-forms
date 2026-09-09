@@ -51,7 +51,7 @@ interface FetusSectionData {
   gaFromBiometry?: { value: string; isManual?: boolean };
   biometry?: Observable[];
   doppler?: Observable[];
-  ultrasoundFindings?: Record<string, string | number>;
+  ultrasoundFindings?: Record<string, string>;
   anatomy?: Record<string, string>;
   markers?: Record<string, string>;
 }
@@ -111,6 +111,15 @@ type LegacyFtUltrasound = { placenta?: string; heartRate?: number; umbilicalCord
 type LegacyFtAnatomy = Record<string, string>;
 type LegacyAnatomy = Record<string, string>;
 type LegacyUltrasoundFindings = Record<string, string | number>;
+
+
+/** Convert every own-property value in a legacy UF object to a string. */
+function normalizeUltrasoundFindings(raw: LegacyUltrasoundFindings): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(raw).map(([k, v]) => [k, String(v)])
+  );
+}
+
 
 // ─── Pass 1 helpers ───────────────────────────────────────────────────────────
 
@@ -246,7 +255,7 @@ export function migratePrenatalEntity(entity: Record<string, unknown>): Record<s
     const fetus0: FetusSectionData = { index: 0 };
     fetus0.biometry = prenatalBiometryToObservables(b);
     fetus0.doppler  = prenatalDopplerToObservables(d);
-    if (Object.keys(uf).length > 0) fetus0.ultrasoundFindings = uf;
+    if (Object.keys(uf).length > 0) fetus0.ultrasoundFindings = normalizeUltrasoundFindings(uf);
     if (Object.keys(an).length > 0) fetus0.anatomy = an;
     if (gaFromBioStr) fetus0.gaFromBiometry = { value: gaFromBioStr, ...(gaFromBioManual ? { isManual: true } : {}) };
     fetuses.push(fetus0);
@@ -263,7 +272,7 @@ export function migratePrenatalEntity(entity: Record<string, unknown>): Record<s
       const fetus1: FetusSectionData = { index: 1 };
       fetus1.biometry = prenatalBiometryToObservables(b2);
       fetus1.doppler  = prenatalDopplerToObservables(d2);
-      if (Object.keys(uf2).length > 0) fetus1.ultrasoundFindings = uf2;
+      if (Object.keys(uf2).length > 0) fetus1.ultrasoundFindings = normalizeUltrasoundFindings(uf2);
       if (Object.keys(an2).length > 0) fetus1.anatomy = an2;
       if (gaFromBio2Str) fetus1.gaFromBiometry = { value: gaFromBio2Str, ...(gaFromBio2Manual ? { isManual: true } : {}) };
       fetuses.push(fetus1);
@@ -285,9 +294,9 @@ export function migratePrenatalEntity(entity: Record<string, unknown>): Record<s
     if (Object.keys(ftM).length > 0) fetus0.markers = ftM;
     if (ftU.placenta || ftU.heartRate != null || ftU.umbilicalCord) {
       fetus0.ultrasoundFindings = {
-        ...(ftU.placenta ? { placenta: ftU.placenta } : {}),
-        ...(ftU.heartRate != null ? { heart_rate: ftU.heartRate } : {}),
-        ...(ftU.umbilicalCord ? { umbilical_cord: ftU.umbilicalCord } : {}),
+        ...(ftU.placenta ? { placenta: String(ftU.placenta) } : {}),
+        ...(ftU.heartRate != null ? { heart_rate: String(ftU.heartRate) } : {}),
+        ...(ftU.umbilicalCord ? { umbilical_cord: String(ftU.umbilicalCord) } : {}),
       };
     }
     if (Object.keys(ftA).length > 0) fetus0.anatomy = ftA;
@@ -310,9 +319,9 @@ export function migratePrenatalEntity(entity: Record<string, unknown>): Record<s
       if (Object.keys(ftM2).length > 0) fetus1.markers = ftM2;
       if (ftU2.placenta || ftU2.heartRate != null || ftU2.umbilicalCord) {
         fetus1.ultrasoundFindings = {
-          ...(ftU2.placenta ? { placenta: ftU2.placenta } : {}),
-          ...(ftU2.heartRate != null ? { heart_rate: ftU2.heartRate } : {}),
-          ...(ftU2.umbilicalCord ? { umbilical_cord: ftU2.umbilicalCord } : {}),
+          ...(ftU2.placenta ? { placenta: String(ftU2.placenta) } : {}),
+          ...(ftU2.heartRate != null ? { heart_rate: String(ftU2.heartRate) } : {}),
+          ...(ftU2.umbilicalCord ? { umbilical_cord: String(ftU2.umbilicalCord) } : {}),
         };
       }
       if (Object.keys(ftA2).length > 0) fetus1.anatomy = ftA2;

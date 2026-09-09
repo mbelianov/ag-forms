@@ -137,7 +137,7 @@ function renderFetusClinicalDetails(fetus: FetusSectionData, examType: string) {
     (fetus.doppler ?? []).map(o => [o.type, o])
   );
 
-  const uf = (fetus.ultrasoundFindings ?? {}) as Record<string, string | number>;
+  const uf = (fetus.ultrasoundFindings ?? {}) as Record<string, string>;
   const anat = (fetus.anatomy ?? {}) as Record<string, string>;
   const gaFromBioValue = fetus.gaFromBiometry?.value;
   const gaFromBioManual = fetus.gaFromBiometry?.isManual;

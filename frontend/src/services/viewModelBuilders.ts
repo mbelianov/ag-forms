@@ -151,13 +151,10 @@ function buildFetusPdfViewModel(
       }
     }
     // Set explicit named aliases
-    ufResult.presentation = ufResult['presentation'];
-    ufResult.gender = ufResult['gender'];
     ufResult.heartRate = ufResult['heart_rate'];
     ufResult.fetalMovement = ufResult['fetal_movement'];
-    ufResult.placenta = ufResult['placenta'];
     ufResult.umbilicalCord = ufResult['umbilical_cord'];
-    result.ultrasound = ufResult as any;
+    result.ultrasound = ufResult as FetusPdfViewModel['ultrasound'];
   }
 
   // Anatomy — config-driven
@@ -168,18 +165,7 @@ function buildFetusPdfViewModel(
       const raw = an[tc.key];
       anResult[tc.key] = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : undefined;
     }
-    anResult.head = anResult['head'];
-    anResult.brain = anResult['brain'];
-    anResult.heart = anResult['heart'];
-    anResult.abdomen = anResult['abdomen'];
-    anResult.kidneys = anResult['kidneys'];
-    anResult.limbs = anResult['limbs'];
-    anResult.skeleton = anResult['skeleton'];
-    anResult.face = anResult['face'];
-    anResult.neckSkin = anResult['neckSkin'];
-    anResult.spine = anResult['spine'];
-    anResult.thorax = anResult['thorax'];
-    result.anatomy = anResult as any;
+    result.anatomy = anResult as FetusPdfViewModel['anatomy'];
   }
 
   // Markers — config-driven (KI-011 fix)
@@ -194,7 +180,7 @@ function buildFetusPdfViewModel(
         mkResult[mt.key] = val || undefined;
       }
     }
-    result.markers = mkResult as any;
+    result.markers = mkResult as FetusPdfViewModel['markers'];
   }
 
   // GA from biometry composite

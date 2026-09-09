@@ -431,12 +431,6 @@ export function useExaminationForm({
         if (err) newErrors[`${prefix}_gaFromBio`] = err;
       }
 
-      // UF heart_rate integer
-      const hrVal = (fetus.ultrasoundFindings as Record<string, string>)['heart_rate'] ?? '';
-      if (hrVal) {
-        const err = validateIntegerField(hrVal, 'Heart rate');
-        if (err) newErrors[`${prefix}_hr`] = err;
-      }
     });
 
     setErrors(newErrors);

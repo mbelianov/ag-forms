@@ -186,7 +186,7 @@ const fetusSectionSchema = Joi.object({
     gaFromBiometry: gaFromBiometrySchema,
     biometry:  Joi.array().items(observableSchema).optional(),
     doppler:   Joi.array().items(observableSchema).optional(),
-    ultrasoundFindings: Joi.object().optional(),
+    ultrasoundFindings: Joi.object().pattern(Joi.string(), Joi.string().allow('')).optional(),
     anatomy:   Joi.object().optional(),
     markers:   Joi.object().optional()
 }).optional();
