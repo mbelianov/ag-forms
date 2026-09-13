@@ -57,7 +57,7 @@ function fmtObservableValueWithUnit(obs: Observable | undefined, unit: string): 
   const val = obs.value;
   if (val === undefined || val === null || val === '') return '—';
   if (typeof val === 'string') return val;
-  if (unit === 'g') return String(Math.round(val as number));
+  if (unit === 'g') return `${String(Math.round(val as number))} g`;
   if (unit === 'bpm') return String(Math.round(val as number));
   if (unit === 'mm') return `${fmtBiometry(val as number)} mm`;
   // dimensionless (empty unit) or any other unit
@@ -69,10 +69,10 @@ function buildObservablePdfEntryFromConfig(tc: ObservableTypeConfig, stored: Obs
   return {
     type: tc.type,
     label,
-    value: fmtObservableValueWithUnit(stored, tc.unit),
-    percentile: stored ? pctStr(stored.percentile?.value, stored.percentile?.isManual) : undefined,
+    value: withManualMarker(fmtObservableValueWithUnit(stored, tc.unit), stored?.isManual) as string,
+    percentile: stored ? pctStr(stored.percentile?.value, stored.percentile?.isManual ?? stored.isManual) : undefined,
     ga: stored?.ga?.value
-      ? withManualMarker(stored.ga.value, stored.ga.isManual)
+      ? withManualMarker(stored.ga.value, stored.ga.isManual ?? stored.isManual)
       : undefined,
   };
 }
