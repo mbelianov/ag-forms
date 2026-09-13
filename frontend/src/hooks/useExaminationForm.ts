@@ -401,10 +401,8 @@ export function useExaminationForm({
       for (const tc of config.biometryTypes) {
         const val = fetus.biometry[tc.type]?.value?.value ?? '';
         if (!val) continue;
-        const isFreeText = tc.type === 'vp' || tc.type === 'la' || tc.type === 'ducVen';
-        if (isFreeText) continue;
-        const isPuls = tc.type === 'puls';
-        const err = isPuls
+        if (tc.valueKind === 'text') continue;
+        const err = tc.valueKind === 'integer'
           ? validateIntegerField(val, tc.label)
           : validatePositiveFloat(val, tc.label);
         if (err) newErrors[`${prefix}_bio_${tc.type}`] = err;
@@ -417,7 +415,7 @@ export function useExaminationForm({
       }
 
       // Doppler numeric validations
-      for (const tc of [...config.dopplerVessels, ...config.dopplerSingle]) {
+      for (const tc of [...config.dopplerVessels.flatMap(g => g.measurements), ...config.dopplerSingle]) {
         const val = fetus.doppler[tc.type]?.value?.value ?? '';
         if (!val) continue;
         const err = validateNonNegativeFloat(val, tc.label);

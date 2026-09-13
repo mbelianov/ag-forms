@@ -73,6 +73,12 @@ export interface ObservableTypeConfig {
   hasGa: boolean;           // whether a GA column is rendered and calculated
   validRange?: { min: number; max: number }; // valid input range (from registry)
   sourceTag?: string;       // attribution label (e.g. "Hadlock") — from registry
+  valueKind?: 'float' | 'integer' | 'text'; // validation kind; absent means 'float'
+}
+
+export interface DopplerVesselGroup {
+  vesselLabel: string;                          // display name for the vessel row: "A.ut.Dex"
+  measurements: readonly ObservableTypeConfig[]; // measurement entries for this vessel (PI, RI, …)
 }
 
 export interface DescriptorOption {
@@ -99,7 +105,7 @@ export interface ExamTypeConfig {
   label: string;                              // display label for the exam type
   trimester: 'first' | 'second';             // 'first' → render markers block
   biometryTypes: readonly ObservableTypeConfig[];
-  dopplerVessels: readonly ObservableTypeConfig[]; // PI+RI pairs — rendered 2-per-row
+  dopplerVessels: readonly DopplerVesselGroup[];   // explicit vessel groups — each has vesselLabel + measurements
   dopplerSingle: readonly ObservableTypeConfig[];  // single-value rows (CMA PI, PSV, CPR, DucVen)
   ultrasoundFindingTypes: readonly DescriptorTypeConfig[];
   anatomyTypes: readonly DescriptorTypeConfig[];

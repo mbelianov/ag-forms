@@ -2,18 +2,19 @@
  * DopplerSection — renders the doppler measurement inputs for one fetus.
  *
  * Two sub-grids:
- *   Vessel grid  — vesselConfigs entries taken in pairs (PI + RI per vessel row).
- *                  Each pair shares a row: [PI label+input] [RI label+input].
+ *   Vessel grid  — vesselGroups entries; each group renders as a row with PI and RI inputs.
+ *                  Each input uses its full measurement label (e.g. "A.ut.Dex PI") for alignment.
  *   Single grid  — singleConfigs entries, one per row, full width.
  */
 import React from 'react';
 import { TextInput } from '@carbon/react';
 import type { ObservableFormMap, ObservableFormFieldState, AutoCalcValue } from '../../types/formData';
+import type { DopplerVesselGroup } from '../../types';
 import type { ObservableTypeConfig } from '../../constants/examinationTypes';
 
 interface DopplerSectionProps {
   fetusIndex: number;
-  vesselConfigs: readonly ObservableTypeConfig[];
+  vesselGroups: readonly DopplerVesselGroup[];
   singleConfigs: readonly ObservableTypeConfig[];
   data: ObservableFormMap;
   disabled?: boolean;
@@ -34,16 +35,9 @@ const sectionTitleStyle: React.CSSProperties = {
   marginTop: '1.5rem',
 };
 
-const colHeaderStyle: React.CSSProperties = {
-  fontSize: '0.75rem',
-  color: '#525252',
-  fontWeight: 600,
-  paddingBottom: '0.25rem',
-};
-
 export const DopplerSection: React.FC<DopplerSectionProps> = React.memo(({
   fetusIndex,
-  vesselConfigs,
+  vesselGroups,
   singleConfigs,
   data,
   disabled = false,
@@ -53,13 +47,7 @@ export const DopplerSection: React.FC<DopplerSectionProps> = React.memo(({
     onFieldChange(fetusIndex, 'doppler', type, 'value', { value, isManual: value.trim() !== '' });
   };
 
-  // Pair vessel configs: [0,1], [2,3], [4,5] ...
-  const vesselPairs: [ObservableTypeConfig, ObservableTypeConfig][] = [];
-  for (let i = 0; i + 1 < vesselConfigs.length; i += 2) {
-    vesselPairs.push([vesselConfigs[i], vesselConfigs[i + 1]]);
-  }
-
-  const hasVessels = vesselPairs.length > 0;
+  const hasVessels = vesselGroups.length > 0;
   const hasSingle = singleConfigs.length > 0;
 
   if (!hasVessels && !hasSingle) return null;
@@ -71,17 +59,13 @@ export const DopplerSection: React.FC<DopplerSectionProps> = React.memo(({
       {/* Vessel sub-grid */}
       {hasVessels && (
         <div style={{ marginBottom: hasSingle ? '1rem' : 0 }}>
-          {/* Column headers */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.25rem' }}>
-            <span style={colHeaderStyle}>PI</span>
-            <span style={colHeaderStyle}>RI</span>
-          </div>
-          {vesselPairs.map(([piConfig, riConfig]) => {
+          {vesselGroups.map((group) => {
+            const [piConfig, riConfig] = group.measurements as [ObservableTypeConfig, ObservableTypeConfig];
             const piVal = data[piConfig.type]?.value?.value ?? '';
             const riVal = data[riConfig.type]?.value?.value ?? '';
             return (
               <div
-                key={piConfig.type}
+                key={group.vesselLabel}
                 style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.5rem' }}
               >
                 <TextInput

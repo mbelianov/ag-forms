@@ -8,10 +8,10 @@
  *       to avoid a circular dependency with observableRegistry.ts.
  */
 import { enrichTypeConfig } from '../utils/observableRegistry';
-import type { ObservableTypeConfig, ExamTypeConfig, MarkerTypeConfig, DescriptorTypeConfig, DescriptorOption } from '../types';
+import type { ObservableTypeConfig, DopplerVesselGroup, ExamTypeConfig, MarkerTypeConfig, DescriptorTypeConfig, DescriptorOption } from '../types';
 
 // Re-export for convenience so callers can import from a single place
-export type { ObservableTypeConfig, ExamTypeConfig, MarkerTypeConfig, DescriptorTypeConfig, DescriptorOption };
+export type { ObservableTypeConfig, DopplerVesselGroup, ExamTypeConfig, MarkerTypeConfig, DescriptorTypeConfig, DescriptorOption };
 
 // ── Examination type list (2 entries) ─────────────────────────────────────────
 
@@ -132,21 +132,36 @@ export const EXAM_TYPE_CONFIG: Record<string, ExamTypeConfig> = {
       enrichTypeConfig({ type: 'fl',         label: 'FL',          unit: 'mm', hasPercentile: true,  hasGa: true  }),
       enrichTypeConfig({ type: 'efw',        label: 'EFW',         unit: 'g',  hasPercentile: true,  hasGa: true  }),
       enrichTypeConfig({ type: 'tcd',        label: 'TCD',         unit: 'mm', hasPercentile: true,  hasGa: true  }),
-      enrichTypeConfig({ type: 'vp',         label: 'Vp',          unit: '',   hasPercentile: false, hasGa: false }),
+      enrichTypeConfig({ type: 'vp',         label: 'Vp',          unit: '',   hasPercentile: false, hasGa: false, valueKind: 'text' }),
       enrichTypeConfig({ type: 'cm',         label: 'CM',          unit: 'mm', hasPercentile: false, hasGa: false }),
       enrichTypeConfig({ type: 'nuchalFold', label: 'NF',          unit: 'mm', hasPercentile: false, hasGa: false }),
       enrichTypeConfig({ type: 'nb',         label: 'NB',          unit: 'mm', hasPercentile: false, hasGa: false }),
-      enrichTypeConfig({ type: 'la',         label: 'LA',          unit: '',   hasPercentile: false, hasGa: false }),
+      enrichTypeConfig({ type: 'la',         label: 'LA',          unit: '',   hasPercentile: false, hasGa: false, valueKind: 'text' }),
       enrichTypeConfig({ type: 'lc',         label: 'LC',          unit: 'mm', hasPercentile: false, hasGa: false }),
     ],
     dopplerVessels: [
-      enrichTypeConfig({ type: 'utADexPI', label: 'A.ut.Dex PI', unit: '', hasPercentile: false, hasGa: false }),
-      enrichTypeConfig({ type: 'utADexRI', label: 'A.ut.Dex RI', unit: '', hasPercentile: false, hasGa: false }),
-      enrichTypeConfig({ type: 'utASinPI', label: 'A.ut.Sin PI', unit: '', hasPercentile: false, hasGa: false }),
-      enrichTypeConfig({ type: 'utASinRI', label: 'A.ut.Sin RI', unit: '', hasPercentile: false, hasGa: false }),
-      enrichTypeConfig({ type: 'pi',       label: 'A.Umb. PI',   unit: '', hasPercentile: false, hasGa: false }),
-      enrichTypeConfig({ type: 'ri',       label: 'A.Umb. RI',   unit: '', hasPercentile: false, hasGa: false }),
-    ],
+      {
+        vesselLabel: 'A.ut.Dex',
+        measurements: [
+          enrichTypeConfig({ type: 'utADexPI', label: 'A.ut.Dex PI', unit: '', hasPercentile: false, hasGa: false }),
+          enrichTypeConfig({ type: 'utADexRI', label: 'A.ut.Dex RI', unit: '', hasPercentile: false, hasGa: false }),
+        ],
+      },
+      {
+        vesselLabel: 'A.ut.Sin',
+        measurements: [
+          enrichTypeConfig({ type: 'utASinPI', label: 'A.ut.Sin PI', unit: '', hasPercentile: false, hasGa: false }),
+          enrichTypeConfig({ type: 'utASinRI', label: 'A.ut.Sin RI', unit: '', hasPercentile: false, hasGa: false }),
+        ],
+      },
+      {
+        vesselLabel: 'A.Umb.',
+        measurements: [
+          enrichTypeConfig({ type: 'pi', label: 'A.Umb. PI', unit: '', hasPercentile: false, hasGa: false }),
+          enrichTypeConfig({ type: 'ri', label: 'A.Umb. RI', unit: '', hasPercentile: false, hasGa: false }),
+        ],
+      },
+    ] satisfies readonly DopplerVesselGroup[],
     dopplerSingle: [
       enrichTypeConfig({ type: 'cma',    label: 'CMA PI',    unit: '', hasPercentile: false, hasGa: false }),
       enrichTypeConfig({ type: 'psv',    label: 'PSV',       unit: '', hasPercentile: false, hasGa: false }),
@@ -165,14 +180,24 @@ export const EXAM_TYPE_CONFIG: Record<string, ExamTypeConfig> = {
       enrichTypeConfig({ type: 'crl',  label: 'CRL',        unit: 'mm',  hasPercentile: false, hasGa: true  }),
       enrichTypeConfig({ type: 'nt',   label: 'NT',         unit: 'mm',  hasPercentile: false, hasGa: false }),
       enrichTypeConfig({ type: 'nb',   label: 'NB',         unit: 'mm',  hasPercentile: false, hasGa: false }),
-      enrichTypeConfig({ type: 'puls', label: 'Heart Rate', unit: 'bpm', hasPercentile: false, hasGa: false }),
+      enrichTypeConfig({ type: 'puls', label: 'Heart Rate', unit: 'bpm', hasPercentile: false, hasGa: false, valueKind: 'integer' }),
     ],
     dopplerVessels: [
-      enrichTypeConfig({ type: 'utADexPI', label: 'A.ut.Dex PI', unit: '', hasPercentile: false, hasGa: false }),
-      enrichTypeConfig({ type: 'utADexRI', label: 'A.ut.Dex RI', unit: '', hasPercentile: false, hasGa: false }),
-      enrichTypeConfig({ type: 'utASinPI', label: 'A.ut.Sin PI', unit: '', hasPercentile: false, hasGa: false }),
-      enrichTypeConfig({ type: 'utASinRI', label: 'A.ut.Sin RI', unit: '', hasPercentile: false, hasGa: false }),
-    ],
+      {
+        vesselLabel: 'A.ut.Dex',
+        measurements: [
+          enrichTypeConfig({ type: 'utADexPI', label: 'A.ut.Dex PI', unit: '', hasPercentile: false, hasGa: false }),
+          enrichTypeConfig({ type: 'utADexRI', label: 'A.ut.Dex RI', unit: '', hasPercentile: false, hasGa: false }),
+        ],
+      },
+      {
+        vesselLabel: 'A.ut.Sin',
+        measurements: [
+          enrichTypeConfig({ type: 'utASinPI', label: 'A.ut.Sin PI', unit: '', hasPercentile: false, hasGa: false }),
+          enrichTypeConfig({ type: 'utASinRI', label: 'A.ut.Sin RI', unit: '', hasPercentile: false, hasGa: false }),
+        ],
+      },
+    ] satisfies readonly DopplerVesselGroup[],
     dopplerSingle: [],
     ultrasoundFindingTypes: FT_UF_CONFIG,
     anatomyTypes: COMMON_ANATOMY_CONFIG,

@@ -206,7 +206,7 @@ const FetusSection = React.memo(function FetusSection({
       {/* Doppler section */}
       <DopplerSection
         fetusIndex={fi}
-        vesselConfigs={examConfig.dopplerVessels}
+        vesselGroups={examConfig.dopplerVessels}
         singleConfigs={examConfig.dopplerSingle}
         data={fetus.doppler}
         disabled={isSubmitting}

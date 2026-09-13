@@ -14,7 +14,7 @@ import {
   calcOFDPercentile, calcTCDPercentile, calcEFWPercentile,
   calcEFW, calcGAFromBiometry,
 } from './calculations';
-import type { ObservableTypeConfig } from '../types';
+import type { ObservableTypeConfig, DopplerVesselGroup } from '../types';
 import type {
   ObservableFormMap,
   ObservableFormFieldState,
@@ -209,7 +209,7 @@ export function buildFetusSectionFormData(
   storedFetus: FetusSectionData | undefined,
   _examType: 'prenatal' | 'first_trimester',
   // EXAM_TYPE_CONFIG is passed in to avoid circular dependency
-  examTypeConfig: { biometryTypes: readonly ObservableTypeConfig[]; dopplerVessels: readonly ObservableTypeConfig[]; dopplerSingle: readonly ObservableTypeConfig[] },
+  examTypeConfig: { biometryTypes: readonly ObservableTypeConfig[]; dopplerVessels: readonly DopplerVesselGroup[]; dopplerSingle: readonly ObservableTypeConfig[] },
 ): FetusSectionFormData {
   const initMap = (
     types: readonly string[],
@@ -243,7 +243,10 @@ export function buildFetusSectionFormData(
       storedFetus?.biometry,
     ),
     doppler: initMap(
-      [...examTypeConfig.dopplerVessels, ...examTypeConfig.dopplerSingle].map(t => t.type),
+      [
+        ...examTypeConfig.dopplerVessels.flatMap(g => g.measurements),
+        ...examTypeConfig.dopplerSingle,
+      ].map(t => t.type),
       storedFetus?.doppler,
     ),
     ultrasoundFindings: storedFetus?.ultrasoundFindings

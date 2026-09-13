@@ -137,7 +137,7 @@ function renderBiometryBlock(
   doc.setFont(fontId, 'normal');
   doc.setFontSize(7);
   setTextColor(doc, C_MID);
-  doc.text('Measurement', xStart, y);
+  doc.text('', xStart, y);
   doc.text('Value',       xValue, y);
   doc.text('Percentile',  xPct,   y);
   doc.text('GA',          xGA,    y);
@@ -196,31 +196,25 @@ function renderDopplerBlock(
   const config = EXAM_TYPE_CONFIG[examType] ?? EXAM_TYPE_CONFIG['prenatal'];
   const dopplerMap = new Map<string, string | undefined>(fetus.doppler.map(d => [d.type, d.value]));
 
-  // Pair vessel configs in chunks of 2: [PI, RI]
-  const vesselPairs: [import('../../types').ObservableTypeConfig, import('../../types').ObservableTypeConfig][] = [];
-  for (let i = 0; i + 1 < config.dopplerVessels.length; i += 2) {
-    vesselPairs.push([config.dopplerVessels[i], config.dopplerVessels[i + 1]]);
-  }
-
-  if (vesselPairs.length > 0) {
+  if (config.dopplerVessels.length > 0) {
     // Header: Vessel | PI | RI
     doc.setFont(fontId, 'normal');
     doc.setFontSize(7.5);
     setTextColor(doc, C_MID);
-    doc.text('Vessel', xStart, y);
+    doc.text('', xStart, y);
     doc.text('PI', xPI, y);
     doc.text('RI', xRI, y);
     y += PITCH;
 
-    for (const [piConfig, riConfig] of vesselPairs) {
+    for (const group of config.dopplerVessels) {
+      const [piConfig, riConfig] = group.measurements;
       const piVal = dopplerMap.get(piConfig.type) || '—';
       const riVal = dopplerMap.get(riConfig.type) || '—';
-      const vesselLabel = piConfig.label.replace(/\s*PI$/i, '').trim();
 
       doc.setFont(fontId, 'normal');
       doc.setFontSize(7.5);
       setTextColor(doc, C_MID);
-      doc.text(vesselLabel, xStart, y);
+      doc.text(group.vesselLabel, xStart, y);
       doc.setFont(fontId, 'bold');
       doc.setFontSize(8);
       setTextColor(doc, C_DARK);

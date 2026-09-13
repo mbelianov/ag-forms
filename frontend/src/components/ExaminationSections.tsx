@@ -203,7 +203,7 @@ function renderFetusClinicalDetails(fetus: FetusSectionData, examType: string) {
             }}
           >
             {/* Headers */}
-            <span style={bioLabelStyle}>Measurement</span>
+            <span style={bioLabelStyle}></span>
             <span style={{ ...bioLabelStyle, textAlign: 'right' }}>Value</span>
             {hasPercentileCol && <span style={bioLabelStyle}>Percentile</span>}
             <span style={bioLabelStyle}>GA</span>
@@ -264,18 +264,12 @@ function renderFetusClinicalDetails(fetus: FetusSectionData, examType: string) {
 
       {/* 5. Doppler Section — Config-driven Sub-grid A (Vessels) and Sub-grid B (Single) */}
       {(config.dopplerVessels.length > 0 || config.dopplerSingle.length > 0) && (() => {
-        // Pair vessel configs in chunks of 2: [PI, RI]
-        const vesselPairs: [import('../types').ObservableTypeConfig, import('../types').ObservableTypeConfig][] = [];
-        for (let i = 0; i + 1 < config.dopplerVessels.length; i += 2) {
-          vesselPairs.push([config.dopplerVessels[i], config.dopplerVessels[i + 1]]);
-        }
-
         return (
           <div>
             <div style={subSectionTitleStyle}>Doppler</div>
 
-            {/* Sub-grid A: Dynamic Vessel Pairs (3 cols: Vessel | PI | RI) */}
-            {vesselPairs.length > 0 && (
+            {/* Sub-grid A: Dynamic Vessel Groups (3 cols: Vessel | PI | RI) */}
+            {config.dopplerVessels.length > 0 && (
               <div
                 style={{
                   display: 'grid',
@@ -285,18 +279,18 @@ function renderFetusClinicalDetails(fetus: FetusSectionData, examType: string) {
                   marginBottom: config.dopplerSingle.length > 0 ? '0.75rem' : 0,
                 }}
               >
-                <span style={bioLabelStyle}>Vessel</span>
+                <span style={bioLabelStyle}></span>
                 <span style={bioLabelStyle}>PI</span>
                 <span style={bioLabelStyle}>RI</span>
 
-                {vesselPairs.map(([piConfig, riConfig]) => {
+                {config.dopplerVessels.map((group) => {
+                  const [piConfig, riConfig] = group.measurements;
                   const piObs = dopplerMap.get(piConfig.type);
                   const riObs = dopplerMap.get(riConfig.type);
-                  const vesselLabel = piConfig.label.replace(/\s*PI$/i, '').trim();
 
                   return (
-                    <Fragment key={piConfig.type}>
-                      <span style={bioLabelStyle}>{vesselLabel}</span>
+                    <Fragment key={group.vesselLabel}>
+                      <span style={bioLabelStyle}>{group.vesselLabel}</span>
                       <span style={bioValueStyle}>
                         {piObs?.value != null && piObs.value !== '' ? String(piObs.value) : '—'}
                       </span>
@@ -319,8 +313,8 @@ function renderFetusClinicalDetails(fetus: FetusSectionData, examType: string) {
                   alignItems: 'baseline',
                 }}
               >
-                <span style={bioLabelStyle}>Measurement</span>
-                <span style={bioLabelStyle}>Value</span>
+                <span style={bioLabelStyle}></span>
+                <span style={bioLabelStyle}></span>
 
                 {config.dopplerSingle.map(tc => {
                   const obs = dopplerMap.get(tc.type);

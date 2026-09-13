@@ -89,7 +89,7 @@ function buildFetusPdfViewModel(
   const result: FetusPdfViewModel = {
     index: fetus.index,
     biometry: config.biometryTypes.map(tc => buildObservablePdfEntryFromConfig(tc, storedBiometry.get(tc.type))),
-    doppler: [...config.dopplerVessels, ...config.dopplerSingle].map(tc => buildObservablePdfEntryFromConfig(tc, storedDoppler.get(tc.type))),
+    doppler: [...config.dopplerVessels.flatMap(g => g.measurements), ...config.dopplerSingle].map(tc => buildObservablePdfEntryFromConfig(tc, storedDoppler.get(tc.type))),
   };
 
   // Ultrasound findings — config-driven (always populate so section renders with '—' when empty)
