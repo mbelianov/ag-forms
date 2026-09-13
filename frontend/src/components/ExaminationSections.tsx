@@ -221,7 +221,48 @@ function renderFetusClinicalDetails(fetus: FetusSectionData, examType: string) {
         </div>
       )}
 
-      {/* 3. Doppler Section — Config-driven Sub-grid A (Vessels) and Sub-grid B (Single) */}
+      {/* 3. Markers (driven dynamically by config.markerTypes) */}
+      {config.markerTypes.length > 0 && (
+        <div>
+          <div style={subSectionTitleStyle}>First Trimester Markers</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.4rem 1rem' }}>
+            {config.markerTypes.map(mt => {
+              const val = fetus.markers?.[mt.key];
+              const displayVal = mt.inputType === 'boolean'
+                ? (val === 'yes' || val === 'true' ? 'Yes' : val === 'no' || val === 'false' ? 'No' : '—')
+                : (val || '—');
+              return (
+                <Fragment key={mt.key}>
+                  <span style={bioLabelStyle}>{mt.label}</span>
+                  <span style={bioValueStyle}>{displayVal}</span>
+                </Fragment>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 4. Anatomy (unconditionally rendered from config) */}
+      {config.anatomyTypes.length > 0 && (
+        <div>
+          <div style={subSectionTitleStyle}>Anatomy</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.75rem 0.5rem' }}>
+            {config.anatomyTypes.map(tc => {
+              const rawVal = anat[tc.key];
+              const displayVal = rawVal && rawVal.trim() !== ''
+                ? rawVal.charAt(0).toUpperCase() + rawVal.slice(1)
+                : '—';
+              return (
+                <Fragment key={tc.key}>
+                  {fieldBlock(tc.label, displayVal)}
+                </Fragment>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 5. Doppler Section — Config-driven Sub-grid A (Vessels) and Sub-grid B (Single) */}
       {(config.dopplerVessels.length > 0 || config.dopplerSingle.length > 0) && (() => {
         // Pair vessel configs in chunks of 2: [PI, RI]
         const vesselPairs: [import('../types').ObservableTypeConfig, import('../types').ObservableTypeConfig][] = [];
@@ -297,47 +338,6 @@ function renderFetusClinicalDetails(fetus: FetusSectionData, examType: string) {
           </div>
         );
       })()}
-
-      {/* 4. Anatomy (unconditionally rendered from config) */}
-      {config.anatomyTypes.length > 0 && (
-        <div>
-          <div style={subSectionTitleStyle}>Anatomy</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.75rem 0.5rem' }}>
-            {config.anatomyTypes.map(tc => {
-              const rawVal = anat[tc.key];
-              const displayVal = rawVal && rawVal.trim() !== ''
-                ? rawVal.charAt(0).toUpperCase() + rawVal.slice(1)
-                : '—';
-              return (
-                <Fragment key={tc.key}>
-                  {fieldBlock(tc.label, displayVal)}
-                </Fragment>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 5. Markers (driven dynamically by config.markerTypes) */}
-      {config.markerTypes.length > 0 && (
-        <div>
-          <div style={subSectionTitleStyle}>First Trimester Markers</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.4rem 1rem' }}>
-            {config.markerTypes.map(mt => {
-              const val = fetus.markers?.[mt.key];
-              const displayVal = mt.inputType === 'boolean'
-                ? (val === 'yes' || val === 'true' ? 'Yes' : val === 'no' || val === 'false' ? 'No' : '—')
-                : (val || '—');
-              return (
-                <Fragment key={mt.key}>
-                  <span style={bioLabelStyle}>{mt.label}</span>
-                  <span style={bioValueStyle}>{displayVal}</span>
-                </Fragment>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

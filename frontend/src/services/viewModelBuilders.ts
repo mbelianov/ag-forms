@@ -10,7 +10,7 @@ import {
   fmtBiometry,
 } from '../utils/calculations';
 import { EXAM_TYPE_CONFIG } from '../constants/examinationTypes';
-import type { Examination, Observable, FetusSectionData } from '../types';
+import type { Examination, Observable, FetusSectionData, ObservableTypeConfig } from '../types';
 import type { ExamPdfViewModel, FetusPdfViewModel, ObservablePdfEntry } from './print.service';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -50,72 +50,29 @@ const PRENATAL_BIOMETRY_CITATIONS =
 const FT_BIOMETRY_CITATIONS =
   '1. Robinson HP. Br Med J. 1975;4(5986):28–31. PMID 1182090. (GA from CRL)';
 
-// ─── OBSERVABLE_PDF_META ──────────────────────────────────────────────────────
-// Maps type key → { label with unit } for PDF row rendering.
-// Covers all observable types from §14.3 for both exam types.
+// ─── Config-aware observable formatters ──────────────────────────────────────
 
-const OBSERVABLE_PDF_META: Record<string, { label: string }> = {
-  // Prenatal biometry
-  bpd:       { label: 'BPD (mm)' },
-  ofd:       { label: 'OFD (mm)' },
-  hc:        { label: 'HC (mm)' },
-  tad:       { label: 'TAD (mm)' },
-  apad:      { label: 'APAD (mm)' },
-  ac:        { label: 'AC (mm)' },
-  fl:        { label: 'FL (mm)' },
-  efw:       { label: 'EFW (grams)' },
-  tcd:       { label: 'TCD (mm)' },
-  vp:        { label: 'Vp' },
-  cm:        { label: 'CM (mm)' },
-  nuchalFold: { label: 'NF (mm)' },
-  nb:        { label: 'NB (mm)' },
-  la:        { label: 'LA' },
-  lc:        { label: 'LC (mm)' },
-  // Prenatal doppler
-  pi:        { label: 'PI (Umb.)' },
-  ri:        { label: 'RI (Umb.)' },
-  utADexPI:  { label: 'A.ut.Dex PI' },
-  utADexRI:  { label: 'A.ut.Dex RI' },
-  utASinPI:  { label: 'A.ut.Sin PI' },
-  utASinRI:  { label: 'A.ut.Sin RI' },
-  cma:       { label: 'CMA PI' },
-  psv:       { label: 'PSV' },
-  cpr:       { label: 'CPR' },
-  ducVen:    { label: 'Duc. Ven.' },
-  // First trimester biometry
-  crl:       { label: 'CRL (mm)' },
-  nt:        { label: 'NT (mm)' },
-  puls:      { label: 'Heart Rate (bpm)' },
-};
-
-// ─── Fetus observable serializer ─────────────────────────────────────────────
-
-function fmtObservableValue(obs: Observable): string {
+function fmtObservableValueWithUnit(obs: Observable | undefined, unit: string): string {
+  if (!obs) return '—';
   const val = obs.value;
   if (val === undefined || val === null || val === '') return '—';
   if (typeof val === 'string') return val;
-  // EFW in grams — no unit appended (label already says "grams")
-  if (obs.type === 'efw') return `${fmtBiometry(val)} g`;
-  // Heart rate, dimensionless doppler — no unit appended
-  if (['pi', 'ri', 'utADexPI', 'utADexRI', 'utASinPI', 'utASinRI',
-       'cma', 'psv', 'cpr', 'puls'].includes(obs.type)) {
-    return typeof val === 'number' ? val.toFixed(2) : String(val);
-  }
-  // Free-text (vp, la, ducVen)
-  if (['vp', 'la', 'ducVen'].includes(obs.type)) return String(val);
-  // Default mm measurements
-  return `${fmtBiometry(Number(val))} mm`;
+  if (unit === 'g') return String(Math.round(val as number));
+  if (unit === 'bpm') return String(Math.round(val as number));
+  if (unit === 'mm') return `${fmtBiometry(val as number)} mm`;
+  // dimensionless (empty unit) or any other unit
+  return (val as number).toFixed(2);
 }
 
-function buildObservablePdfEntry(obs: Observable): ObservablePdfEntry {
-  const meta = OBSERVABLE_PDF_META[obs.type] ?? { label: obs.type };
+function buildObservablePdfEntryFromConfig(tc: ObservableTypeConfig, stored: Observable | undefined): ObservablePdfEntry {
+  const label = tc.unit ? `${tc.label} (${tc.unit})` : tc.label;
   return {
-    type: obs.type,
-    label: meta.label,
-    value: fmtObservableValue(obs),
-    percentile: pctStr(obs.percentile?.value, obs.percentile?.isManual),
-    ga: obs.ga?.value
-      ? withManualMarker(obs.ga.value, obs.ga.isManual)
+    type: tc.type,
+    label,
+    value: fmtObservableValueWithUnit(stored, tc.unit),
+    percentile: stored ? pctStr(stored.percentile?.value, stored.percentile?.isManual) : undefined,
+    ga: stored?.ga?.value
+      ? withManualMarker(stored.ga.value, stored.ga.isManual)
       : undefined,
   };
 }
@@ -125,48 +82,42 @@ function buildFetusPdfViewModel(
   examType: string,
 ): FetusPdfViewModel {
   const config = EXAM_TYPE_CONFIG[examType] ?? EXAM_TYPE_CONFIG['prenatal'];
+
+  const storedBiometry = new Map<string, Observable>((fetus.biometry ?? []).map(o => [o.type, o]));
+  const storedDoppler = new Map<string, Observable>((fetus.doppler ?? []).map(o => [o.type, o]));
+
   const result: FetusPdfViewModel = {
     index: fetus.index,
-    biometry: (fetus.biometry ?? []).map(buildObservablePdfEntry),
-    doppler: (fetus.doppler ?? []).map(buildObservablePdfEntry),
+    biometry: config.biometryTypes.map(tc => buildObservablePdfEntryFromConfig(tc, storedBiometry.get(tc.type))),
+    doppler: [...config.dopplerVessels, ...config.dopplerSingle].map(tc => buildObservablePdfEntryFromConfig(tc, storedDoppler.get(tc.type))),
   };
 
-  // Ultrasound findings — config-driven
-  const uf = fetus.ultrasoundFindings;
-  if (uf) {
-    const ufResult: Record<string, string | undefined> = {};
-    for (const tc of config.ultrasoundFindingTypes) {
-      const raw = uf[tc.key];
-      if (raw != null && raw !== '') {
-        const opt = tc.options?.find(o => o.value === raw);
-        if (opt) {
-          ufResult[tc.key] = opt.label;
-        } else {
-          const s = String(raw);
-          const capitalized = s.charAt(0).toUpperCase() + s.slice(1);
-          ufResult[tc.key] = tc.unit && !s.includes(tc.unit) ? `${capitalized} ${tc.unit}` : capitalized;
-        }
+  // Ultrasound findings — config-driven (always populate so section renders with '—' when empty)
+  const ufResult: Record<string, string | undefined> = {};
+  for (const tc of config.ultrasoundFindingTypes) {
+    const raw = fetus.ultrasoundFindings?.[tc.key];
+    if (raw != null && raw !== '') {
+      const opt = tc.options?.find(o => o.value === raw);
+      if (opt) {
+        ufResult[tc.key] = opt.label;
       } else {
-        ufResult[tc.key] = undefined;
+        const s = String(raw);
+        const capitalized = s.charAt(0).toUpperCase() + s.slice(1);
+        ufResult[tc.key] = tc.unit && !s.includes(tc.unit) ? `${capitalized} ${tc.unit}` : capitalized;
       }
+    } else {
+      ufResult[tc.key] = undefined;
     }
-    // Set explicit named aliases
-    ufResult.heartRate = ufResult['heart_rate'];
-    ufResult.fetalMovement = ufResult['fetal_movement'];
-    ufResult.umbilicalCord = ufResult['umbilical_cord'];
-    result.ultrasound = ufResult as FetusPdfViewModel['ultrasound'];
   }
+  result.ultrasound = ufResult;
 
-  // Anatomy — config-driven
-  const an = fetus.anatomy;
-  if (an) {
-    const anResult: Record<string, string | undefined> = {};
-    for (const tc of config.anatomyTypes) {
-      const raw = an[tc.key];
-      anResult[tc.key] = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : undefined;
-    }
-    result.anatomy = anResult as FetusPdfViewModel['anatomy'];
+  // Anatomy — config-driven (always populate so section renders with '—' when empty)
+  const anResult: Record<string, string | undefined> = {};
+  for (const tc of config.anatomyTypes) {
+    const raw = fetus.anatomy?.[tc.key];
+    anResult[tc.key] = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : undefined;
   }
+  result.anatomy = anResult;
 
   // Markers — config-driven (KI-011 fix)
   if (config.markerTypes.length > 0 && fetus.markers) {
@@ -180,7 +131,7 @@ function buildFetusPdfViewModel(
         mkResult[mt.key] = val || undefined;
       }
     }
-    result.markers = mkResult as FetusPdfViewModel['markers'];
+    result.markers = mkResult;
   }
 
   // GA from biometry composite

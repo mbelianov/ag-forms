@@ -96,18 +96,16 @@ export function computePairLayout(pairSize: number): PairLayout {
 // ─── Anatomy & Ultrasound pair builders (Config-driven) ───────────────────────
 
 function mkAnatomyPairs(a: FetusPdfViewModel['anatomy'], examType = 'prenatal'): Array<[string, string | undefined]> {
-  if (!a) return [];
   const config = EXAM_TYPE_CONFIG[examType] ?? EXAM_TYPE_CONFIG['prenatal'];
-  return config.anatomyTypes.map(tc => [tc.label, a[tc.key]]);
+  return config.anatomyTypes.map(tc => [tc.label, a?.[tc.key]] as [string, string | undefined]);
 }
 
 function mkUltrasoundPairs(u: FetusPdfViewModel['ultrasound'], examType = 'prenatal'): Array<[string, string | undefined]> {
-  if (!u) return [];
   const config = EXAM_TYPE_CONFIG[examType] ?? EXAM_TYPE_CONFIG['prenatal'];
   return config.ultrasoundFindingTypes.map(tc => {
-    const val = u[tc.key];
+    const val = u?.[tc.key];
     const label = tc.unit && tc.inputType === 'text' && tc.key === 'heart_rate' ? 'FHR (bpm)' : tc.label;
-    return [label, val];
+    return [label, val] as [string, string | undefined];
   });
 }
 
@@ -354,12 +352,12 @@ export function renderClinicalSectionsPair(
 ): number {
   const { rule, sectionHeadingAt, kvGridAt, FONT_ID } = helpers;
   const { colW, xStart, xEnd } = layout;
-  const isFt = vm.examinationType === 'first_trimester';
+  const examConfig = EXAM_TYPE_CONFIG[vm.examinationType ?? 'prenatal'] ?? EXAM_TYPE_CONFIG['prenatal'];
 
   // Helper: render a section for each fetus in the pair side-by-side
   const renderPairSection = (
     label: string,
-    renderFn: (fetus: FetusPdfViewModel, xS: number, xE: number) => number,
+    renderFn: (fetus: FetusPdfViewModel, xS: number, xE: number, y1: number) => number,
   ) => {
     rule(doc, y); y += 4;
     const yStart = y;
@@ -367,34 +365,17 @@ export function renderClinicalSectionsPair(
 
     for (let i = 0; i < pair.length; i++) {
       const y1 = sectionHeadingAt(doc, pair.length > 1 ? `${label} — Fetus ${pair[i].index + 1}` : label, yStart, xStart[i], xEnd[i]);
-      const yAfter = renderFn(pair[i], xStart[i], xEnd[i]);
+      const yAfter = renderFn(pair[i], xStart[i], xEnd[i], y1);
       if (yAfter > maxY) maxY = yAfter;
-      y = y1; // y is only used to start rendering in renderFn; maxY tracks real bottom
     }
 
     y = maxY + 1;
   };
 
   // ── Ultrasound Findings ──────────────────────────────────────────────────────
-  const hasUF = pair.some(f => f.ultrasound && Object.values(f.ultrasound).some(Boolean));
-  if (hasUF) {
-    renderPairSection('Ultrasound Findings', (fetus, xS) => {
-      const pairs = mkUltrasoundPairs(fetus.ultrasound);
-      return kvGridAt(doc, pairs, sectionHeadingAt(doc, '', y + 4, xS, xS + colW) - 5 + 5, 2, xS, colW, 7);
-    });
-  } else {
-    // Render with empty fields
-    rule(doc, y); y += 4;
-    const yStart = y;
-    let maxY = yStart;
-    for (let i = 0; i < pair.length; i++) {
-      const heading = pair.length > 1 ? `Ultrasound Findings — Fetus ${pair[i].index + 1}` : 'Ultrasound Findings';
-      const y1 = sectionHeadingAt(doc, heading, yStart, xStart[i], xEnd[i]);
-      const ySec = kvGridAt(doc, mkUltrasoundPairs(pair[i].ultrasound, vm.examinationType), y1, 2, xStart[i], colW, 7);
-      if (ySec > maxY) maxY = ySec;
-    }
-    y = maxY + 1;
-  }
+  renderPairSection('Ultrasound Findings', (fetus, xS, _xE, y1) =>
+    kvGridAt(doc, mkUltrasoundPairs(fetus.ultrasound, vm.examinationType), y1, 2, xS, colW, 7)
+  );
 
   // ── Biometry ─────────────────────────────────────────────────────────────────
   {
@@ -410,8 +391,8 @@ export function renderClinicalSectionsPair(
     y = maxY + 1;
   }
 
-  // ── Markers (first trimester only) ───────────────────────────────────────────
-  if (isFt) {
+  // ── Markers (render when config defines marker types) ────────────────────────
+  if (examConfig.markerTypes.length > 0) {
     rule(doc, y); y += 4;
     const yStart = y;
     let maxY = yStart;

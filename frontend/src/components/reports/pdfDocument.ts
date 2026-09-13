@@ -131,7 +131,9 @@ function kvGridAt(
     doc.setFont(FONT_ID, 'normal');
     doc.setFontSize(7.5);
     setTextColor(doc, C_MID);
-    doc.text(label, x, rowY);
+    const displayLabel = label.length > 12 ? label.slice(0, 11) + '…' : label;
+    doc.text(displayLabel, x, rowY);
+    //doc.text(label, x, rowY);
 
     doc.setFont(FONT_ID, 'bold');
     doc.setFontSize(bodyFontSize);

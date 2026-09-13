@@ -18,39 +18,9 @@ export interface FetusPdfViewModel {
   index: number;          // 0-based fetus index
   biometry: ObservablePdfEntry[];
   doppler: ObservablePdfEntry[];
-  ultrasound?: Record<string, string | undefined> & {
-    presentation?: string;
-    gender?: string;
-    heartRate?: string;
-    fetalMovement?: string;
-    placenta?: string;
-    umbilicalCord?: string;
-  };
-  anatomy?: Record<string, string | undefined> & {
-    head?: string;
-    brain?: string;
-    heart?: string;
-    abdomen?: string;
-    kidneys?: string;
-    limbs?: string;
-    skeleton?: string;
-    face?: string;
-    neckSkin?: string;
-    spine?: string;
-    thorax?: string;
-  };
-  markers?: Record<string, string | undefined> & {
-    arrhythmia?: string;
-    tricuspidRegurgitation?: string;
-    abnormalDvFlow?: string;
-    echogenicCardiacFocus?: string;
-    singleUmbilicalArtery?: string;
-    choroidPlexusCysts?: string;
-    exomphalos?: string;
-    megacystis?: string;
-    placenta?: string;
-    cordInsertion?: string;
-  };
+  ultrasound?: Record<string, string | undefined>;
+  anatomy?: Record<string, string | undefined>;
+  markers?: Record<string, string | undefined>;
   gaFromBiometry?: string;   // "28w 3d" or "28w 3d †" for manual
 }
 
