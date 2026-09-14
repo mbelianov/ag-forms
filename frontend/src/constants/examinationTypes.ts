@@ -68,7 +68,7 @@ export const PRENATAL_UF_CONFIG: readonly DescriptorTypeConfig[] = [
   },
   {
     key: 'heart_rate',
-    label: 'FHR',
+    label: 'FHR (bpm)',
     inputType: 'text',
     unit: 'bpm',
     placeholder: 'e.g. 145',
@@ -104,7 +104,7 @@ export const FT_UF_CONFIG: readonly DescriptorTypeConfig[] = [
   },
   {
     key: 'heart_rate',
-    label: 'FHR',
+    label: 'FHR (bpm)',
     inputType: 'text',
     unit: 'bpm',
     placeholder: 'e.g. 160',

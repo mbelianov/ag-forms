@@ -104,8 +104,7 @@ function mkUltrasoundPairs(u: FetusPdfViewModel['ultrasound'], examType = 'prena
   const config = EXAM_TYPE_CONFIG[examType] ?? EXAM_TYPE_CONFIG['prenatal'];
   return config.ultrasoundFindingTypes.map(tc => {
     const val = u?.[tc.key];
-    const label = tc.unit && tc.inputType === 'text' && tc.key === 'heart_rate' ? 'FHR (bpm)' : tc.label;
-    return [label, val] as [string, string | undefined];
+    return [tc.label, val] as [string, string | undefined];
   });
 }
 

@@ -119,67 +119,57 @@ const FetusSection = React.memo(function FetusSection({
   const markers = fetus.markers as Record<string, string>;
   const prefix = `f${fi}`;
 
-  return (
-    <div style={styleFetusColumn}>
-      {/* Column header — only when multiple fetuses */}
-      {fetusCount > 1 && (
-        <h3 style={styleFetusHeader}>
-          Fetus {fi + 1}
-        </h3>
-      )}
+  const ultrasoundFindingsSection = examConfig.ultrasoundFindingTypes.length > 0 ? (
+    <div style={styleUFSection}>
+      <h5 className="observable-section-title">Ultrasound Findings</h5>
+      <div style={styleUFGrid}>
+        {examConfig.ultrasoundFindingTypes.map((tc) => {
+          const val = uf[tc.key] ?? '';
+          if (tc.inputType === 'select' && tc.options) {
+            return (
+              <Select
+                key={tc.key}
+                id={`${prefix}_uf_${tc.key}`}
+                labelText={tc.label}
+                value={val}
+                onChange={(e) => onFetusDescriptorChange(fi, 'ultrasoundFindings', tc.key, e.target.value)}
+                disabled={isSubmitting}
+                size="sm"
+              >
+                <SelectItem value="" text="Select" />
+                {tc.options.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value} text={opt.label} />
+                ))}
+              </Select>
+            );
+          }
+          return (
+            <TextInput
+              key={tc.key}
+              id={`${prefix}_uf_${tc.key}`}
+              labelText={tc.label}
+              placeholder={tc.placeholder}
+              value={val}
+              onChange={(e) => onFetusDescriptorChange(fi, 'ultrasoundFindings', tc.key, e.target.value)}
+              disabled={isSubmitting}
+              size="sm"
+            />
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
 
-      {/* Ultrasound Findings */}
-      {examConfig.ultrasoundFindingTypes.length > 0 && (
-        <div style={styleUFSection}>
-          <h5 className="observable-section-title">Ultrasound Findings</h5>
-          <div style={styleUFGrid}>
-            {examConfig.ultrasoundFindingTypes.map((tc) => {
-              const val = uf[tc.key] ?? '';
-              const label = tc.unit && tc.inputType === 'text' && tc.key === 'heart_rate' ? 'FHR (bpm)' : tc.label;
-              if (tc.inputType === 'select' && tc.options) {
-                return (
-                  <Select
-                    key={tc.key}
-                    id={`${prefix}_uf_${tc.key}`}
-                    labelText={label}
-                    value={val}
-                    onChange={(e) => onFetusDescriptorChange(fi, 'ultrasoundFindings', tc.key, e.target.value)}
-                    disabled={isSubmitting}
-                    size="sm"
-                  >
-                    <SelectItem value="" text="Select" />
-                    {tc.options.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value} text={opt.label} />
-                    ))}
-                  </Select>
-                );
-              }
-              return (
-                <TextInput
-                  key={tc.key}
-                  id={`${prefix}_uf_${tc.key}`}
-                  labelText={label}
-                  placeholder={tc.placeholder}
-                  value={val}
-                  onChange={(e) => onFetusDescriptorChange(fi, 'ultrasoundFindings', tc.key, e.target.value)}
-                  disabled={isSubmitting}
-                  size="sm"
-                />
-              );
-            })}
-          </div>
-        </div>
-      )}
-
+  const biometrySection = (
+    <>
       <h5 className="observable-section-title">Biometry</h5>
-      {/* GA from Biometry */}
       <TextInput
         id={`${prefix}_gaFromBio`}
         labelText={
           <>
             GA from Biometry {autoSuffix(
-              fetus.gaFromBiometry.isManual, 
-              examConfig.trimester === 'first' ? 'Robinson' : 'Hadlock', 
+              fetus.gaFromBiometry.isManual,
+              examConfig.trimester === 'first' ? 'Robinson' : 'Hadlock',
               !!fetus.gaFromBiometry.value)}
           </>
         }
@@ -191,8 +181,6 @@ const FetusSection = React.memo(function FetusSection({
         disabled={isSubmitting}
         style={{ marginBottom: '1rem' }}
       />
-
-      {/* Biometry section */}
       <ObservableSection
         title="Measurements"
         fetusIndex={fi}
@@ -202,80 +190,112 @@ const FetusSection = React.memo(function FetusSection({
         disabled={isSubmitting}
         onFieldChange={onFetusChange}
       />
+    </>
+  );
 
-      {/* Doppler section */}
-      <DopplerSection
-        fetusIndex={fi}
-        vesselGroups={examConfig.dopplerVessels}
-        singleConfigs={examConfig.dopplerSingle}
-        data={fetus.doppler}
-        disabled={isSubmitting}
-        onFieldChange={onFetusChange}
-      />
-
-      {/* Anatomy */}
-      {examConfig.anatomyTypes.length > 0 && (
-        <div style={styleAnatomySection}>
-          <h5 className="observable-section-title">Anatomy</h5>
-          <div style={styleAnatomyGrid}>
-            {examConfig.anatomyTypes.map(({ key, label }) => (
+  const markersSection = examConfig.markerTypes.length > 0 ? (
+    <div style={styleMarkersSection}>
+      <h5 className="observable-section-title">First Trimester Markers</h5>
+      <div style={styleMarkersGrid}>
+        {examConfig.markerTypes.map(({ key, label, inputType }) => {
+          const value = markers[key] ?? '';
+          if (inputType === 'text') {
+            return (
               <TextInput
                 key={key}
-                id={`${prefix}_anat_${key}`}
+                id={`${prefix}_mkr_${key}`}
                 labelText={label}
-                value={anat[key] ?? ''}
-                onChange={(e) => onFetusDescriptorChange(fi, 'anatomy', key, e.target.value)}
+                value={value}
+                onChange={(e) => onFetusDescriptorChange(fi, 'markers', key, e.target.value)}
                 disabled={isSubmitting}
                 size="sm"
               />
-            ))}
-          </div>
-        </div>
-      )}
+            );
+          }
+          // boolean — Yes / No radio group with clear
+          return (
+            <div key={key}>
+              <RadioButtonGroup
+                legendText={label}
+                name={`${prefix}_mkr_${key}`}
+                valueSelected={value || 'none'}
+                onChange={(val: string) =>
+                  onFetusDescriptorChange(fi, 'markers', key, val === 'none' ? '' : val)
+                }
+                disabled={isSubmitting}
+                orientation="horizontal"
+              >
+                <RadioButton labelText="Yes" value="yes" id={`${prefix}_mkr_${key}_yes`} />
+                <RadioButton labelText="No"  value="no"  id={`${prefix}_mkr_${key}_no`}  />
+                <RadioButton labelText="—"   value="none" id={`${prefix}_mkr_${key}_none`} />
+              </RadioButtonGroup>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
 
-      {/* Markers — config-driven, only rendered when markerTypes is non-empty */}
-      {examConfig.markerTypes.length > 0 && (
-        <div style={styleMarkersSection}>
-          <h5 className="observable-section-title">First Trimester Markers</h5>
-          <div style={styleMarkersGrid}>
-            {examConfig.markerTypes.map(({ key, label, inputType }) => {
-              const value = markers[key] ?? '';
-              if (inputType === 'text') {
-                return (
-                  <TextInput
-                    key={key}
-                    id={`${prefix}_mkr_${key}`}
-                    labelText={label}
-                    value={value}
-                    onChange={(e) => onFetusDescriptorChange(fi, 'markers', key, e.target.value)}
-                    disabled={isSubmitting}
-                    size="sm"
-                  />
-                );
-              }
-              // boolean — Yes / No radio group with clear
-              return (
-                <div key={key}>
-                  <RadioButtonGroup
-                    legendText={label}
-                    name={`${prefix}_mkr_${key}`}
-                    valueSelected={value || 'none'}
-                    onChange={(val: string) =>
-                      onFetusDescriptorChange(fi, 'markers', key, val === 'none' ? '' : val)
-                    }
-                    disabled={isSubmitting}
-                    orientation="horizontal"
-                  >
-                    <RadioButton labelText="Yes" value="yes" id={`${prefix}_mkr_${key}_yes`} />
-                    <RadioButton labelText="No"  value="no"  id={`${prefix}_mkr_${key}_no`}  />
-                    <RadioButton labelText="—"   value="none" id={`${prefix}_mkr_${key}_none`} />
-                  </RadioButtonGroup>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+  const anatomySection = examConfig.anatomyTypes.length > 0 ? (
+    <div style={styleAnatomySection}>
+      <h5 className="observable-section-title">Anatomy</h5>
+      <div style={styleAnatomyGrid}>
+        {examConfig.anatomyTypes.map((tc) => {
+          const val = anat[tc.key] ?? '';
+          if (tc.inputType === 'select' && tc.options) {
+            return (
+              <Select
+                key={tc.key}
+                id={`${prefix}_anat_${tc.key}`}
+                labelText={tc.label}
+                value={val}
+                onChange={(e) => onFetusDescriptorChange(fi, 'anatomy', tc.key, e.target.value)}
+                disabled={isSubmitting}
+                size="sm"
+              >
+                <SelectItem value="" text="Select" />
+                {tc.options.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value} text={opt.label} />
+                ))}
+              </Select>
+            );
+          }
+          return (
+            <TextInput
+              key={tc.key}
+              id={`${prefix}_anat_${tc.key}`}
+              labelText={tc.label}
+              placeholder={tc.placeholder}
+              value={val}
+              onChange={(e) => onFetusDescriptorChange(fi, 'anatomy', tc.key, e.target.value)}
+              disabled={isSubmitting}
+              size="sm"
+            />
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
+
+  const dopplerSection = (
+    <DopplerSection
+      fetusIndex={fi}
+      vesselGroups={examConfig.dopplerVessels}
+      singleConfigs={examConfig.dopplerSingle}
+      data={fetus.doppler}
+      disabled={isSubmitting}
+      onFieldChange={onFetusChange}
+    />
+  );
+
+  return (
+    <div style={styleFetusColumn}>
+      {fetusCount > 1 && <h3 style={styleFetusHeader}>Fetus {fi + 1}</h3>}
+      {ultrasoundFindingsSection}
+      {biometrySection}
+      {markersSection}
+      {anatomySection}
+      {dopplerSection}
     </div>
   );
 });

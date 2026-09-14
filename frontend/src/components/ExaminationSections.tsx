@@ -168,7 +168,7 @@ function renderFetusClinicalDetails(fetus: FetusSectionData, examType: string) {
               }
               return (
                 <Fragment key={tc.key}>
-                  {fieldBlock(tc.unit && tc.inputType === 'text' && tc.key === 'heart_rate' ? 'FHR (bpm)' : tc.label, displayVal)}
+                  {fieldBlock(tc.label, displayVal)}
                 </Fragment>
               );
             })}
