@@ -152,6 +152,13 @@ describe('Examinations Integration', () => {
 
         expect(response.status).toBe(200);
         expect(body.data.message).toBe('Examination deleted successfully');
+
+        // Verify primary entity in PATIENT_ partition is soft-deleted
+        const primaryEntity = await getTableClient('Examinations').getEntity<any>(
+            `PATIENT_${patient.patientId}`,
+            examination.primaryRowKey!
+        );
+        expect(primaryEntity.isDeleted).toBe(true);
     });
 
     test('should simulate email report sending', async () => {

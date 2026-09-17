@@ -7,7 +7,7 @@
  */
 import {
   calcEDD,
-  fmtBiometry,
+  fmtObservableValueWithUnit,
 } from '../utils/calculations';
 import { EXAM_TYPE_CONFIG } from '../constants/examinationTypes';
 import type { Examination, Observable, FetusSectionData, ObservableTypeConfig } from '../types';
@@ -51,18 +51,6 @@ const FT_BIOMETRY_CITATIONS =
   '1. Robinson HP. Br Med J. 1975;4(5986):28–31. PMID 1182090. (GA from CRL)';
 
 // ─── Config-aware observable formatters ──────────────────────────────────────
-
-function fmtObservableValueWithUnit(obs: Observable | undefined, unit: string): string {
-  if (!obs) return '—';
-  const val = obs.value;
-  if (val === undefined || val === null || val === '') return '—';
-  if (typeof val === 'string') return val;
-  if (unit === 'g') return `${String(Math.round(val as number))} g`;
-  if (unit === 'bpm') return String(Math.round(val as number));
-  if (unit === 'mm') return `${fmtBiometry(val as number)} mm`;
-  // dimensionless (empty unit) or any other unit
-  return (val as number).toFixed(2);
-}
 
 function buildObservablePdfEntryFromConfig(tc: ObservableTypeConfig, stored: Observable | undefined): ObservablePdfEntry {
   const label = tc.unit ? `${tc.label} (${tc.unit})` : tc.label;

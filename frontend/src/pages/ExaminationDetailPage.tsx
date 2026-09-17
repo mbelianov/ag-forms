@@ -260,7 +260,7 @@ export default function ExaminationDetailPage() {
               <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.5rem' }}>
                 Examination Date
               </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#161616' }}>
+              <div style={{ fontSize: '1rem', fontWeight: 600, color: '#161616' }}>
                 {formatPlainDate(examination.examDate)}
               </div>
               {examination.examinationType && (
@@ -272,7 +272,7 @@ export default function ExaminationDetailPage() {
             {/* Cell 2: MRN */}
             <div>
               <div style={{ fontSize: '0.875rem', color: '#525252', marginBottom: '0.5rem' }}>MRN</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#161616' }}>
+              <div style={{ fontSize: '1rem', fontWeight: 600, color: '#161616' }}>
                 {examination.mrn || '—'}
               </div>
             </div>

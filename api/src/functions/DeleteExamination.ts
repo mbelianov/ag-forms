@@ -57,10 +57,11 @@ export async function deleteExamination(request: HttpRequest, context: Invocatio
         await updateEntity(EXAMINATIONS_TABLE, deletedLookupEntity);
 
         // Also soft delete primary entity (PATIENT_{patientId} partition)
+        const primaryRowKey = examination.primaryRowKey || examination.rowKey;
         const primaryEntity = await getEntity<Examination>(
             EXAMINATIONS_TABLE,
             `PATIENT_${examination.patientId}`,
-            examination.rowKey
+            primaryRowKey
         );
 
         if (primaryEntity) {

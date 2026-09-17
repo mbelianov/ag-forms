@@ -3,6 +3,8 @@
  * All functions are pure and side-effect-free.
  */
 
+import type { Observable } from '../types';
+
 /**
  * Format a fractional gestational-age value (in weeks) into the canonical
  * "Xw Yd" string used throughout the application.
@@ -616,6 +618,26 @@ export function calcGAFromEFW(efw_g: number | undefined): string | undefined {
  */
 export function fmtBiometry(value: number): string {
   return value.toFixed(2);
+}
+
+/**
+ * Format an observable value with its unit for display.
+ * Single source of truth used by both the details view and PDF generation.
+ *  - mm  → "70.00 mm"
+ *  - g   → "1200 g"      (rounded, no decimals)
+ *  - bpm → "151 bpm"     (rounded, no decimals)
+ *  - ''  → "1.02"        (dimensionless, two decimals)
+ *  - string value → returned as-is
+ */
+export function fmtObservableValueWithUnit(obs: Observable | undefined, unit: string): string {
+  if (!obs) return '—';
+  const val = obs.value;
+  if (val === undefined || val === null || val === '') return '—';
+  if (typeof val === 'string') return val;
+  if (unit === 'g') return `${String(Math.round(val as number))} g`;
+  if (unit === 'bpm') return `${String(Math.round(val as number))} bpm`;
+  if (unit === 'mm') return `${fmtBiometry(val as number)} mm`;
+  return (val as number).toFixed(2);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

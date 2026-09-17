@@ -8,7 +8,7 @@
  */
 import { Fragment } from 'react';
 import { Tile } from '@carbon/react';
-import { fmtBiometry } from '../utils/calculations';
+import { fmtObservableValueWithUnit } from '../utils/calculations';
 import { EXAM_TYPE_CONFIG } from '../constants/examinationTypes';
 import { autoSuffix } from './AutoCalcHelpers';
 import type { Examination, Observable, FetusSectionData } from '../types';
@@ -73,9 +73,7 @@ const fieldBlock = (label: string, value: React.ReactNode) => (
 
 /** Returns observable value as display string. */
 function obsValue(obs: Observable | undefined, unit: string): string {
-  if (!obs || obs.value == null || obs.value === '') return '—';
-  const raw = typeof obs.value === 'number' ? fmtBiometry(obs.value) : String(obs.value);
-  return unit ? `${raw} ${unit}` : raw;
+  return fmtObservableValueWithUnit(obs, unit);
 }
 
 /** Returns percentile display string from observable. */
@@ -292,10 +290,10 @@ function renderFetusClinicalDetails(fetus: FetusSectionData, examType: string) {
                     <Fragment key={group.vesselLabel}>
                       <span style={bioLabelStyle}>{group.vesselLabel}</span>
                       <span style={bioValueStyle}>
-                        {piObs?.value != null && piObs.value !== '' ? String(piObs.value) : '—'}
+                        {piObs?.value != null && piObs.value !== '' ? (() => { const n = parseFloat(String(piObs.value)); return isNaN(n) ? String(piObs.value) : n.toFixed(2); })() : '—'}
                       </span>
                       <span style={bioValueStyle}>
-                        {riObs?.value != null && riObs.value !== '' ? String(riObs.value) : '—'}
+                        {riObs?.value != null && riObs.value !== '' ? (() => { const n = parseFloat(String(riObs.value)); return isNaN(n) ? String(riObs.value) : n.toFixed(2); })() : '—'}
                       </span>
                     </Fragment>
                   );
