@@ -464,7 +464,26 @@ export default function ExaminationForm(props: ExaminationFormProps) {
           <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Pregnancy Data</h4>
           <Stack gap={3}>
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'nowrap' }}>
-              <div style={{ flex: '0 0 auto', minWidth: '200px' }}>
+              <div
+                style={{ flex: '0 0 auto', minWidth: '200px' }}
+                onKeyDownCapture={(e) => {
+                  if (e.key !== 'Enter') return;
+                  // flatpickr attaches its instance directly on the input element as ._flatpickr
+                  const input = e.target as HTMLInputElement & { _flatpickr?: { isOpen: boolean } };
+                  if (input._flatpickr?.isOpen) {
+                    e.preventDefault();
+                    const form = input.closest('form');
+                    const focusable = form?.querySelectorAll<HTMLElement>(
+                      'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
+                    );
+                    if (focusable) {
+                      const list = Array.from(focusable);
+                      const idx = list.indexOf(input);
+                      if (idx >= 0 && idx < list.length - 1) list[idx + 1].focus();
+                    }
+                  }
+                }}
+              >
                 <DatePicker
                   datePickerType="single"
                   dateFormat="d/m/Y"
