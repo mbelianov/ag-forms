@@ -50,10 +50,10 @@ export const PRENATAL_UF_CONFIG: readonly DescriptorTypeConfig[] = [
     label: 'Presentation',
     inputType: 'select',
     options: [
-      { value: 'cephalic',   label: 'Cephalic' },
-      { value: 'breech',     label: 'Breech' },
-      { value: 'transverse', label: 'Transverse' },
-      { value: 'oblique',    label: 'Oblique' },
+      { value: 'cephalic',   label: 'Главично' },
+      { value: 'breech',     label: 'Седалищно' },
+      { value: 'transverse', label: 'Напречно' },
+      { value: 'oblique',    label: 'Косо' },
     ],
   },
   {
@@ -61,9 +61,9 @@ export const PRENATAL_UF_CONFIG: readonly DescriptorTypeConfig[] = [
     label: 'Gender',
     inputType: 'select',
     options: [
-      { value: 'male',    label: 'Male' },
-      { value: 'female',  label: 'Female' },
-      { value: 'unknown', label: 'Unknown' },
+      { value: 'male',    label: 'Мъж' },
+      { value: 'female',  label: 'Жена' },
+      { value: 'unknown', label: 'ХХХ' },
     ],
   },
   {
@@ -78,10 +78,10 @@ export const PRENATAL_UF_CONFIG: readonly DescriptorTypeConfig[] = [
     label: 'Fetal Movement',
     inputType: 'select',
     options: [
-      { value: 'active',  label: 'Active' },
-      { value: 'present', label: 'Present' },
-      { value: 'reduced', label: 'Reduced' },
-      { value: 'absent',  label: 'Absent' },
+      { value: 'active',  label: 'Активни' },
+      { value: 'present', label: 'Налични' },
+      { value: 'reduced', label: 'Редуцирани' },
+      { value: 'absent',  label: 'Липсват' },
     ],
   },
   {

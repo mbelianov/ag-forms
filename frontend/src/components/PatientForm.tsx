@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import IMask from 'imask';
 import {
   Form,
   Stack,
@@ -57,6 +58,32 @@ export default function PatientForm({ patient, onSubmit, onCancel, isEdit = fals
       });
     }
   }, [patient]);
+
+  // ── Birthdate input mask (imask) ────────────────────────────────────────────
+  // Cannot use ref prop on DatePickerInput — Carbon's DatePicker overwrites it
+  // with its own internal ref (DatePicker.js:185). Use getElementById instead.
+  useEffect(() => {
+    const el = document.getElementById('patient-birthDate') as HTMLInputElement | null;
+    if (!el) return;
+    const mask = IMask(el, {
+      mask: Date,
+      pattern: 'd{/}`m{/}`Y',
+      format: (date: Date) => {
+        const dd = String(date.getDate()).padStart(2, '0');
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const yyyy = date.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+      },
+      parse: (str: string) => {
+        const [dd, mm, yyyy] = str.split('/');
+        return new Date(+yyyy, +mm - 1, +dd);
+      },
+      lazy: true,
+      overwrite: true,
+    });
+    return () => mask.destroy();
+  }, []);
+  // ───────────────────────────────────────────────────────────────────────────
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};

@@ -16,6 +16,7 @@ interface ObservableSectionProps {
   sectionKey: 'biometry' | 'doppler';
   typeConfigs: readonly ObservableTypeConfig[];
   data: ObservableFormMap;
+  errors?: Record<string, string>;
   disabled?: boolean;
   onFieldChange: (
     fetusIndex: number,
@@ -32,6 +33,7 @@ export const ObservableSection: React.FC<ObservableSectionProps> = React.memo(({
   sectionKey,
   typeConfigs,
   data,
+  errors,
   disabled = false,
   onFieldChange,
 }) => {
@@ -50,6 +52,7 @@ export const ObservableSection: React.FC<ObservableSectionProps> = React.memo(({
               key={config.type}
               config={config}
               fieldState={fieldState}
+              errors={errors}
               idPrefix={`f${fetusIndex}_${sectionKey}_${config.type}`}
               disabled={disabled}
               onChange={(field, next) =>

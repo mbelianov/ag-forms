@@ -4,7 +4,51 @@
  * (Requires vitest to be installed: npm install -D vitest)
  */
 import { describe, it, expect } from 'vitest';
-import { validatePositiveFloat, validateNonNegativeFloat, validateIntegerField } from './validators';
+import { validatePositiveFloat, validateNonNegativeFloat, validateIntegerField, validateObservableValue } from './validators';
+import type { ObservableTypeConfig } from '../types';
+
+describe('validateObservableValue', () => {
+  const numericConfig: ObservableTypeConfig = {
+    type: 'bpd',
+    label: 'BPD',
+    unit: 'mm',
+    hasPercentile: true,
+    hasGa: true,
+  };
+
+  const textConfig: ObservableTypeConfig = {
+    type: 'vp',
+    label: 'Vp',
+    unit: '',
+    hasPercentile: false,
+    hasGa: false,
+    valueKind: 'text',
+  };
+
+  it('accepts empty or whitespace-only strings', () => {
+    expect(validateObservableValue('', numericConfig)).toBeUndefined();
+    expect(validateObservableValue('   ', numericConfig)).toBeUndefined();
+  });
+
+  it('accepts valid integers and floats for numeric configs', () => {
+    expect(validateObservableValue('50', numericConfig)).toBeUndefined();
+    expect(validateObservableValue('50.5', numericConfig)).toBeUndefined();
+    expect(validateObservableValue('0', numericConfig)).toBeUndefined();
+    expect(validateObservableValue('0.0', numericConfig)).toBeUndefined();
+  });
+
+  it('rejects non-numeric characters for numeric configs', () => {
+    expect(validateObservableValue('50abc', numericConfig)).toBe('BPD must be a number');
+    expect(validateObservableValue('abc', numericConfig)).toBe('BPD must be a number');
+    expect(validateObservableValue('50,5', numericConfig)).toBe('BPD must be a number');
+  });
+
+  it('allows arbitrary strings for text valueKind configs', () => {
+    expect(validateObservableValue('normal', textConfig)).toBeUndefined();
+    expect(validateObservableValue('3.2mm', textConfig)).toBeUndefined();
+    expect(validateObservableValue('anything', textConfig)).toBeUndefined();
+  });
+});
 
 describe('validatePositiveFloat', () => {
   it('accepts empty string (optional field)', () => {

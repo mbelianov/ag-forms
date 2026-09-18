@@ -188,6 +188,7 @@ const FetusSection = React.memo(function FetusSection({
         sectionKey="biometry"
         typeConfigs={examConfig.biometryTypes}
         data={fetus.biometry}
+        errors={errors}
         disabled={isSubmitting}
         onFieldChange={onFetusChange}
       />
@@ -284,6 +285,7 @@ const FetusSection = React.memo(function FetusSection({
       vesselGroups={examConfig.dopplerVessels}
       singleConfigs={examConfig.dopplerSingle}
       data={fetus.doppler}
+      errors={errors}
       disabled={isSubmitting}
       onFieldChange={onFetusChange}
     />
@@ -655,7 +657,7 @@ export default function ExaminationForm(props: ExaminationFormProps) {
           <Button kind="secondary" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting || Object.keys(errors).length > 0}>
             {isSubmitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Examination'}
           </Button>
         </ButtonSet>

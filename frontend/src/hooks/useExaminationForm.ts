@@ -21,9 +21,7 @@ import type {
 import { calcGAFromLMP, calcEDD, calculateAgeAtDate } from '../utils/calculations';
 import { EXAM_TYPE_CONFIG } from '../constants/examinationTypes';
 import {
-  validatePositiveFloat,
-  validateNonNegativeFloat,
-  validateIntegerField,
+  validateObservableValue,
   GA_REGEX,
 } from '../utils/validators';
 import {
@@ -253,6 +251,31 @@ export function useExaminationForm({
     field: keyof ObservableFormFieldState,
     next: AutoCalcValue<string>,
   ) => {
+    if (field === 'value') {
+      const errorKey = `f${index}_${section}_${type}`;
+      const currentConfig = section === 'biometry'
+        ? examConfig.biometryTypes.find(c => c.type === type)
+        : [
+            ...examConfig.dopplerVessels.flatMap(g => g.measurements),
+            ...examConfig.dopplerSingle,
+          ].find(c => c.type === type);
+
+      if (currentConfig) {
+        const err = validateObservableValue(next.value, currentConfig);
+        setErrors(prev => {
+          if (err) {
+            return { ...prev, [errorKey]: err };
+          }
+          if (prev[errorKey]) {
+            const updated = { ...prev };
+            delete updated[errorKey];
+            return updated;
+          }
+          return prev;
+        });
+      }
+    }
+
     setFormData(prev => {
       const newFetuses = [...prev.fetuses];
       const fetus = { ...newFetuses[index] };
@@ -315,7 +338,7 @@ export function useExaminationForm({
       newFetuses[index] = fetus;
       return { ...prev, fetuses: newFetuses };
     });
-  }, []);
+  }, [examConfig]);
 
   // ── Per-fetus descriptor (anatomy/ultrasoundFindings/markers/gaFromBiometry) ──
   const handleFetusDescriptorChange = useCallback((
@@ -401,16 +424,13 @@ export function useExaminationForm({
       for (const tc of config.biometryTypes) {
         const val = fetus.biometry[tc.type]?.value?.value ?? '';
         if (!val) continue;
-        if (tc.valueKind === 'text') continue;
-        const err = tc.valueKind === 'integer'
-          ? validateIntegerField(val, tc.label)
-          : validatePositiveFloat(val, tc.label);
-        if (err) newErrors[`${prefix}_bio_${tc.type}`] = err;
+        const err = validateObservableValue(val, tc);
+        if (err) newErrors[`${prefix}_biometry_${tc.type}`] = err;
         // GA field validation
         const gaVal = fetus.biometry[tc.type]?.ga?.value ?? '';
         if (gaVal) {
           const gaErr = validateGA(gaVal);
-          if (gaErr) newErrors[`${prefix}_bio_${tc.type}_ga`] = gaErr;
+          if (gaErr) newErrors[`${prefix}_biometry_${tc.type}_ga`] = gaErr;
         }
       }
 
@@ -418,8 +438,8 @@ export function useExaminationForm({
       for (const tc of [...config.dopplerVessels.flatMap(g => g.measurements), ...config.dopplerSingle]) {
         const val = fetus.doppler[tc.type]?.value?.value ?? '';
         if (!val) continue;
-        const err = validateNonNegativeFloat(val, tc.label);
-        if (err) newErrors[`${prefix}_dop_${tc.type}`] = err;
+        const err = validateObservableValue(val, tc);
+        if (err) newErrors[`${prefix}_doppler_${tc.type}`] = err;
       }
 
       // gaFromBiometry format

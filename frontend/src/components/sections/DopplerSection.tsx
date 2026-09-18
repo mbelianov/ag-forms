@@ -17,6 +17,7 @@ interface DopplerSectionProps {
   vesselGroups: readonly DopplerVesselGroup[];
   singleConfigs: readonly ObservableTypeConfig[];
   data: ObservableFormMap;
+  errors?: Record<string, string>;
   disabled?: boolean;
   onFieldChange: (
     fetusIndex: number,
@@ -40,6 +41,7 @@ export const DopplerSection: React.FC<DopplerSectionProps> = React.memo(({
   vesselGroups,
   singleConfigs,
   data,
+  errors,
   disabled = false,
   onFieldChange,
 }) => {
@@ -63,25 +65,31 @@ export const DopplerSection: React.FC<DopplerSectionProps> = React.memo(({
             const [piConfig, riConfig] = group.measurements as [ObservableTypeConfig, ObservableTypeConfig];
             const piVal = data[piConfig.type]?.value?.value ?? '';
             const riVal = data[riConfig.type]?.value?.value ?? '';
+            const piError = errors?.[`f${fetusIndex}_doppler_${piConfig.type}`];
+            const riError = errors?.[`f${fetusIndex}_doppler_${riConfig.type}`];
             return (
               <div
                 key={group.vesselLabel}
                 style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.5rem' }}
               >
                 <TextInput
-                  id={`f${fetusIndex}_dop_${piConfig.type}`}
+                  id={`f${fetusIndex}_doppler_${piConfig.type}`}
                   labelText={piConfig.label}
                   placeholder="e.g., 0.0"
                   value={piVal}
+                  invalid={!!piError}
+                  invalidText={piError}
                   disabled={disabled}
                   onChange={(e) => handleChange(piConfig.type, e.target.value)}
                   size="sm"
                 />
                 <TextInput
-                  id={`f${fetusIndex}_dop_${riConfig.type}`}
+                  id={`f${fetusIndex}_doppler_${riConfig.type}`}
                   labelText={riConfig.label}
                   placeholder="e.g., 0.0"
                   value={riVal}
+                  invalid={!!riError}
+                  invalidText={riError}
                   disabled={disabled}
                   onChange={(e) => handleChange(riConfig.type, e.target.value)}
                   size="sm"
@@ -97,13 +105,16 @@ export const DopplerSection: React.FC<DopplerSectionProps> = React.memo(({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {singleConfigs.map((config) => {
             const val = data[config.type]?.value?.value ?? '';
+            const valError = errors?.[`f${fetusIndex}_doppler_${config.type}`];
             return (
               <TextInput
                 key={config.type}
-                id={`f${fetusIndex}_dop_${config.type}`}
+                id={`f${fetusIndex}_doppler_${config.type}`}
                 labelText={config.label}
                 placeholder="e.g., 0.0"
                 value={val}
+                invalid={!!valError}
+                invalidText={valError}
                 disabled={disabled}
                 onChange={(e) => handleChange(config.type, e.target.value)}
                 size="sm"

@@ -15,6 +15,7 @@ interface ObservableRowProps {
   config: ObservableTypeConfig;
   fieldState: ObservableFormFieldState;
   idPrefix: string;
+  errors?: Record<string, string>;
   disabled?: boolean;
   onChange: (field: keyof ObservableFormFieldState, next: AutoCalcValue<string>) => void;
 }
@@ -36,6 +37,7 @@ export const ObservableRow: React.FC<ObservableRowProps> = React.memo(({
   config,
   fieldState,
   idPrefix,
+  errors,
   disabled = false,
   onChange,
 }) => {
@@ -47,6 +49,7 @@ export const ObservableRow: React.FC<ObservableRowProps> = React.memo(({
   const pctlLabelNode = buildLabel(`${label} %`, fieldState.percentile?.value ?? '', fieldState.percentile?.isManual, sourceTag);
 
   const valuePlaceholder = validRange ? `${validRange.min}–${validRange.max}` : '';
+  const valueError = errors?.[idPrefix];
 
   return (
     <div className="observable-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', alignItems: 'start' }}>
@@ -55,6 +58,8 @@ export const ObservableRow: React.FC<ObservableRowProps> = React.memo(({
         labelText={valueLabelNode as string}
         placeholder={valuePlaceholder}
         value={fieldState.value.value}
+        invalid={!!valueError}
+        invalidText={valueError}
         disabled={disabled}
         onChange={(e) => {
           const val = e.target.value;
