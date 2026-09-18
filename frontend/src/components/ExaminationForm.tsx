@@ -7,7 +7,8 @@
  * Create form: exam type selector (2 options) + fetus count selector.
  * Edit form: both exam type and fetus count are read-only.
  */
-import React from 'react';
+import React, { useEffect } from 'react';
+import IMask from 'imask';
 import {
   Form,
   Stack,
@@ -323,6 +324,43 @@ export default function ExaminationForm(props: ExaminationFormProps) {
 
   const fetusCount = formData.fetuses.length;
 
+  // ── LMP input mask (imask) ──────────────────────────────────────────────────
+  // Attaches a DD/MM/YYYY live mask to the LMP DatePickerInput so the user only
+  // needs to type digits — separators are inserted automatically.
+  //
+  // NOTE: We cannot use a ref prop on <DatePickerInput> because Carbon's DatePicker
+  // calls React.cloneElement on its child and overwrites the ref with its own
+  // internal startInputField ref (DatePicker.js:185). lmpInputRef.current would
+  // stay null. Instead, we look up the element by its stable DOM id after mount.
+  //
+  // The backtick before `m and `Y in the pattern marks those separators as
+  // "eager" — imask auto-inserts the '/' as soon as the preceding block is full,
+  // so the user never needs to type a separator manually.
+  //
+  // Cleanup (mask.destroy) is called when the component unmounts.
+  useEffect(() => {
+    const el = document.getElementById('last_menstrual_period') as HTMLInputElement | null;
+    if (!el) return;
+    const mask = IMask(el, {
+      mask: Date,
+      pattern: 'd{/}`m{/}`Y',
+      format: (date: Date) => {
+        const dd = String(date.getDate()).padStart(2, '0');
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const yyyy = date.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+      },
+      parse: (str: string) => {
+        const [dd, mm, yyyy] = str.split('/');
+        return new Date(+yyyy, +mm - 1, +dd);
+      },
+      lazy: true,     // don't show placeholder slots until the user starts typing
+      overwrite: true,
+    });
+    return () => mask.destroy();
+  }, []);
+  // ───────────────────────────────────────────────────────────────────────────
+
   return (
     <Form onSubmit={handleSubmit} autoComplete="off">
       <Stack gap={4}>
@@ -464,11 +502,28 @@ export default function ExaminationForm(props: ExaminationFormProps) {
           <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Pregnancy Data</h4>
           <Stack gap={3}>
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'nowrap' }}>
+              {/*
+               * ── Enter-key fix ───────────────────────────────────────────────
+               * Problem: Carbon's DatePicker (flatpickr) never calls
+               * event.preventDefault() when Enter is pressed on a text input, so
+               * the browser's default action (form submission) always fires.
+               *
+               * Fix: wrap the DatePicker in a div with onKeyDownCapture.
+               * React's synthetic capture listener fires BEFORE Carbon's native
+               * capture listener (fixEventsPlugin), so preventDefault() reaches
+               * the browser first.
+               *
+               * Guard: read input._flatpickr.isOpen — flatpickr attaches its
+               * instance on the DOM element at node._flatpickr (flatpickr.js:2656).
+               *
+               *   Calendar OPEN  + Enter → preventDefault + advance focus (no submit)
+               *   Calendar CLOSED + Enter → handler exits  → form submits normally
+               * ────────────────────────────────────────────────────────────────
+               */}
               <div
                 style={{ flex: '0 0 auto', minWidth: '200px' }}
                 onKeyDownCapture={(e) => {
                   if (e.key !== 'Enter') return;
-                  // flatpickr attaches its instance directly on the input element as ._flatpickr
                   const input = e.target as HTMLInputElement & { _flatpickr?: { isOpen: boolean } };
                   if (input._flatpickr?.isOpen) {
                     e.preventDefault();
