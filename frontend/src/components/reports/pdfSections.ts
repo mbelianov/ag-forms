@@ -133,14 +133,14 @@ function renderBiometryBlock(
   const xGA    = xStart + labelW + valueW + pctW;
 
   // Header row
-  doc.setFont(fontId, 'normal');
-  doc.setFontSize(7);
-  setTextColor(doc, C_MID);
-  doc.text('', xStart, y);
-  doc.text('Value',       xValue, y);
-  doc.text('Percentile',  xPct,   y);
-  doc.text('GA',          xGA,    y);
-  y += PITCH;
+  //doc.setFont(fontId, 'normal');
+  //doc.setFontSize(7);
+  //setTextColor(doc, C_MID);
+  //doc.text('', xStart, y);
+  //doc.text('Value',       xValue, y);
+  //doc.text('Percentile',  xPct,   y);
+  //doc.text('GA',          xGA,    y);
+  //y += PITCH;
 
   for (const entry of fetus.biometry) {
     // Label
@@ -150,7 +150,7 @@ function renderBiometryBlock(
     doc.text(entry.label, xStart, y);
 
     // Value
-    doc.setFont(fontId, 'bold');
+    doc.setFont(fontId, 'normal');
     doc.setFontSize(8);
     setTextColor(doc, C_DARK);
     doc.text(entry.value || '—', xValue, y);
@@ -325,7 +325,8 @@ function kvGridAtStacked(
     }
   }
 
-  return col === 0 ? rowY : rowY + PITCH;
+  //return col === 0 ? rowY : rowY + PITCH;
+  return rowY + PITCH/2;
 }
 
 // ─── renderClinicalSectionsPair ───────────────────────────────────────────────

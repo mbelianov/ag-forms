@@ -141,7 +141,7 @@ function kvGridAt(
     const lines = doc.splitTextToSize(value, valueW) as string[];
     doc.text(lines, x + labelW, rowY);
 
-    const cellBottom = rowY + (lines.length - 1) * 4;
+    const cellBottom = rowY + (lines.length - 1) * 3;
     if (cellBottom > rowBottom) rowBottom = cellBottom;
 
     col++;
@@ -151,7 +151,7 @@ function kvGridAt(
       rowBottom = rowY;
     }
   });
-
+  
   return col === 0 ? rowY - 3.85 / 2 : rowBottom + 3.85 / 2;
 }
 
@@ -178,8 +178,9 @@ function textBlock(
     lines = lines.slice(0, maxLines);
     lines[maxLines - 1] = lines[maxLines - 1].replace(/\s*\S+$/, '') + '… (continued)';
   }
-  doc.text(lines, MARGIN_L, y + 4.5);
-  return y + 5 + lines.length * 4.5;
+  const lineH = bodyFontSize * 0.3528 * 1.15;
+  doc.text(lines, MARGIN_L, y + lineH);
+  return y + 5 + lines.length * lineH;
 }
 
 // ─── Common page sections ─────────────────────────────────────────────────────
@@ -194,7 +195,7 @@ function drawHeader(doc: jsPDF, vm: ExamPdfViewModel): number {
   doc.rect(0, 0, PAGE_W, 22, 'F');
 
   doc.setFont(FONT_ID, 'bold');
-  doc.setFontSize(13);
+  doc.setFontSize(10);
   setTextColor(doc, C_DARK);
   doc.text(headerTitle, MARGIN_L, 10);
 
@@ -217,16 +218,16 @@ function drawPatientBlock(doc: jsPDF, vm: ExamPdfViewModel, y: number): number {
   doc.setFontSize(8.5);
   setTextColor(doc, C_MID);
   const statusLabel = 'Status: ';
-  doc.text(statusLabel, MARGIN_R - 42, y);
-  doc.setFont(FONT_ID, 'bold');
+  doc.text(statusLabel, MARGIN_R - 24, y);
+  doc.setFont(FONT_ID, 'normal');
   setTextColor(doc, C_DARK);
-  doc.text(vm.status, MARGIN_R - 42 + doc.getTextWidth(statusLabel), y);
+  doc.text(vm.status, MARGIN_R - 24 + doc.getTextWidth(statusLabel), y);
 
   y += 5;
   doc.setFont(FONT_ID, 'normal');
   doc.setFontSize(8);
   setTextColor(doc, C_MID);
-  doc.text(`Patient age at exam: ${vm.patientAgeAtExam !== undefined ? `${vm.patientAgeAtExam} years` : '—'}`, MARGIN_L, y);
+  doc.text(`Patient age: ${vm.patientAgeAtExam !== undefined ? `${vm.patientAgeAtExam} years` : '—'}`, MARGIN_L, y);
   y += 4;
 
   // GA from LMP + GA from Bio + EDD row
