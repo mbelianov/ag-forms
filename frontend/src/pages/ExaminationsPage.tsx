@@ -90,6 +90,9 @@ export default function ExaminationsPage() {
   const [continuationToken, setContinuationToken] = useState<string | undefined>();
   const [hasMore, setHasMore] = useState(false);
 
+  // DatePicker reset key — incremented on clear to force remount with blank defaultValue
+  const [datePickerKey, setDatePickerKey] = useState(0);
+
   // Patient combobox state (IMPL-010)
   const [defaultPatients, setDefaultPatients] = useState<Patient[]>([]);
   const [patientSearchResults, setPatientSearchResults] = useState<Patient[]>([]);
@@ -428,6 +431,7 @@ export default function ExaminationsPage() {
     setContinuationToken(undefined);
     setPage(1);
     setSearchParams({});
+    setDatePickerKey((k) => k + 1);
     startBrowse();
   };
 
@@ -530,11 +534,12 @@ export default function ExaminationsPage() {
         </div>
         <div style={{ flex: '0 0 auto' }}>
           <DatePicker
+            key={datePickerKey}
             datePickerType="range"
             dateFormat="d/m/Y"
             value={[
-              fromDate ? toDisplayDate(fromDate) : '',
-              toDate ? toDisplayDate(toDate) : '',
+              fromDate ? new Date(fromDate) : '',
+              toDate ? new Date(toDate) : '',
             ]}
             onChange={(dates: Date[]) => {
               const from = dates[0] ? toISODate(dates[0]) : '';
