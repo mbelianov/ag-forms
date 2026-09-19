@@ -91,8 +91,9 @@ export default function ExaminationsPage() {
   const [hasMore, setHasMore] = useState(false);
 
   // Patient combobox state (IMPL-010)
+  const [defaultPatients, setDefaultPatients] = useState<Patient[]>([]);
   const [patientSearchResults, setPatientSearchResults] = useState<Patient[]>([]);
-  const [selectedPatientName, setSelectedPatientName] = useState<string>('');
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isPatientSearching, setIsPatientSearching] = useState(false);
 
   // Refs
@@ -209,6 +210,29 @@ export default function ExaminationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Mount: pre-populate patient dropdown + resolve URL patient ───────────
+  useEffect(() => {
+    // Load first 5 patients for the default dropdown list
+    patientService.getPatients().then((res) => {
+      const first5 = res.patients.slice(0, 5);
+      setDefaultPatients(first5);
+      setPatientSearchResults(first5);
+    }).catch(() => {
+      // Silent failure — dropdown stays empty, typing search still works
+    });
+
+    // If URL has ?patient=<id>, fetch that patient and pre-select it
+    const urlPatientId = searchParams.get('patient');
+    if (urlPatientId) {
+      patientService.getPatient(urlPatientId).then((patient) => {
+        setSelectedPatient(patient);
+      }).catch(() => {
+        // Silent — patient may have been deleted; filter still runs via URL param
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -225,8 +249,8 @@ export default function ExaminationsPage() {
     if (!value) {
       // Clear — reset patient filter and return to browse mode if no other filter active
       setSelectedPatientId('');
-      setSelectedPatientName('');
-      setPatientSearchResults([]);
+      setSelectedPatient(null);
+      setPatientSearchResults(defaultPatients);
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.delete('patient');
@@ -243,8 +267,8 @@ export default function ExaminationsPage() {
     }
 
     if (value.trim().length < 2) {
-      // Too short — clear results but preserve existing filter
-      setPatientSearchResults([]);
+      // Too short — show defaults, preserve existing filter
+      setPatientSearchResults(defaultPatients);
       return;
     }
 
@@ -273,8 +297,8 @@ export default function ExaminationsPage() {
     if (!selectedItem) {
       // Clear selection
       setSelectedPatientId('');
-      setSelectedPatientName('');
-      setPatientSearchResults([]);
+      setSelectedPatient(null);
+      setPatientSearchResults(defaultPatients);
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.delete('patient');
@@ -291,7 +315,7 @@ export default function ExaminationsPage() {
     }
 
     setSelectedPatientId(selectedItem.patientId);
-    setSelectedPatientName(selectedItem.name);
+    setSelectedPatient(selectedItem);
     setPage(1);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -386,7 +410,7 @@ export default function ExaminationsPage() {
   const isFilterActive = !!(selectedPatientId || selectedStatus || selectedExamType || fromDate || toDate);
 
   const activeFilterSummary = [
-    selectedPatientId && selectedPatientName && `Patient: ${selectedPatientName}`,
+    selectedPatientId && selectedPatient?.name && `Patient: ${selectedPatient.name}`,
     selectedStatus && `Status: ${selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)}`,
     selectedExamType && `Type: ${getExamTypeLabel(selectedExamType)}`,
     fromDate && `From: ${toDisplayDate(fromDate)}`,
@@ -399,8 +423,8 @@ export default function ExaminationsPage() {
     setSelectedExamType('');
     setFromDate('');
     setToDate('');
-    setSelectedPatientName('');
-    setPatientSearchResults([]);
+    setSelectedPatient(null);
+    setPatientSearchResults(defaultPatients);
     setContinuationToken(undefined);
     setPage(1);
     setSearchParams({});
@@ -466,7 +490,7 @@ export default function ExaminationsPage() {
             placeholder="Type to search patients..."
             items={patientSearchResults}
             itemToString={(item) => item?.name ?? ''}
-            selectedItem={patientSearchResults.find(p => p.patientId === selectedPatientId) ?? null}
+            selectedItem={selectedPatient}
             onInputChange={handlePatientComboInputChange}
             onChange={({ selectedItem }) => handlePatientComboSelect(selectedItem ?? null)}
             shouldFilterItem={() => true}
