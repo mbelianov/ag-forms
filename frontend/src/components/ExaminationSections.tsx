@@ -180,14 +180,16 @@ function renderFetusClinicalDetails(fetus: FetusSectionData, examType: string) {
           <div style={subSectionTitleStyle}>Biometry</div>
 
           {/* GA from Biometry header summary if present */}
-          {gaFromBioValue && (
+          
             <div style={{ marginBottom: '0.75rem' }}>
               {fieldBlock(
                 'GA from Biometry',
-                <>{gaFromBioValue}{autoSuffix(gaFromBioManual, config.trimester === 'first' ? 'Robinson' : 'Hadlock', true)}</>
+                gaFromBioValue
+                  ? <>{gaFromBioValue}{autoSuffix(gaFromBioManual, config.trimester === 'first' ? 'Robinson' : 'Hadlock', true)}</>
+                  : '—'
               )}
             </div>
-          )}
+          
 
           {/* Biometry grid — Single unified CSS Grid container for headers and data rows */}
           <div

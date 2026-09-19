@@ -146,7 +146,7 @@ export default function ExaminationDetailPage() {
   // ST-07: Derive exam type label + fetus count composite
   const fetusCount = examination.data?.fetuses?.length ?? 0;
   const examTypeLabel = getExamTypeLabel(examination.examinationType ?? 'prenatal');
-  const fetusCountLabel = fetusCount > 1 ? ` — ${fetusCount} fetuses` : '';
+  const fetusCountLabel = fetusCount > 1 ? ` - ${fetusCount} fetuses` : '';
   const compositeTypeLabel = `${examTypeLabel}${fetusCountLabel}`;
 
   // Derived values — sourced from stored data

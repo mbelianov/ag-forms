@@ -384,7 +384,8 @@ export default function PatientDetailPage() {
               rows={examinations.map((exam) => ({
                 id: exam.examinationId,
                 examDate: formatDateShort(exam.examDate.includes('T') ? exam.examDate : exam.examDate + 'T00:00:00'),
-                type: getExamTypeLabel(exam.examinationType || '') || '—',
+                type: (() => { const fetusCount = exam.data?.fetuses?.length ?? 0; 
+                  return `${getExamTypeLabel(exam.examinationType ?? 'prenatal')}${fetusCount > 1 ? ` (×${fetusCount})` : ''}`; })(),
                 status: exam.status,
               }))}
               headers={examinationHeaders}
