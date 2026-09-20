@@ -419,7 +419,7 @@ function Invoke-DeleteAll {
 
     # Repeat pages until none left (each delete removes from the next page result)
     do {
-        $batch = Get-AllPatients -BaseUrl $BaseUrl -Session $session
+        $batch = @(Get-AllPatients -BaseUrl $BaseUrl -Session $session)
         if ($batch.Count -eq 0) { break }
 
         Write-Host "  Deleting batch of $($batch.Count) patients ..." -ForegroundColor DarkGray
