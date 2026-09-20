@@ -5,15 +5,15 @@ declare const beforeEach: any;
 declare const jest: any;
 
 // Mock the tableClient module so these tests run without Azurite
-jest.mock('../../utils/tableClient', () => ({
+jest.mock('../../shared/storage/tableClient', () => ({
   getEntity: jest.fn(),
   createEntity: jest.fn(),
   updateEntity: jest.fn(),
   ensureTableExists: jest.fn().mockResolvedValue(undefined),
 }));
 
-import { adjustCounter } from '../../utils/counterService';
-import { getEntity, createEntity, updateEntity } from '../../utils/tableClient';
+import { adjustCounter } from '../../shared/storage/counterService';
+import { getEntity, createEntity, updateEntity } from '../../shared/storage/tableClient';
 
 const TABLE = 'Counters';
 const PK = 'COUNTER';

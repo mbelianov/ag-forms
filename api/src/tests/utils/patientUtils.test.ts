@@ -2,7 +2,7 @@ declare const describe: any;
 declare const test: any;
 declare const expect: any;
 
-import { normalizePatientName, getSearchPartitionKey } from '../../utils/patientUtils';
+import { normalizePatientName, getSearchPartitionKey } from '../../shared/patients/patientUtils';
 
 describe('patientUtils', () => {
     describe('normalizePatientName', () => {

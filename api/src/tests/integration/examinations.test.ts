@@ -1,19 +1,19 @@
-ï»¿declare const describe: any;
+declare const describe: any;
 declare const test: any;
 declare const expect: any;
 declare const beforeEach: any;
 declare const afterEach: any;
 
-import { createExamination } from '../../functions/CreateExamination';
-import { getExaminations } from '../../functions/GetExaminations';
-import { getExamination } from '../../functions/GetExamination';
-import { getExaminationByMRN } from '../../functions/GetExaminationByMRN';
-import { updateExamination } from '../../functions/UpdateExamination';
-import { deleteExamination } from '../../functions/DeleteExamination';
-import { emailExaminationReport } from '../../functions/EmailExaminationReport';
-import { getExaminationsCount } from '../../functions/GetExaminationsCount';
+import { createExamination } from '../../functions/examinations/CreateExamination';
+import { getExaminations } from '../../functions/examinations/GetExaminations';
+import { getExamination } from '../../functions/examinations/GetExamination';
+import { getExaminationByMRN } from '../../functions/examinations/GetExaminationByMRN';
+import { updateExamination } from '../../functions/examinations/UpdateExamination';
+import { deleteExamination } from '../../functions/examinations/DeleteExamination';
+import { emailExaminationReport } from '../../functions/system/EmailExaminationReport';
+import { getExaminationsCount } from '../../functions/examinations/GetExaminationsCount';
 import { createTestUser, createTestPatient, createTestExamination, cleanupTestData, seedCounter, mockHttpRequest, mockInvocationContext } from '../testUtils';
-import { getTableClient } from '../../utils/tableClient';
+import { getTableClient } from '../../shared/storage/tableClient';
 
 const parseBody = (response: any) => JSON.parse(response.body);
 
@@ -55,7 +55,7 @@ describe('Examinations Integration', () => {
         const response = await createExamination(request, context);
         const body = parseBody(response);
 
-        // Should succeed â€” examination created with MRN
+        // Should succeed — examination created with MRN
         expect(response.status).toBe(201);
         expect(body.success).toBe(true);
         expect(body.data.examination.patientId).toBe(patient.patientId);
@@ -130,7 +130,7 @@ describe('Examinations Integration', () => {
         const response = await updateExamination(request, context);
         const body = parseBody(response);
 
-        // Should succeed â€” examination updated
+        // Should succeed — examination updated
         expect(response.status).toBe(200);
         expect(body.success).toBe(true);
         expect(body.data.examination.status).toBe('completed');
@@ -392,7 +392,7 @@ describe('Examinations Integration', () => {
         const table = getTableClient('Examinations');
         const persisted = await table.getEntity<any>('EXAM', examination.examinationId);
 
-        // First update with valid ETag â€” consumes it
+        // First update with valid ETag — consumes it
         const firstRequest = mockHttpRequest('PUT', {
             status: 'completed',
             etag: persisted.etag
@@ -403,7 +403,7 @@ describe('Examinations Integration', () => {
         const firstResponse = await updateExamination(firstRequest, mockInvocationContext());
         expect(firstResponse.status).toBe(200);
 
-        // Second update with the now-stale original ETag â€” expect 409
+        // Second update with the now-stale original ETag — expect 409
         const staleRequest = mockHttpRequest('PUT', {
             status: 'reviewed',
             etag: persisted.etag

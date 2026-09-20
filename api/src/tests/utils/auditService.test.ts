@@ -4,7 +4,7 @@ declare const expect: any;
 declare const beforeEach: any;
 declare const jest: any;
 
-jest.mock('../../utils/tableClient', () => ({
+jest.mock('../../shared/storage/tableClient', () => ({
     createEntity: jest.fn(),
     ensureTableExists: jest.fn().mockResolvedValue(undefined)
 }));
@@ -25,8 +25,8 @@ import {
     logUserDeleted,
     logExaminationsReassigned,
     logPasswordResetByAdmin
-} from '../../utils/auditService';
-import { createEntity } from '../../utils/tableClient';
+} from '../../shared/audit/auditService';
+import { createEntity } from '../../shared/storage/tableClient';
 
 describe('auditService', () => {
     beforeEach(() => {

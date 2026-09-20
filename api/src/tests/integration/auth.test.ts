@@ -5,13 +5,13 @@ declare const beforeEach: any;
 declare const afterEach: any;
 declare const jest: any;
 
-import { register } from '../../functions/Register';
-import { login } from '../../functions/Login';
-import { changePassword } from '../../functions/ChangePassword';
-import { getCurrentUser } from '../../functions/GetCurrentUser';
-import { logout } from '../../functions/Logout';
+import { register } from '../../functions/auth/Register';
+import { login } from '../../functions/auth/Login';
+import { changePassword } from '../../functions/auth/ChangePassword';
+import { getCurrentUser } from '../../functions/auth/GetCurrentUser';
+import { logout } from '../../functions/auth/Logout';
 import { mockHttpRequest, mockInvocationContext, cleanupTestData, createTestUser } from '../testUtils';
-import { getTableClient } from '../../utils/tableClient';
+import { getTableClient } from '../../shared/storage/tableClient';
 
 const parseBody = (response: any) => JSON.parse(response.body);
 

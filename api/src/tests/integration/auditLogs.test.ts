@@ -4,8 +4,8 @@ declare const expect: any;
 declare const beforeEach: any;
 declare const afterEach: any;
 
-import { getAuditLogs } from '../../functions/GetAuditLogs';
-import { login } from '../../functions/Login';
+import { getAuditLogs } from '../../functions/audit/GetAuditLogs';
+import { login } from '../../functions/auth/Login';
 import { createTestUser, cleanupTestData, mockHttpRequest, mockInvocationContext } from '../testUtils';
 
 const parseBody = (response: any) => JSON.parse(response.body);

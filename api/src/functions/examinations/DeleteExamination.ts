@@ -1,0 +1,122 @@
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
+import { requireAuth, isAdmin } from '../../shared/auth/authMiddleware';
+import { handleError } from '../../shared/http/errorHandler';
+import { successResponse, unauthorizedResponse, forbiddenResponse, errorResponse } from '../../shared/http/responseHelpers';
+import { getEntity, ensureTableExists, updateEntity } from '../../shared/storage/tableClient';
+import { logExaminationDeleted } from '../../shared/audit/auditService';
+import { adjustCounter } from '../../shared/storage/counterService';
+import { Examination, MRNLookup } from '../../types';
+
+const EXAMINATIONS_TABLE = 'Examinations';
+
+export async function deleteExamination(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    try {
+        const user = await requireAuth(request);
+        if (!user) {
+            return unauthorizedResponse('Authentication required');
+        }
+
+        // Only admins can delete examinations
+        if (!isAdmin(user)) {
+            return forbiddenResponse('Admin role required to delete examinations');
+        }
+
+        await ensureTableExists(EXAMINATIONS_TABLE);
+
+        // Get examination ID from route parameter
+        const examinationId = request.params.id;
+        if (!examinationId) {
+            return errorResponse('Examination ID is required', 400);
+        }
+
+        // Get examination from EXAM partition
+        const examination = await getEntity<Examination>(
+            EXAMINATIONS_TABLE,
+            'EXAM',
+            examinationId
+        );
+
+        if (!examination) {
+            return errorResponse('Examination not found', 404);
+        }
+
+        if (examination.isDeleted) {
+            return errorResponse('Examination is already deleted', 400);
+        }
+
+        const now = new Date().toISOString();
+
+        // Soft delete lookup entity (EXAM partition)
+        const deletedLookupEntity: Examination & { deletedBy: string } = {
+            ...examination,
+            isDeleted: true,
+            deletedAt: now,
+            deletedBy: user.userId
+        };
+
+        await updateEntity(EXAMINATIONS_TABLE, deletedLookupEntity);
+
+        // Also soft delete primary entity (PATIENT_{patientId} partition)
+        const primaryRowKey = examination.primaryRowKey || examination.rowKey;
+        const primaryEntity = await getEntity<Examination>(
+            EXAMINATIONS_TABLE,
+            `PATIENT_${examination.patientId}`,
+            primaryRowKey
+        );
+
+        if (primaryEntity) {
+            const deletedPrimaryEntity: Examination & { deletedBy: string } = {
+                ...primaryEntity,
+                isDeleted: true,
+                deletedAt: now,
+                deletedBy: user.userId
+            };
+
+            await updateEntity(EXAMINATIONS_TABLE, deletedPrimaryEntity);
+        }
+
+        // Also soft delete MRN lookup entity (MRN partition)
+        if (examination.mrn) {
+            const mrnLookup = await getEntity<MRNLookup & { isDeleted: boolean; deletedAt?: string; deletedBy?: string }>(
+                EXAMINATIONS_TABLE,
+                'MRN',
+                examination.mrn
+            );
+
+            if (mrnLookup) {
+                const deletedMrnLookup = {
+                    ...mrnLookup,
+                    isDeleted: true,
+                    deletedAt: now,
+                    deletedBy: user.userId
+                };
+                await updateEntity(EXAMINATIONS_TABLE, deletedMrnLookup);
+            }
+        }
+
+        // Decrement EXAM_TOTAL counter (non-fatal)
+        adjustCounter('Counters', 'COUNTER', 'EXAM_TOTAL', -1).catch(err =>
+            context.error('Failed to decrement EXAM_TOTAL counter:', err)
+        );
+
+        await logExaminationDeleted(user.userId, examinationId);
+
+        context.log('Examination soft deleted:', { examinationId, deletedBy: user.userId });
+
+        return successResponse({
+            message: 'Examination deleted successfully'
+        });
+    } catch (error) {
+        context.error('Error in deleteExamination:', error);
+        return handleError(error, context);
+    }
+}
+
+app.http('DeleteExamination', {
+    methods: ['DELETE'],
+    authLevel: 'anonymous',
+    route: 'v1/examinations/{id}',
+    handler: deleteExamination
+});
+
+// Made with Bob

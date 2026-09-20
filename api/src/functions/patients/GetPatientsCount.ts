@@ -1,0 +1,34 @@
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
+import { requireAuth } from '../../shared/auth/authMiddleware';
+import { handleError } from '../../shared/http/errorHandler';
+import { successResponse, unauthorizedResponse } from '../../shared/http/responseHelpers';
+import { getEntity } from '../../shared/storage/tableClient';
+import { Counter } from '../../types';
+
+export async function getPatientsCount(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    try {
+        const user = await requireAuth(request);
+        if (!user) {
+            return unauthorizedResponse('Authentication required');
+        }
+
+        const counter = await getEntity<Counter>('Counters', 'COUNTER', 'PATIENT_TOTAL');
+        const count = counter ? counter.value : 0;
+
+        context.log('Patient count retrieved:', { count, requestedBy: user.userId });
+
+        return successResponse({ count });
+    } catch (error) {
+        context.error('Error in getPatientsCount:', error);
+        return handleError(error, context);
+    }
+}
+
+app.http('GetPatientsCount', {
+    methods: ['GET'],
+    authLevel: 'anonymous',
+    route: 'v1/patients-count',
+    handler: getPatientsCount
+});
+
+// Made with Bob

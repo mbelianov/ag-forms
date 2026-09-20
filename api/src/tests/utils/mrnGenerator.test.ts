@@ -5,7 +5,7 @@ declare const beforeEach: any;
 declare const jest: any;
 
 // Mock the tableClient module so these tests run without Azurite
-jest.mock('../../utils/tableClient', () => ({
+jest.mock('../../shared/storage/tableClient', () => ({
     getEntity: jest.fn(),
     createEntity: jest.fn(),
     updateEntity: jest.fn(),
@@ -20,8 +20,8 @@ import {
     normalizeNameSegment,
     getCurrentCounterValue,
     resetCounter,
-} from '../../utils/mrnGenerator';
-import { getEntity, createEntity, updateEntity } from '../../utils/tableClient';
+} from '../../shared/mrn/mrnGenerator';
+import { getEntity, createEntity, updateEntity } from '../../shared/storage/tableClient';
 
 const currentYear = new Date().getFullYear();
 

@@ -4,14 +4,14 @@ declare const expect: any;
 declare const beforeEach: any;
 declare const afterEach: any;
 
-import { createUser } from '../../functions/CreateUser';
-import { getUsers } from '../../functions/GetUsers';
-import { updateUser } from '../../functions/UpdateUser';
-import { deleteUser } from '../../functions/DeleteUser';
-import { resetUserPassword } from '../../functions/ResetUserPassword';
-import { login } from '../../functions/Login';
+import { createUser } from '../../functions/users/CreateUser';
+import { getUsers } from '../../functions/users/GetUsers';
+import { updateUser } from '../../functions/users/UpdateUser';
+import { deleteUser } from '../../functions/users/DeleteUser';
+import { resetUserPassword } from '../../functions/users/ResetUserPassword';
+import { login } from '../../functions/auth/Login';
 import { createTestUser, createTestExamination, createTestPatient, cleanupTestData, mockHttpRequest, mockInvocationContext } from '../testUtils';
-import { getTableClient } from '../../utils/tableClient';
+import { getTableClient } from '../../shared/storage/tableClient';
 
 const parseBody = (response: any) => JSON.parse(response.body);
 

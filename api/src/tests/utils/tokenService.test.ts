@@ -10,7 +10,7 @@ import {
     decodeTokenUnsafe,
     isTokenExpired,
     refreshToken
-} from '../../utils/tokenService';
+} from '../../shared/auth/tokenService';
 import { mockHttpRequest } from '../testUtils';
 
 describe('Token Service', () => {

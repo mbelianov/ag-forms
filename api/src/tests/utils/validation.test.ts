@@ -2,7 +2,7 @@ declare const describe: any;
 declare const test: any;
 declare const expect: any;
 
-import { validateUser, validatePatient, validateExamination, validateLogin, validateRegister } from '../../utils/validation';
+import { validateUser, validatePatient, validateExamination, validateLogin, validateRegister } from '../../shared/validation/validation';
 // Made with Bob — ST-01 / ST-04 additions imported via the same entry-point
 
 describe('Validation Utilities', () => {

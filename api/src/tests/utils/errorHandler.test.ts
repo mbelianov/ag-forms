@@ -2,7 +2,7 @@ declare const describe: any;
 declare const test: any;
 declare const expect: any;
 
-import { handleError } from '../../utils/errorHandler';
+import { handleError } from '../../shared/http/errorHandler';
 import { mockInvocationContext } from '../testUtils';
 
 const parseBody = (response: any) => JSON.parse(response.body);

@@ -2,7 +2,7 @@ declare const describe: any;
 declare const test: any;
 declare const expect: any;
 
-import { hashPassword, verifyPassword, validatePasswordStrength, generateSecurePassword } from '../../utils/passwordService';
+import { hashPassword, verifyPassword, validatePasswordStrength, generateSecurePassword } from '../../shared/auth/passwordService';
 
 describe('Password Service', () => {
     describe('hashPassword', () => {

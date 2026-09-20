@@ -4,17 +4,17 @@ declare const expect: any;
 declare const beforeEach: any;
 declare const afterEach: any;
 
-import { createPatient } from '../../functions/CreatePatient';
-import { getPatients } from '../../functions/GetPatients';
-import { getPatient } from '../../functions/GetPatient';
-import { searchPatients } from '../../functions/SearchPatients';
-import { updatePatient } from '../../functions/UpdatePatient';
-import { deletePatient } from '../../functions/DeletePatient';
-import { getPatientsCount } from '../../functions/GetPatientsCount';
-import { getExamination } from '../../functions/GetExamination';
-import { createExamination } from '../../functions/CreateExamination';
+import { createPatient } from '../../functions/patients/CreatePatient';
+import { getPatients } from '../../functions/patients/GetPatients';
+import { getPatient } from '../../functions/patients/GetPatient';
+import { searchPatients } from '../../functions/patients/SearchPatients';
+import { updatePatient } from '../../functions/patients/UpdatePatient';
+import { deletePatient } from '../../functions/patients/DeletePatient';
+import { getPatientsCount } from '../../functions/patients/GetPatientsCount';
+import { getExamination } from '../../functions/examinations/GetExamination';
+import { createExamination } from '../../functions/examinations/CreateExamination';
 import { createTestUser, createTestPatient, createTestExamination, cleanupTestData, seedCounter, mockHttpRequest, mockInvocationContext } from '../testUtils';
-import { getTableClient } from '../../utils/tableClient';
+import { getTableClient } from '../../shared/storage/tableClient';
 
 const parseBody = (response: any) => JSON.parse(response.body);
 

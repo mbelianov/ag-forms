@@ -1,10 +1,10 @@
 declare const jest: any;
 import { HttpRequest, InvocationContext } from '@azure/functions';
 import { v4 as uuidv4 } from 'uuid';
-import { generateToken } from '../utils/tokenService';
-import { hashPassword } from '../utils/passwordService';
-import { ensureTableExists, getTableClient } from '../utils/tableClient';
-import { generateMRN } from '../utils/mrnGenerator';
+import { generateToken } from '../shared/auth/tokenService';
+import { hashPassword } from '../shared/auth/passwordService';
+import { ensureTableExists, getTableClient } from '../shared/storage/tableClient';
+import { generateMRN } from '../shared/mrn/mrnGenerator';
 import { User, Patient, Examination, Counter, MRNLookup } from '../types';
 
 const USERS_TABLE = 'Users';

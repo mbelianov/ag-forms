@@ -1,4 +1,4 @@
-﻿declare const describe: any;
+declare const describe: any;
 declare const test: any;
 declare const expect: any;
 
@@ -13,8 +13,8 @@ import {
     getUserId,
     getUsername,
     getUserRole
-} from '../../utils/authMiddleware';
-import { generateToken } from '../../utils/tokenService';
+} from '../../shared/auth/authMiddleware';
+import { generateToken } from '../../shared/auth/tokenService';
 import { mockHttpRequest } from '../testUtils';
 
 describe('Auth Middleware', () => {
