@@ -39,7 +39,7 @@
 
 ### TST-00 — Prerequisite: Extend `cleanupTestData` in `testUtils.ts`
 
-**Status:** [ ] pending
+**Status:** [x] done
 
 **Intent:** `cleanupTestData` is the shared isolation contract that every integration test depends on. It currently does not wipe `AuditLogs` rows or the `PATIENT_TOTAL`/`EXAM_TOTAL` counter rows. Without these sweeps, TST-06/TST-07/TST-08 count-endpoint tests see accumulated counter values from prior tests, and TST-09 audit filter tests see log entries written by prior tests. This must be fixed in `testUtils.ts` before any integration sub-tasks are implemented.
 
@@ -85,7 +85,7 @@
 
 ### TST-01 — Unit Tests: `patientUtils`
 
-**Status:** [ ] pending
+**Status:** [x] done
 
 **Intent:** Cover the `patientUtils` pure-utility module that has zero tests. It is imported across multiple files and is a prime candidate for silent breakage during refactoring. The `examinationTypes` constants are intentionally excluded: the refactoring plan (REF-ST-04) collapses the four legacy type keys to two new ones (`prenatal`, `first_trimester`), so any assertions written against the old keys would break immediately after that sub-task completes. `examinationTypes` tests will be written post-refactoring against the new two-value registry.
 
@@ -107,7 +107,7 @@
 
 ### TST-02 — Unit Tests: `auditService` (sanitization and dispatch)
 
-**Status:** [ ] pending
+**Status:** [x] done
 
 **Intent:** Verify that `sanitizeAuditDetails` correctly redacts sensitive field names and that every domain-event helper dispatches the correct action string. This protects against accidental PII leakage and ensures the audit trail action vocabulary stays consistent.
 
@@ -144,7 +144,7 @@
 
 ### TST-04 — Unit Tests: Extended `validation.ts` coverage
 
-**Status:** [ ] pending
+**Status:** [x] done
 
 **Intent:** The current validation tests cover the main paths but miss: `validateRegister` fully, `fullName` required-on-register vs. optional-on-create, `gestationalAgeIsManual` field, and RI boundary values. The following blocks are intentionally excluded and deferred to post-refactoring:
 1. `biometry2`/`doppler2` twin-field validation — refactoring REF-ST-04 removes these top-level fields from the schema entirely.
@@ -173,7 +173,7 @@ All three blocks will be re-added after REF-ST-04 is complete, written against t
 
 ### TST-05 — Integration Tests: Extended Auth flows
 
-**Status:** [ ] pending
+**Status:** [x] done
 
 **Intent:** Fill gaps in `auth.test.ts`: the `/auth/me` endpoint with invalid/expired token, concurrent lockout race (verifying `failedLoginAttempts` ≥ 1 after rapid sequential bad logins), and password mismatch on `change-password` confirm field.
 
@@ -395,7 +395,7 @@ The following are intentionally excluded and deferred to post-refactoring:
 
 ### TST-12 — Unit Tests: `errorHandler` branch coverage
 
-**Status:** [ ] pending
+**Status:** [x] done
 
 **Intent:** `errorHandler.ts` is imported by every Azure Function and has 10 conditional branches mapping error message strings and `statusCode` properties to HTTP response status codes. It is currently untested. If any branch is modified during refactoring, the wrong HTTP status is silently returned — no integration test would catch this because integration tests don't exercise the error paths in isolation.
 

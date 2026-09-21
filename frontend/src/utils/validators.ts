@@ -2,6 +2,7 @@
  * Client-side validation utilities shared between PatientForm and ExaminationForm.
  * TASK-026: Extracted from duplicated validation blocks in form components.
  */
+import type { ObservableTypeConfig } from '../types';
 
 export interface ValidationResult {
   valid: boolean;
@@ -83,7 +84,20 @@ export function validateGestationalAge(ga: string): string | undefined {
 }
 
 /** Strict numeric regex — rejects "1abc", "1,5", "1e5" */
-const NUMERIC_REGEX = /^\d+(\.\d+)?$/;
+const NUMERIC_REGEX = /^\d+(\.\d*)?$/;
+
+/**
+ * Validates an observable value based on ObservableTypeConfig.
+ * Simple number vs text check: if valueKind !== 'text', ensures the input is numeric.
+ */
+export function validateObservableValue(val: string, config: ObservableTypeConfig): string | undefined {
+  if (!val || !val.trim()) return undefined;
+  if (config.valueKind === 'text') return undefined;
+  if (!NUMERIC_REGEX.test(val.trim())) {
+    return `${config.label} must be a number`;
+  }
+  return undefined;
+}
 
 /**
  * Validate a positive float field (biometry).

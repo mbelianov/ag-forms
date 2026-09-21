@@ -333,3 +333,38 @@ For an FT twins exam, the same blob also carries `twin2_ft_biometry`, `twin2_ft_
 
 - **Priority:** P5 · Informational — no action required; document for developer awareness
 - **Status:** Documented — no fix planned; layout is consistent and intentional
+
+---
+
+## KI-011 · Marker definitions in `pdfSections.ts` and `viewModelBuilders.ts` are not driven by `EXAM_TYPE_CONFIG`
+
+- **Files:**
+  - `frontend/src/components/reports/pdfSections.ts` (lines 281–290) — hardcoded `[label, value]` pairs for all 10 first-trimester markers
+  - `frontend/src/services/viewModelBuilders.ts` (lines 167–178) — hardcoded per-key reads from `fetus.markers` for all 10 markers
+- **Symptom:** None — purely a maintenance debt. No user-visible impact.
+- **Root cause:** `EXAM_TYPE_CONFIG['first_trimester'].markerTypes` is now the single source of truth for marker keys and labels (added during V2 refactor). The form (`ExaminationForm.tsx`) already iterates `examConfig.markerTypes` config-driven. However `pdfSections.ts` and `viewModelBuilders.ts` were not updated — they still contain their own hardcoded inline lists that duplicate the same 10 keys and labels.
+- **Risk:** If a marker is added, removed, or renamed in `EXAM_TYPE_CONFIG`, the form will update correctly but the PDF and detail-page view model will silently diverge — the new marker will appear in the form but not in the PDF or detail page, and vice versa for removals.
+- **Fix:**
+  - In `viewModelBuilders.ts`: import `EXAM_TYPE_CONFIG` and iterate `EXAM_TYPE_CONFIG['first_trimester'].markerTypes` to build the `result.markers` object dynamically instead of hardcoding each key.
+  - In `pdfSections.ts`: import `EXAM_TYPE_CONFIG` and iterate `markerTypes` to build the label/value rows for the markers PDF block instead of the hardcoded `[label, value]` array.
+- **Priority:** P3 · Low — no current user impact; becomes a real bug the moment any marker definition changes
+- **Status:** ✅ Resolved — `viewModelBuilders.ts` and `pdfSections.ts` now dynamically iterate `EXAM_TYPE_CONFIG` for all markers, ultrasound findings, anatomy, and doppler vessel pairings.
+
+---
+
+## KI-012 · `clinicalNotes` / `notes` field retained in data model but removed from input form
+
+- **Files:**
+  - `frontend/src/hooks/useExaminationForm.ts` — `clinicalNotes` field in `ExaminationFormData` state; mapped to `notes` in the submit payload
+  - `frontend/src/types/formData.ts` — `clinicalNotes: string` on `ExaminationFormData`
+  - `api/src/types/index.ts` — `notes?: string` on `Examination` entity
+  - `api/src/functions/CreateExamination.ts` / `UpdateExamination.ts` — accept and store `notes`
+  - `frontend/src/pages/ExaminationDetailPage.tsx` — may render `notes` on the detail page
+  - `frontend/src/components/reports/pdfSections.ts` — may include `notes` in the PDF
+- **Symptom:** None — the Notes `<TextArea>` was intentionally removed from `ExaminationForm.tsx` because Findings and Comments are sufficient. No user-visible regression.
+- **Residual state:** `clinicalNotes` remains in `ExaminationFormData` and is still sent in the create/update payload as `notes: formData.clinicalNotes` (always empty string for new exams). Existing records that previously had `notes` data are unaffected — the field is still stored and returned by the API.
+- **Decision needed:**
+  - **Option A — Full removal:** Delete `clinicalNotes` from `ExaminationFormData`, remove `notes` from the create/update payload, remove `notes` rendering from the detail page and PDF. Requires a decision on whether existing records with non-empty `notes` should be migrated (copy to `findings` or `comments`) or silently dropped from display.
+  - **Option B — Keep in model, hide in form (current state):** Leave the field in the data model and API layer. Existing notes are preserved and still visible on the detail page/PDF if present. New exams simply have an empty `notes` field. No migration needed.
+- **Priority:** P3 · Low — no functional or clinical impact; purely a housekeeping decision
+- **Status:** Deferred — Option B is the current state. Revisit when deciding whether to fully retire the `notes` field.

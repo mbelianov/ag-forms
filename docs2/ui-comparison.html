@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AG Forms — Carbon vs New UI</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  font-family:-apple-system,"Segoe UI",system-ui,sans-serif;
+  font-size:13px;
+  background:#e5e7eb;
+  color:#1a1d23;
+  /* new palette vars */
+  --n-accent:#2563eb;
+  --n-accent-light:#eff6ff;
+  --n-border:#e2e5ea;
+  --n-surface:#f8f9fb;
+  --n-surface2:#f0f2f5;
+  --n-muted:#6b7280;
+  --n-text:#1a1d23;
+  --n-green:#059669;
+  --n-green-light:#ecfdf5;
+  --n-amber:#d97706;
+  --n-amber-light:#fffbeb;
+  --n-red:#dc2626;
+  --n-purple:#7c3aed;
+}
+body{padding:28px 16px 80px;}
+
+/* ── Doc header ── */
+.doc-head{max-width:1280px;margin:0 auto 24px;text-align:center;}
+.doc-head h1{font-size:22px;font-weight:800;letter-spacing:-.4px;color:#1a1d23;margin-bottom:6px;}
+.doc-head p{font-size:14px;color:#6b7280;}
+
+/* ── Tabs ── */
+.tabs{max-width:1280px;margin:0 auto 20px;display:flex;gap:6px;flex-wrap:wrap;}
+.tab{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;
+     border:1px solid #d1d5db;background:#fff;color:#6b7280;transition:all .15s;user-select:none;}
+.tab:hover{background:#f3f4f6;}
+.tab.active{background:#1a1d23;color:#fff;border-color:#1a1d23;}
+
+/* ── Comparison grid ── */
+.compare{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.compare.hidden{display:none;}
+.panel{border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.13);}
+.panel-label{padding:10px 18px;font-size:11.5px;font-weight:700;letter-spacing:.5px;
+             text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+.dot2{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.panel-carbon .panel-label{background:#393939;color:#f4f4f4;}
+.panel-new    .panel-label{background:#0f172a;color:#e2e8f0;}
+
+/* ═══════════════ CARBON ═══════════════ */
+.c-header{background:#161616;height:48px;display:flex;align-items:center;padding:0 16px;border-bottom:1px solid #393939;}
+.c-logo{font-size:14px;font-weight:400;color:#f4f4f4;padding:0 16px;border-right:1px solid #393939;height:100%;display:flex;align-items:center;white-space:nowrap;}
+.c-nav{display:flex;height:100%;}
+.c-nav-item{font-size:14px;color:#c6c6c6;padding:0 16px;display:flex;align-items:center;cursor:pointer;border-bottom:2px solid transparent;height:100%;}
+.c-nav-item.active{color:#f4f4f4;border-bottom-color:#0f62fe;}
+.c-hdr-right{margin-left:auto;display:flex;height:100%;}
+.c-hdr-btn{width:48px;height:48px;display:flex;align-items:center;justify-content:center;color:#f4f4f4;cursor:pointer;font-size:16px;}
+.c-content{padding:2rem;background:#fff;}
+.c-h1{font-size:28px;font-weight:300;color:#161616;margin-bottom:1.5rem;line-height:1.25;}
+.c-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e0e0e0;border:1px solid #e0e0e0;margin-bottom:2rem;}
+.c-tile{background:#fff;padding:1rem;min-height:100px;}
+.c-tile-label{font-size:.875rem;color:#525252;margin-bottom:.5rem;}
+.c-tile-val{font-size:2rem;font-weight:700;color:#161616;line-height:1;}
+.c-table-wrap{border:1px solid #e0e0e0;margin-bottom:1rem;}
+.c-toolbar{background:#f4f4f4;padding:.75rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e0e0e0;}
+.c-toolbar-title{font-size:1rem;font-weight:600;color:#161616;}
+.c-toolbar-count{font-size:.75rem;color:#525252;margin-left:.5rem;}
+.c-search{height:40px;background:#f4f4f4;border:none;border-bottom:1px solid #8d8d8d;padding:0 1rem;font-size:14px;color:#161616;width:100%;outline:none;font-family:inherit;}
+.c-table{width:100%;border-collapse:collapse;}
+.c-table th{background:#f4f4f4;font-size:.875rem;font-weight:600;color:#161616;padding:.75rem 1rem;text-align:left;border-bottom:1px solid #e0e0e0;}
+.c-table td{padding:.875rem 1rem;font-size:.875rem;color:#161616;border-bottom:1px solid #e0e0e0;}
+.c-table tr:last-child td{border-bottom:none;}
+.c-table tr:hover td{background:#e8e8e8;}
+.c-tag{display:inline-flex;align-items:center;height:24px;padding:0 8px;font-size:.75rem;border-radius:24px;}
+.c-tag-gray{background:#e0e0e0;color:#161616;}
+.c-tag-green{background:#defbe6;color:#0e6027;}
+.c-tag-blue{background:#d0e2ff;color:#0043ce;}
+.c-btn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 15px;font-size:.875rem;cursor:pointer;border:none;font-family:inherit;white-space:nowrap;}
+.c-btn-primary{background:#0f62fe;color:#fff;}
+.c-btn-secondary{background:#393939;color:#fff;}
+.c-btn-tertiary{background:transparent;color:#0f62fe;border:1px solid #0f62fe;}
+.c-btn-danger{background:#da1e28;color:#fff;}
+.c-btn-ghost{background:transparent;color:#0f62fe;}
+.c-notif{display:flex;align-items:flex-start;gap:.75rem;padding:.875rem 1rem;border-left:3px solid;margin-bottom:1rem;}
+.c-notif-warn{background:#fff8e1;border-color:#f1c21b;}
+.c-notif-err {background:#fff1f1;border-color:#da1e28;}
+.c-notif-info{background:#edf5ff;border-color:#0f62fe;}
+.c-notif-succ{background:#defbe6;border-color:#24a148;}
+.c-notif-title{font-size:.875rem;font-weight:600;color:#161616;}
+.c-notif-sub{font-size:.875rem;color:#525252;}
+.c-loading{display:flex;align-items:center;gap:.5rem;font-size:.875rem;color:#525252;}
+.c-spinner{width:16px;height:16px;border:2px solid #e0e0e0;border-top-color:#0f62fe;border-radius:50%;animation:spin .8s linear infinite;}
+.c-field{margin-bottom:0;}
+.c-field label{display:block;font-size:.75rem;color:#525252;margin-bottom:.5rem;}
+.c-input{width:100%;height:40px;background:#f4f4f4;border:none;border-bottom:1px solid #8d8d8d;padding:0 1rem;font-size:14px;color:#161616;outline:none;font-family:inherit;}
+.c-fg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;}
+.c-breadcrumb{display:flex;gap:.5rem;align-items:center;font-size:.875rem;margin-bottom:1rem;flex-wrap:wrap;}
+.c-breadcrumb a{color:#0f62fe;text-decoration:none;}
+.c-status-tile{background:#f4f4f4;padding:1.5rem;margin-bottom:1rem;}
+.c-status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;}
+.c-status-label{font-size:.875rem;color:#525252;margin-bottom:.5rem;}
+.c-status-val{font-size:1.5rem;font-weight:600;color:#161616;line-height:1.2;}
+.c-status-sub{font-size:.875rem;color:#525252;margin-top:.25rem;}
+.c-section-tile{border:1px solid #e0e0e0;padding:1.5rem;margin-bottom:1rem;}
+.c-section-title{font-size:.875rem;font-weight:600;color:#161616;text-transform:uppercase;margin-bottom:1rem;}
+.c-fl-label{font-size:.875rem;color:#525252;margin-bottom:.25rem;}
+.c-fl-val{font-size:1rem;font-weight:500;}
+.c-2col{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;}
+.c-pagination{background:#f4f4f4;border-top:1px solid #e0e0e0;padding:.75rem 1rem;display:flex;align-items:center;gap:.5rem;font-size:.875rem;color:#525252;}
+.c-page-btn{height:40px;width:40px;background:transparent;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#161616;font-size:14px;}
+.c-page-btn:hover{background:#e8e8e8;}
+.c-page-btn.active{background:#0f62fe;color:#fff;}
+.c-login-wrap{max-width:400px;margin:2rem auto;padding:0 2rem 2rem;}
+.c-login-title{font-size:28px;font-weight:300;margin-bottom:2rem;color:#161616;}
+.c-empty{text-align:center;padding:2rem;color:#525252;}
+.c-btn-group{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;}
+
+/* ═══════════════ NEW ═══════════════ */
+.n-header{background:#0f172a;height:52px;display:flex;align-items:center;padding:0 20px;gap:20px;}
+.n-logo{font-size:15px;font-weight:800;color:#fff;letter-spacing:-.3px;white-space:nowrap;}
+.n-nav{display:flex;gap:4px;align-items:center;}
+.n-nav-item{font-size:12.5px;color:#94a3b8;padding:6px 12px;border-radius:6px;font-weight:500;cursor:pointer;white-space:nowrap;}
+.n-nav-item.active{background:rgba(255,255,255,.1);color:#fff;}
+.n-hdr-right{margin-left:auto;display:flex;gap:8px;align-items:center;}
+.n-avatar-pill{background:rgba(255,255,255,.1);color:#e2e8f0;font-size:12px;padding:5px 12px;border-radius:20px;font-weight:500;cursor:pointer;white-space:nowrap;}
+.n-icon-btn{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;color:#94a3b8;cursor:pointer;}
+.n-content{padding:24px;background:#fff;}
+.n-page-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;gap:12px;flex-wrap:wrap;}
+.n-h1{font-size:20px;font-weight:800;color:var(--n-text);letter-spacing:-.3px;line-height:1.2;}
+.n-h1 span{font-size:13px;font-weight:400;color:var(--n-muted);margin-left:8px;}
+.n-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:inherit;white-space:nowrap;transition:background .15s;}
+.n-btn-primary{background:var(--n-accent);color:#fff;}
+.n-btn-ghost{background:var(--n-surface2);color:var(--n-text);border:1px solid var(--n-border);}
+.n-btn-danger{background:#fef2f2;color:var(--n-red);border:1px solid #fecaca;}
+.n-btn-sm{padding:5px 12px;font-size:12px;}
+.n-btn-group{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.n-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px;}
+.n-stat{background:#fff;border:1px solid var(--n-border);border-radius:10px;padding:14px 16px;}
+.n-stat.blue  {border-left:3px solid var(--n-accent);}
+.n-stat.green {border-left:3px solid var(--n-green);}
+.n-stat.amber {border-left:3px solid var(--n-amber);}
+.n-stat.purple{border-left:3px solid var(--n-purple);}
+.n-stat-label{font-size:10.5px;font-weight:700;color:var(--n-muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;}
+.n-stat-val{font-size:26px;font-weight:800;color:var(--n-text);letter-spacing:-1px;line-height:1;}
+.n-stat-sub{font-size:11px;color:var(--n-muted);margin-top:3px;}
+.n-table-wrap{border:1px solid var(--n-border);border-radius:10px;overflow:hidden;margin-bottom:14px;}
+.n-search-row{display:flex;gap:10px;margin-bottom:14px;align-items:center;}
+.n-search{flex:1;background:#fff;border:1px solid var(--n-border);border-radius:8px;padding:8px 14px;font-size:13px;color:var(--n-muted);font-family:inherit;outline:none;}
+.n-search:focus{border-color:var(--n-accent);}
+.n-table{width:100%;border-collapse:collapse;}
+.n-table thead tr{background:var(--n-surface2);}
+.n-table th{font-size:10.5px;font-weight:700;color:var(--n-muted);letter-spacing:.5px;text-transform:uppercase;padding:10px 16px;text-align:left;border-bottom:2px solid var(--n-border);}
+.n-table td{padding:10px 16px;font-size:13px;border-bottom:1px solid var(--n-border);}
+.n-table tr:last-child td{border-bottom:none;}
+.n-table tr:hover td{background:var(--n-surface);}
+.n-pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:.3px;}
+.n-pill-green {background:var(--n-green-light);color:var(--n-green);}
+.n-pill-amber {background:var(--n-amber-light);color:var(--n-amber);}
+.n-pill-blue  {background:var(--n-accent-light);color:var(--n-accent);}
+.n-pill-gray  {background:var(--n-surface2);color:var(--n-muted);}
+.n-toast{display:flex;align-items:flex-start;gap:10px;background:#fff;border:1px solid var(--n-border);border-radius:10px;padding:12px 16px;box-shadow:0 4px 12px rgba(0,0,0,.08);margin-bottom:8px;}
+.n-toast-icon{width:18px;height:18px;border-radius:50%;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;}
+.n-toast-icon.succ{background:var(--n-green-light);color:var(--n-green);}
+.n-toast-icon.err {background:#fef2f2;color:var(--n-red);}
+.n-toast-icon.warn{background:var(--n-amber-light);color:var(--n-amber);}
+.n-toast-icon.info{background:var(--n-accent-light);color:var(--n-accent);}
+.n-toast-title{font-size:13px;font-weight:700;color:var(--n-text);}
+.n-toast-sub{font-size:12px;color:var(--n-muted);}
+.n-toast-close{margin-left:auto;color:var(--n-muted);font-size:16px;cursor:pointer;line-height:1;padding-left:8px;}
+.n-loading{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--n-muted);}
+.n-spinner{width:16px;height:16px;border:2px solid var(--n-border);border-top-color:var(--n-accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0;}
+.n-field{display:flex;flex-direction:column;gap:4px;}
+.n-field label{font-size:11px;font-weight:700;color:var(--n-muted);letter-spacing:.4px;text-transform:uppercase;}
+.n-input{background:#fff;border:1px solid var(--n-border);border-radius:6px;padding:8px 12px;font-size:13px;color:var(--n-text);font-family:inherit;outline:none;width:100%;}
+.n-input:focus{border-color:var(--n-accent);box-shadow:0 0 0 3px rgba(37,99,235,.1);}
+.n-input.auto{border-style:dashed;border-color:#93c5fd;background:var(--n-accent-light);color:var(--n-accent);font-weight:600;}
+.n-input.filled{border-color:#93c5fd;background:var(--n-accent-light);}
+.n-fg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.n-form-card{background:#fff;border:1px solid var(--n-border);border-radius:10px;padding:20px;margin-bottom:12px;}
+.n-section-title{font-size:11px;font-weight:700;color:var(--n-muted);letter-spacing:.5px;text-transform:uppercase;padding-bottom:10px;border-bottom:2px solid var(--n-border);margin-bottom:14px;}
+.n-col-headers{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:4px;}
+.n-col-header{font-size:10.5px;font-weight:700;color:var(--n-muted);letter-spacing:.4px;text-transform:uppercase;}
+.n-col-header em{font-style:italic;font-weight:400;letter-spacing:0;text-transform:none;font-size:10px;}
+.n-breadcrumb{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--n-muted);margin-bottom:16px;flex-wrap:wrap;}
+.n-breadcrumb a{color:var(--n-accent);text-decoration:none;}
+.n-breadcrumb .cur{color:var(--n-text);font-weight:600;}
+.n-status-bar{background:var(--n-surface2);border-radius:10px;padding:18px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:18px;}
+.n-sb-label{font-size:10.5px;font-weight:700;color:var(--n-muted);letter-spacing:.4px;text-transform:uppercase;margin-bottom:4px;}
+.n-sb-val{font-size:20px;font-weight:800;color:var(--n-text);letter-spacing:-.5px;line-height:1.2;}
+.n-sb-sub{font-size:11.5px;color:var(--n-muted);margin-top:3px;}
+.n-detail-card{background:#fff;border:1px solid var(--n-border);border-radius:10px;padding:20px;margin-bottom:12px;}
+.n-fl-label{font-size:11px;font-weight:700;color:var(--n-muted);letter-spacing:.4px;text-transform:uppercase;margin-bottom:3px;}
+.n-fl-val{font-size:14px;font-weight:600;color:var(--n-text);}
+.n-fl-val.link{color:var(--n-accent);}
+.n-2col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.n-pagination{display:flex;align-items:center;gap:6px;justify-content:center;padding:14px 0;}
+.n-page-btn{width:32px;height:32px;border-radius:7px;border:1px solid var(--n-border);background:#fff;font-size:13px;font-weight:600;color:var(--n-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;}
+.n-page-btn.active{background:var(--n-accent);color:#fff;border-color:var(--n-accent);}
+.n-page-info{font-size:12px;color:var(--n-muted);padding:0 4px;}
+.n-login-wrap{display:flex;min-height:280px;}
+.n-login-left{flex:1;background:linear-gradient(145deg,#0f172a,#1e3a5f);padding:36px;display:flex;flex-direction:column;justify-content:center;}
+.n-login-left h2{font-size:20px;font-weight:800;color:#fff;letter-spacing:-.3px;margin-bottom:8px;}
+.n-login-left p{font-size:13px;color:#94a3b8;line-height:1.6;}
+.n-login-badge{display:inline-flex;background:rgba(37,99,235,.3);color:#93c5fd;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;letter-spacing:.4px;margin-bottom:14px;}
+.n-login-right{width:290px;padding:32px 24px;display:flex;flex-direction:column;justify-content:center;gap:14px;background:#fff;}
+.n-login-title{font-size:17px;font-weight:800;color:var(--n-text);letter-spacing:-.3px;}
+.n-login-sub{font-size:12px;color:var(--n-muted);margin-top:-8px;}
+.n-divider{height:1px;background:var(--n-border);}
+.n-login-btn{background:var(--n-accent);color:#fff;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;}
+.n-empty{border:1px dashed var(--n-border);border-radius:10px;padding:28px;text-align:center;background:var(--n-surface);margin-bottom:12px;}
+.n-empty-icon{font-size:28px;opacity:.35;margin-bottom:8px;}
+.n-empty-title{font-weight:700;color:var(--n-text);margin-bottom:4px;font-size:14px;}
+.n-empty-sub{font-size:12px;color:var(--n-muted);margin-bottom:14px;}
+.n-search-banner{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-size:13px;}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="doc-head">
+  <h1>AG Forms — Carbon vs Proposed UI</h1>
+  <p>Faithful reproduction of current Carbon styles vs the proposed Tailwind + shadcn/ui redesign. Click a tab to switch screens.</p>
+</div>
+
+<div class="tabs">
+  <div class="tab active"    onclick="show('dashboard',this)">Dashboard</div>
+  <div class="tab"           onclick="show('patients',this)">Patients List</div>
+  <div class="tab"           onclick="show('detail',this)">Exam Detail</div>
+  <div class="tab"           onclick="show('biometry',this)">Biometry Form</div>
+  <div class="tab"           onclick="show('login',this)">Login</div>
+  <div class="tab"           onclick="show('states',this)">UI States</div>
+</div>
+
+<!-- ════ DASHBOARD ════ -->
+<div id="dashboard" class="compare">
+  <div class="panel panel-carbon">
+    <div class="panel-label"><div class="dot2" style="background:#f1c21b"></div>Current — Carbon White</div>
+    <div class="c-header">
+      <div class="c-logo">AG Forms</div>
+      <div class="c-nav">
+        <div class="c-nav-item active">Dashboard</div>
+        <div class="c-nav-item">Patients</div>
+        <div class="c-nav-item">Exams</div>
+      </div>
+      <div class="c-hdr-right">
+        <div class="c-hdr-btn">👤</div>
+        <div class="c-hdr-btn">⏻</div>
+      </div>
+    </div>
+    <div class="c-content">
+      <h1 class="c-h1">Dashboard</h1>
+      <div class="c-grid">
+        <div class="c-tile"><div class="c-tile-label">Total Patients</div><div class="c-tile-val">248</div></div>
+        <div class="c-tile"><div class="c-tile-label">Total Examinations</div><div class="c-tile-val">1,041</div></div>
+        <div class="c-tile"><div class="c-tile-label">Exams This Week</div><div class="c-tile-val">14</div></div>
+        <div class="c-tile"><div class="c-tile-label">Pending Reviews</div><div class="c-tile-val">6</div></div>
+      </div>
+      <div class="c-table-wrap">
+        <div class="c-toolbar">
+          <span class="c-toolbar-title">Quick Actions</span>
+          <div class="c-btn-group">
+            <button class="c-btn c-btn-primary">+ Create New Patient</button>
+            <button class="c-btn c-btn-secondary">All Patients →</button>
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#e0e0e0;border:1px solid #e0e0e0">
+        <div class="c-tile" style="min-height:auto;padding:1.5rem">
+          <div class="c-section-title" style="font-size:1rem">Recent Patients</div>
+          <table class="c-table"><tbody>
+            <tr><td>Мария Иванова</td><td style="color:#525252;font-size:.8rem">12 Jan 2025</td></tr>
+            <tr><td>Елена Тодорова</td><td style="color:#525252;font-size:.8rem">10 Jan 2025</td></tr>
+            <tr><td>Светлана Петрова</td><td style="color:#525252;font-size:.8rem">08 Jan 2025</td></tr>
+          </tbody></table>
+        </div>
+        <div class="c-tile" style="min-height:auto;padding:1.5rem">
+          <div class="c-section-title" style="font-size:1rem">Recent Examinations</div>
+          <table class="c-table"><tbody>
+            <tr><td>Мария Иванова</td><td style="color:#525252;font-size:.8rem">12 Jan 2025</td></tr>
+            <tr><td>Елена Тодорова</td><td style="color:#525252;font-size:.8rem">09 Jan 2025</td></tr>
+            <tr><td>Ана Георгиева</td><td style="color:#525252;font-size:.8rem">07 Jan 2025</td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel panel-new">
+    <div class="panel-label"><div class="dot2" style="background:#34d399"></div>Proposed — Tailwind + shadcn/ui</div>
+    <div class="n-header">
+      <span class="n-logo">AG Forms</span>
+      <div class="n-nav">
+        <div class="n-nav-item active">Dashboard</div>
+        <div class="n-nav-item">Patients</div>
+        <div class="n-nav-item">Exams</div>
+      </div>
+      <div class="n-hdr-right">
+        <div class="n-avatar-pill">Dr. Petrov ▾</div>
+        <div class="n-icon-btn">⏻</div>
+      </div>
+    </div>
+    <div class="n-content">
+      <div class="n-page-row">
+        <div class="n-h1">Dashboard</div>
+        <button class="n-btn n-btn-primary">+ New Patient</button>
+      </div>
+      <div class="n-stat-grid">
+        <div class="n-stat blue"><div class="n-stat-label">Total Patients</div><div class="n-stat-val">248</div><div class="n-stat-sub">all time</div></div>
+        <div class="n-stat green"><div class="n-stat-label">Total Exams</div><div class="n-stat-val">1,041</div><div class="n-stat-sub">all time</div></div>
+        <div class="n-stat amber"><div class="n-stat-label">This Week</div><div class="n-stat-val">14</div><div class="n-stat-sub">examinations</div></div>
+        <div class="n-stat purple"><div class="n-stat-label">Pending Review</div><div class="n-stat-val">6</div><div class="n-stat-sub">draft / completed</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="n-table-wrap">
+          <table class="n-table">
+            <thead><tr><th>Recent Patients</th><th>Added</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Мария Иванова</strong></td><td style="color:var(--n-muted)">12 Jan 2025</td></tr>
+              <tr><td><strong>Елена Тодорова</strong></td><td style="color:var(--n-muted)">10 Jan 2025</td></tr>
+              <tr><td><strong>Светлана Петрова</strong></td><td style="color:var(--n-muted)">08 Jan 2025</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="n-table-wrap">
+          <table class="n-table">
+            <thead><tr><th>Recent Exams</th><th>Date</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Мария Иванова</strong></td><td style="color:var(--n-muted)">12 Jan 2025</td></tr>
+              <tr><td><strong>Елена Тодорова</strong></td><td style="color:var(--n-muted)">09 Jan 2025</td></tr>
+              <tr><td><strong>Ана Георгиева</strong></td><td style="color:var(--n-muted)">07 Jan 2025</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ PATIENTS LIST ════ -->
+<div id="patients" class="compare" style="display:none">
+  <div class="panel panel-carbon">
+    <div class="panel-label"><div class="dot2" style="background:#f1c21b"></div>Current — Carbon White</div>
+    <div class="c-header">
+      <div class="c-logo">AG Forms</div>
+      <div class="c-nav"><div class="c-nav-item">Dashboard</div><div class="c-nav-item active">Patients</div><div class="c-nav-item">Exams</div></div>
+      <div class="c-hdr-right"><div class="c-hdr-btn">👤</div></div>
+    </div>
+    <div class="c-content">
+      <h1 class="c-h1">Patients</h1>
+      <div class="c-notif c-notif-info" style="margin-bottom:40px">
+        <span class="c-notif-title">Showing search results for "Иван".&nbsp;</span>
+        <span class="c-notif-sub" style="color:#0f62fe;cursor:pointer">Clear search</span>
+      </div>
+      <div style="display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center">
+        <input class="c-search" style="flex:1;height:40px" placeholder="Search by name…" value="Иван"/>
+        <button class="c-btn c-btn-primary">+ Create Patient</button>
+      </div>
+      <div class="c-table-wrap">
+        <div class="c-toolbar"><span class="c-toolbar-title">Patient List<span class="c-toolbar-count">3 patients found</span></span></div>
+        <table class="c-table">
+          <thead><tr><th>Name</th><th>Age</th><th>Phone</th><th>Created Date</th></tr></thead>
+          <tbody>
+            <tr style="cursor:pointer"><td>Иван Петров</td><td>34 yrs</td><td>+359 88 111 222</td><td>15 Jan 2025</td></tr>
+            <tr style="cursor:pointer"><td>Иванка Георгиева</td><td>29 yrs</td><td>+359 88 333 444</td><td>10 Jan 2025</td></tr>
+            <tr style="cursor:pointer"><td>Иван-Асен Димитров</td><td>41 yrs</td><td>+359 88 555 666</td><td>05 Jan 2025</td></tr>
+          </tbody>
+        </table>
+        <div class="c-pagination">
+          <span>Items per page: 10</span>
+          <div class="c-page-btn">‹</div>
+          <div class="c-page-btn active">1</div>
+          <div class="c-page-btn">2</div>
+          <div class="c-page-btn">3</div>
+          <div class="c-page-btn">›</div>
+          <span style="margin-left:auto">1–10 of 248 items</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel panel-new">
+    <div class="panel-label"><div class="dot2" style="background:#34d399"></div>Proposed — Tailwind + shadcn/ui</div>
+    <div class="n-header">
+      <span class="n-logo">AG Forms</span>
+      <div class="n-nav"><div class="n-nav-item">Dashboard</div><div class="n-nav-item active">Patients</div><div class="n-nav-item">Exams</div></div>
+      <div class="n-hdr-right"><div class="n-avatar-pill">Dr. Petrov ▾</div></div>
+    </div>
+    <div class="n-content">
+      <div class="n-page-row">
+        <div class="n-h1">Patients <span>248 loaded</span></div>
+        <button class="n-btn n-btn-primary">+ Create Patient</button>
+      </div>
+      <div class="n-search-banner">
+        <span style="color:#92400e">Results for <strong>"Иван"</strong> — 3 found</span>
+        <button class="n-btn n-btn-ghost n-btn-sm">✕ Clear</button>
+      </div>
+      <div class="n-search-row">
+        <input class="n-search" placeholder="🔍  Search by name… (press Enter)" value="Иван"/>
+      </div>
+      <div class="n-table-wrap">
+        <table class="n-table">
+          <thead><tr><th>Name</th><th>Age</th><th>Phone</th><th>Created</th></tr></thead>
+          <tbody>
+            <tr style="cursor:pointer"><td><strong>Иван Петров</strong></td><td>34 yrs</td><td>+359 88 111 222</td><td>15 Jan 2025</td></tr>
+            <tr style="cursor:pointer"><td><strong>Иванка Георгиева</strong></td><td>29 yrs</td><td>+359 88 333 444</td><td>10 Jan 2025</td></tr>
+            <tr style="cursor:pointer"><td><strong>Иван-Асен Димитров</strong></td><td>41 yrs</td><td>+359 88 555 666</td><td>05 Jan 2025</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="n-pagination">
+        <button class="n-page-btn">‹</button>
+        <button class="n-page-btn active">1</button>
+        <button class="n-page-btn">2</button>
+        <button class="n-page-btn">3</button>
+        <span class="n-page-info">…</span>
+        <button class="n-page-btn">24</button>
+        <button class="n-page-btn">›</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ EXAM DETAIL ════ -->
+<div id="detail" class="compare" style="display:none">
+  <div class="panel panel-carbon">
+    <div class="panel-label"><div class="dot2" style="background:#f1c21b"></div>Current — Carbon White</div>
+    <div class="c-header">
+      <div class="c-logo">AG Forms</div>
+      <div class="c-nav"><div class="c-nav-item">Dashboard</div><div class="c-nav-item">Patients</div><div class="c-nav-item active">Exams</div></div>
+      <div class="c-hdr-right"><div class="c-hdr-btn">👤</div></div>
+    </div>
+    <div class="c-content">
+      <div class="c-breadcrumb"><a href="#">Home</a>&nbsp;/&nbsp;<a href="#">Exams</a>&nbsp;/&nbsp;<span class="cur">Мария Иванова — 12 Jan 2025</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap">
+        <h1 class="c-h1" style="margin:0">Ultrasound Prenatal Exam Details</h1>
+        <div class="c-btn-group">
+          <button class="c-btn c-btn-tertiary" style="height:36px">← All Tests</button>
+          <button class="c-btn c-btn-secondary" style="height:36px">← Patient</button>
+          <button class="c-btn c-btn-secondary" style="height:36px">🖨 Print</button>
+          <button class="c-btn c-btn-primary" style="height:36px">✏ Edit</button>
+          <button class="c-btn c-btn-danger" style="height:36px">🗑 Delete</button>
+        </div>
+      </div>
+      <div class="c-status-tile">
+        <div class="c-status-grid">
+          <div><div class="c-status-label">Examination Date</div><div class="c-status-val">12 Jan 2025</div><div class="c-status-sub">Type: Ultrasound Prenatal Exam</div></div>
+          <div><div class="c-status-label">MRN</div><div class="c-status-val" style="font-size:1rem">MRN-IVAN-2025-000041</div></div>
+          <div><div class="c-status-label">Status</div><span class="c-tag c-tag-blue" style="margin-top:.25rem;display:inline-flex">Reviewed</span></div>
+        </div>
+      </div>
+      <div class="c-section-tile">
+        <div class="c-section-title">Patient Information</div>
+        <div class="c-2col">
+          <div><div class="c-fl-label">Patient Name</div><div class="c-fl-val" style="color:#0f62fe">Мария Иванова</div></div>
+          <div><div class="c-fl-label">Age at Examination</div><div class="c-fl-val">32 years</div></div>
+        </div>
+      </div>
+      <div class="c-section-tile">
+        <div class="c-section-title">Pregnancy Data</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
+          <div><div class="c-fl-label">LMP</div><div class="c-fl-val">15 Jun 2024</div></div>
+          <div><div class="c-fl-label">GA from LMP</div><div class="c-fl-val">28w 3d</div></div>
+          <div><div class="c-fl-label">EDD</div><div class="c-fl-val">22 Mar 2025</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel panel-new">
+    <div class="panel-label"><div class="dot2" style="background:#34d399"></div>Proposed — Tailwind + shadcn/ui</div>
+    <div class="n-header">
+      <span class="n-logo">AG Forms</span>
+      <div class="n-nav"><div class="n-nav-item">Dashboard</div><div class="n-nav-item">Patients</div><div class="n-nav-item active">Exams</div></div>
+      <div class="n-hdr-right"><div class="n-avatar-pill">Dr. Petrov ▾</div></div>
+    </div>
+    <div class="n-content">
+      <div class="n-breadcrumb"><a href="#">Home</a> › <a href="#">Exams</a> › <span class="cur">Мария Иванова — 12 Jan 2025</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+        <div class="n-h1">Ultrasound Prenatal Exam</div>
+        <div class="n-btn-group">
+          <button class="n-btn n-btn-ghost n-btn-sm">← All Tests</button>
+          <button class="n-btn n-btn-ghost n-btn-sm">← Patient</button>
+          <button class="n-btn n-btn-ghost n-btn-sm">🖨 Print</button>
+          <button class="n-btn n-btn-primary n-btn-sm">✏ Edit</button>
+          <button class="n-btn n-btn-danger n-btn-sm">🗑</button>
+        </div>
+      </div>
+      <div class="n-status-bar">
+        <div><div class="n-sb-label">Exam Date</div><div class="n-sb-val">12 Jan 2025</div><div class="n-sb-sub">Ultrasound Prenatal Exam</div></div>
+        <div><div class="n-sb-label">MRN</div><div style="font-size:13px;font-weight:700;color:var(--n-text);margin-top:2px">MRN-IVAN-2025-000041</div></div>
+        <div><div class="n-sb-label">Status</div><span class="n-pill n-pill-blue" style="margin-top:6px;display:inline-block">Reviewed</span></div>
+      </div>
+      <div class="n-detail-card">
+        <div class="n-section-title">Patient Information</div>
+        <div class="n-2col">
+          <div><div class="n-fl-label">Patient Name</div><div class="n-fl-val link">Мария Иванова</div></div>
+          <div><div class="n-fl-label">Age at Examination</div><div class="n-fl-val">32 years</div></div>
+        </div>
+      </div>
+      <div class="n-detail-card">
+        <div class="n-section-title">Pregnancy Data</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+          <div><div class="n-fl-label">LMP</div><div class="n-fl-val">15 Jun 2024</div></div>
+          <div><div class="n-fl-label">GA from LMP</div><div class="n-fl-val">28w 3d</div></div>
+          <div><div class="n-fl-label">EDD</div><div class="n-fl-val">22 Mar 2025</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ BIOMETRY FORM ════ -->
+<div id="biometry" class="compare" style="display:none">
+  <div class="panel panel-carbon">
+    <div class="panel-label"><div class="dot2" style="background:#f1c21b"></div>Current — Carbon White</div>
+    <div class="c-header"><div class="c-logo">AG Forms</div><div class="c-nav"><div class="c-nav-item active">Edit Examination</div></div></div>
+    <div class="c-content">
+      <h1 class="c-h1" style="font-size:20px">Edit Ultrasound Prenatal Exam</h1>
+      <div class="c-section-tile">
+        <div class="c-section-title">Biometry</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;margin-bottom:.25rem">
+          <div style="font-size:.75rem;color:#525252">Measurement</div>
+          <div style="font-size:.75rem;color:#525252">Percentile</div>
+          <div style="font-size:.75rem;color:#525252">GA from measurement</div>
+        </div>
+        <div class="c-fg3" style="margin-bottom:1rem">
+          <div class="c-field"><label>BPD (mm)</label><input class="c-input" value="85.5"/></div>
+          <div class="c-field"><label>BPD Percentile</label><input class="c-input" value="52" style="color:#525252"/></div>
+          <div class="c-field"><label>BPD GA</label><input class="c-input" value="28w 2d" style="color:#525252"/></div>
+        </div>
+        <div class="c-fg3" style="margin-bottom:1rem">
+          <div class="c-field"><label>HC (mm)</label><input class="c-input" value="310.5"/></div>
+          <div class="c-field"><label>HC Percentile</label><input class="c-input" value="48" style="color:#525252"/></div>
+          <div class="c-field"><label>HC GA</label><input class="c-input" value="27w 5d" style="color:#525252"/></div>
+        </div>
+        <div class="c-fg3" style="margin-bottom:1rem">
+          <div class="c-field"><label>AC (mm)</label><input class="c-input" value="280.0"/></div>
+          <div class="c-field"><label>AC Percentile</label><input class="c-input" value="45" style="color:#525252"/></div>
+          <div class="c-field"><label>AC GA</label><input class="c-input" value="28w 0d" style="color:#525252"/></div>
+        </div>
+        <div class="c-fg3" style="margin-bottom:1rem">
+          <div class="c-field"><label>FL (mm)</label><input class="c-input" value="55.0"/></div>
+          <div class="c-field"><label>FL Percentile</label><input class="c-input" value="50" style="color:#525252"/></div>
+          <div class="c-field"><label>FL GA</label><input class="c-input" value="28w 1d" style="color:#525252"/></div>
+        </div>
+        <div style="border-top:1px solid #e0e0e0;padding-top:1rem;margin-top:.5rem">
+          <div class="c-fg3">
+            <div class="c-field"><label>GA from Bio (composite)</label><input class="c-input" value="28w 1d" style="font-weight:600"/></div>
+            <div class="c-field"><label>EFW (g)</label><input class="c-input" value="1250"/></div>
+            <div class="c-field"><label>EFW Percentile</label><input class="c-input" value="49" style="color:#525252"/></div>
+          </div>
+        </div>
+      </div>
+      <div class="c-btn-group" style="margin-top:1.5rem">
+        <button class="c-btn c-btn-primary">Save</button>
+        <button class="c-btn c-btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel panel-new">
+    <div class="panel-label"><div class="dot2" style="background:#34d399"></div>Proposed — Tailwind + shadcn/ui</div>
+    <div class="n-header"><span class="n-logo">AG Forms</span><div class="n-nav"><div class="n-nav-item active">Edit Examination</div></div></div>
+    <div class="n-content">
+      <div class="n-h1" style="margin-bottom:18px">Edit Ultrasound Prenatal Exam</div>
+      <div class="n-form-card">
+        <div class="n-section-title">Biometry</div>
+        <div class="n-col-headers" style="margin-bottom:8px">
+          <div class="n-col-header">Measurement</div>
+          <div class="n-col-header">Percentile <em>(auto)</em></div>
+          <div class="n-col-header">GA from meas. <em>(auto)</em></div>
+        </div>
+        <div class="n-fg3" style="margin-bottom:10px">
+          <div class="n-field"><label>BPD (mm)</label><input class="n-input filled" value="85.5"/></div>
+          <div class="n-field"><label>&nbsp;</label><input class="n-input auto" value="52nd"/></div>
+          <div class="n-field"><label>&nbsp;</label><input class="n-input auto" value="28w 2d"/></div>
+        </div>
+        <div class="n-fg3" style="margin-bottom:10px">
+          <div class="n-field"><label>HC (mm)</label><input class="n-input filled" value="310.5"/></div>
+          <div class="n-field"><label>&nbsp;</label><input class="n-input auto" value="48th"/></div>
+          <div class="n-field"><label>&nbsp;</label><input class="n-input auto" value="27w 5d"/></div>
+        </div>
+        <div class="n-fg3" style="margin-bottom:10px">
+          <div class="n-field"><label>AC (mm)</label><input class="n-input filled" value="280.0"/></div>
+          <div class="n-field"><label>&nbsp;</label><input class="n-input auto" value="45th"/></div>
+          <div class="n-field"><label>&nbsp;</label><input class="n-input auto" value="28w 0d"/></div>
+        </div>
+        <div class="n-fg3" style="margin-bottom:14px">
+          <div class="n-field"><label>FL (mm)</label><input class="n-input filled" value="55.0"/></div>
+          <div class="n-field"><label>&nbsp;</label><input class="n-input auto" value="50th"/></div>
+          <div class="n-field"><label>&nbsp;</label><input class="n-input auto" value="28w 1d"/></div>
+        </div>
+        <div style="border-top:2px solid var(--n-border);padding-top:14px;margin-top:4px">
+          <div class="n-fg3">
+            <div class="n-field"><label>GA from Bio (composite)</label><input class="n-input auto" value="28w 1d" style="font-weight:800;font-size:14px"/></div>
+            <div class="n-field"><label>EFW (g)</label><input class="n-input filled" value="1,250"/></div>
+            <div class="n-field"><label>EFW Percentile</label><input class="n-input auto" value="49th"/></div>
+          </div>
+        </div>
+      </div>
+      <div class="n-btn-group" style="margin-top:16px">
+        <button class="n-btn n-btn-primary">Save Changes</button>
+        <button class="n-btn n-btn-ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ LOGIN ════ -->
+<div id="login" class="compare" style="display:none">
+  <div class="panel panel-carbon">
+    <div class="panel-label"><div class="dot2" style="background:#f1c21b"></div>Current — Carbon White</div>
+    <div style="background:#fff">
+      <div class="c-notif c-notif-warn" style="margin:1.5rem 1.5rem 0">
+        <div><div class="c-notif-title">Session Expired</div><div class="c-notif-sub">Your session has expired. Please log in again.</div></div>
+        <span style="margin-left:auto;color:#525252;cursor:pointer;font-size:16px">✕</span>
+      </div>
+      <div class="c-login-wrap">
+        <h1 class="c-login-title">Login to AG Forms</h1>
+        <div class="c-field" style="margin-bottom:1.5rem">
+          <label>Username</label>
+          <input class="c-input" placeholder="Enter your username"/>
+        </div>
+        <div class="c-field" style="margin-bottom:2rem">
+          <label>Password</label>
+          <input class="c-input" type="password" placeholder="Enter your password"/>
+        </div>
+        <button class="c-btn c-btn-primary" style="width:100%;justify-content:center">Login</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel panel-new">
+    <div class="panel-label"><div class="dot2" style="background:#34d399"></div>Proposed — Tailwind + shadcn/ui</div>
+    <div style="background:#fff;position:relative">
+      <div style="position:absolute;top:12px;right:12px;z-index:10;width:250px">
+        <div class="n-toast">
+          <div class="n-toast-icon warn">!</div>
+          <div><div class="n-toast-title">Session expired</div><div class="n-toast-sub">Please sign in again.</div></div>
+          <div class="n-toast-close">✕</div>
+        </div>
+      </div>
+      <div class="n-login-wrap">
+        <div class="n-login-left">
+          <div class="n-login-badge">MEDICAL · AG FORMS</div>
+          <h2>Prenatal Ultrasound Management</h2>
+          <p>Secure access for doctors, nurses, and administrators. All data encrypted and audit-logged.</p>
+        </div>
+        <div class="n-login-right">
+          <div class="n-login-title">Sign in</div>
+          <div class="n-login-sub">Enter your credentials to continue</div>
+          <div class="n-divider"></div>
+          <div class="n-field"><label>Username</label><input class="n-input" placeholder="dr.petrov"/></div>
+          <div class="n-field"><label>Password</label><input class="n-input" type="password" placeholder="••••••••"/></div>
+          <button class="n-login-btn">Sign in →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ UI STATES ════ -->
+<div id="states" class="compare" style="display:none">
+  <div class="panel panel-carbon">
+    <div class="panel-label"><div class="dot2" style="background:#f1c21b"></div>Current — Carbon White</div>
+    <div class="c-content">
+      <div class="c-h1" style="font-size:16px;margin-bottom:1.5rem">Notifications, Empty States &amp; Status Tags</div>
+      <div class="c-notif c-notif-succ"><div><div class="c-notif-title">Examination saved</div><div class="c-notif-sub">Changes have been applied.</div></div><span style="margin-left:auto;cursor:pointer;color:#525252">✕</span></div>
+      <div class="c-notif c-notif-err"><div><div class="c-notif-title">Delete failed</div><div class="c-notif-sub">Concurrent modification detected.</div></div><span style="margin-left:auto;cursor:pointer;color:#525252">✕</span></div>
+      <div class="c-notif c-notif-warn"><div><div class="c-notif-title">Account Locked</div><div class="c-notif-sub">Try again in 30 minutes.</div></div><span style="margin-left:auto;cursor:pointer;color:#525252">✕</span></div>
+      <div class="c-notif c-notif-info"><div><div class="c-notif-title">Search mode</div><div class="c-notif-sub">Showing results for "Иван". <span style="color:#0f62fe;cursor:pointer">Clear search</span></div></div></div>
+      <div class="c-empty" style="border:1px solid #e0e0e0;margin:1rem 0">
+        <p>No patients have been added yet.</p>
+        <button class="c-btn c-btn-ghost c-btn-sm" style="margin-top:1rem">+ Add Patient</button>
+      </div>
+      <div style="padding:1rem 0"><div class="c-loading"><div class="c-spinner"></div> Loading patients...</div></div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem">
+        <span class="c-tag c-tag-gray">Draft</span>
+        <span class="c-tag c-tag-green">Completed</span>
+        <span class="c-tag c-tag-blue">Reviewed</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel panel-new">
+    <div class="panel-label"><div class="dot2" style="background:#34d399"></div>Proposed — Tailwind + shadcn/ui</div>
+    <div class="n-content">
+      <div class="n-h1" style="margin-bottom:18px">Notifications, Empty States &amp; Status Tags</div>
+      <div class="n-toast"><div class="n-toast-icon succ">✓</div><div><div class="n-toast-title">Examination saved</div><div class="n-toast-sub">Changes have been applied.</div></div><div class="n-toast-close">✕</div></div>
+      <div class="n-toast"><div class="n-toast-icon err">✕</div><div><div class="n-toast-title">Delete failed</div><div class="n-toast-sub">Concurrent modification detected.</div></div><div class="n-toast-close">✕</div></div>
+      <div class="n-toast"><div class="n-toast-icon warn">!</div><div><div class="n-toast-title">Account locked</div><div class="n-toast-sub">Try again in 30 minutes.</div></div><div class="n-toast-close">✕</div></div>
+      <div class="n-search-banner">
+        <span style="color:#92400e">Search: <strong>"Иван"</strong></span>
+        <button class="n-btn n-btn-ghost n-btn-sm">✕ Clear</button>
+      </div>
+      <div class="n-empty">
+        <div class="n-empty-icon">🗂</div>
+        <div class="n-empty-title">No patients yet</div>
+        <div class="n-empty-sub">Get started by creating the first patient record.</div>
+        <button class="n-btn n-btn-primary n-btn-sm">+ Add Patient</button>
+      </div>
+      <div style="padding:12px 0"><div class="n-loading"><div class="n-spinner"></div> Loading patients…</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <span class="n-pill n-pill-gray">Draft</span>
+        <span class="n-pill n-pill-green">Completed</span>
+        <span class="n-pill n-pill-blue">Reviewed</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="max-width:1280px;margin:32px auto 0;padding-top:20px;border-top:1px solid #d1d5db;text-align:center;font-size:12px;color:#9ca3af">
+  Made with IBM Bob
+</div>
+
+<script>
+function show(screenId, tabEl) {
+  document.querySelectorAll('.compare').forEach(function(el) {
+    el.style.display = 'none';
+  });
+  document.getElementById(screenId).style.display = 'grid';
+  document.querySelectorAll('.tab').forEach(function(t) {
+    t.classList.remove('active');
+  });
+  tabEl.classList.add('active');
+}
+</script>
+</body>
+</html>

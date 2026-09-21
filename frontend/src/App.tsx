@@ -4,21 +4,21 @@ import { AuthProvider } from './contexts/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import PatientsPage from './pages/PatientsPage';
-import CreatePatientPage from './pages/CreatePatientPage';
-import PatientDetailPage from './pages/PatientDetailPage';
-import EditPatientPage from './pages/EditPatientPage';
-import ExaminationsPage from './pages/ExaminationsPage';
-import CreateExaminationPage from './pages/CreateExaminationPage';
-import ExaminationDetailPage from './pages/ExaminationDetailPage';
-import EditExaminationPage from './pages/EditExaminationPage';
-import ChangePasswordPage from './pages/ChangePasswordPage';
-import UsersPage from './pages/UsersPage';
-import CreateUserPage from './pages/CreateUserPage';
-import EditUserPage from './pages/EditUserPage';
-import AuditLogPage from './pages/AuditLogPage';
+import LoginPage from './features/auth/LoginPage';
+import DashboardPage from './features/dashboard/DashboardPage';
+import PatientsPage from './features/patients/PatientsPage';
+import CreatePatientPage from './features/patients/CreatePatientPage';
+import PatientDetailPage from './features/patients/PatientDetailPage';
+import EditPatientPage from './features/patients/EditPatientPage';
+import ExaminationsPage from './features/examinations/ExaminationsPage';
+import CreateExaminationPage from './features/examinations/CreateExaminationPage';
+import ExaminationDetailPage from './features/examinations/ExaminationDetailPage';
+import EditExaminationPage from './features/examinations/EditExaminationPage';
+import ChangePasswordPage from './features/auth/ChangePasswordPage';
+import UsersPage from './features/users/UsersPage';
+import CreateUserPage from './features/users/CreateUserPage';
+import EditUserPage from './features/users/EditUserPage';
+import AuditLogPage from './features/audit/AuditLogPage';
 
 function App() {
   return (

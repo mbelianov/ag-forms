@@ -113,3 +113,8 @@ code {
 .p-input-wrap .cds--text-input {
   background-color: var(--p-bg, transparent);
 }
+
+.cds--list-box__menu {
+  text-align: left;
+}
+
