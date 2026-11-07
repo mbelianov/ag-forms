@@ -294,7 +294,7 @@ Existing mechanism: `auditService.logAuditEvent`; all `details` pass through `sa
 
 | Action | Details recorded |
 |---|---|
-| `EMAIL_PROVIDER_SAVED` | provider, host, port, security, username, fromEmail, `secretChanged: boolean` (never the secret) |
+| `EMAIL_PROVIDER_SAVED` | provider, host, port, security, username, fromEmail, `credentialsReplaced: boolean` (never the secret; the name avoids the audit sanitiser's `secret` key filter) |
 | `EMAIL_PROVIDER_DELETED` | provider |
 | `EMAIL_PROVIDER_TEST` | result (`success` / failure code) |
 | `EXAMINATION_EMAIL_SENT` *(extended)* | examinationId, patientId, `examinationStatus`, recipientEmail, `patientProfileEmail`, **`recipientOverridden`**, fromEmail, pdfSizeKB, deliveryStatus |

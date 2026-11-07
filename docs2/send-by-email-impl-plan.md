@@ -37,7 +37,7 @@ Settle the small cross-cutting decisions that several later sub-tasks depend on,
 - `api/src/shared/http/responseHelpers.ts`, `api/src/shared/http/errorHandler.ts`
 - `api/src/shared/audit/auditService.ts`
 
-**Status**: `[ ] pending`
+**Status**: `[x] done`
 
 ---
 
@@ -265,10 +265,22 @@ Verify what the NFR-03 check could not: authentication, real delivery and the fu
 
 ## Decisions
 
-_To be filled in during sub-task 0._
+Recorded in sub-task 0. No code was changed for these; they are implemented in the sub-tasks named below.
 
-Already decided (spec A-08): no rate limiting, no NFR-04 request-size check.
+| # | Decision | Implemented in |
+|---|---|---|
+| DEC-01 | **Error-code mechanism.** `errorResponse` currently always sets `error.code = 'ERROR'`. It gets an optional trailing code parameter (backward compatible: existing callers are unchanged). Spec codes `EMAIL_PROVIDER_NOT_CONFIGURED`, `EMAIL_AUTH_FAILED`, `EMAIL_CONNECTION_FAILED`, `EMAIL_REJECTED` reach the client through it. The frontend keeps reading `error.message` and additionally reads `error.code`. | Sub-task 2 (parameter), 3–4 (use), 5–6 (frontend) |
+| DEC-02 | **Audit field naming.** `EMAIL_PROVIDER_SAVED` uses `credentialsReplaced: boolean` instead of `secretChanged` (the sanitiser redacts keys containing `password`, `secret`, `token`). The spec (REQ-EML-06) has been updated accordingly. Spec item E-07 overstates the sanitiser (lowercased keys are compared with mixed-case entries); do not rely on it for new fields — never pass secrets to audit at all. | Sub-task 2 |
+| DEC-03 | **No rate-limit store.** No rate limiting and no persistence for it (spec A-08, TC-EMAIL-021 removed). | n/a |
+| DEC-04 | **No NFR-04 request-size check.** Only the 10 MB decoded PDF cap stays, as an abuse guard (spec A-08). | n/a |
 
 ## Notes for next sub-task
 
-_Implementing agents add notes here._
+**From sub-task 0 (for sub-task 1):**
+- Docs commit `f82f80f` on `feature/email` (spec, plan, hosting-check plan). Not pushed. Git prints LF→CRLF warnings on stderr; harmless.
+- `local.settings.json` was never committed: `git log --all -- api/local.settings.json` is empty and `git check-ignore -v` confirms `api/.gitignore:25`. Only `api/local.settings.json.example` is tracked (currently has no email variables; sub-task 7 adds `EMAIL_CREDENTIALS_ENCRYPTION_KEY`).
+- Sub-task 1 needs no `errorResponse` change. When it is made (sub-task 2), the new code goes in as an optional **4th** parameter after `details` in `api/src/shared/http/responseHelpers.ts:56` (`message, statusCode = 400, details?, code = 'ERROR'`), so existing callers stay unchanged.
+- Use the audit field name `credentialsReplaced` (not `secretChanged`) everywhere; never pass secret material to audit.
+- Do not add any rate-limit or request-size-check code (DEC-03, DEC-04).
+- Sub-task 1 must have its own env var handling for `EMAIL_CREDENTIALS_ENCRYPTION_KEY` in tests (set it in the test setup, not in a committed file with a real key).
+- Plan and spec edits made in sub-task 0 (Decisions table, status, `credentialsReplaced`) are uncommitted at the time of writing; the user decides whether to commit them.
