@@ -24,7 +24,9 @@ import {
     logPasswordChanged,
     logUserDeleted,
     logExaminationsReassigned,
-    logPasswordResetByAdmin
+    logPasswordResetByAdmin,
+    logEmailProviderSaved,
+    logEmailProviderDeleted
 } from '../../shared/audit/auditService';
 import { createEntity } from '../../shared/storage/tableClient';
 
@@ -99,7 +101,17 @@ describe('auditService', () => {
         ['logPasswordChanged', () => logPasswordChanged('user-1', 'alice'), 'PASSWORD_CHANGED'],
         ['logUserDeleted', () => logUserDeleted('admin-1', 'user-2', 'doctor2'), 'USER_DELETED'],
         ['logExaminationsReassigned', () => logExaminationsReassigned('admin-1', 'user-1', 'user-2', 3), 'EXAMINATIONS_REASSIGNED'],
-        ['logPasswordResetByAdmin', () => logPasswordResetByAdmin('admin-1', 'user-2', 'doctor2'), 'PASSWORD_RESET_BY_ADMIN']
+        ['logPasswordResetByAdmin', () => logPasswordResetByAdmin('admin-1', 'user-2', 'doctor2'), 'PASSWORD_RESET_BY_ADMIN'],
+        ['logEmailProviderSaved', () => logEmailProviderSaved('user-1', 'alice', {
+            provider: 'google',
+            host: 'smtp.gmail.com',
+            port: 587,
+            security: 'starttls',
+            username: 'alice@gmail.com',
+            fromEmail: 'alice@gmail.com',
+            credentialsReplaced: true
+        }), 'EMAIL_PROVIDER_SAVED'],
+        ['logEmailProviderDeleted', () => logEmailProviderDeleted('user-1', 'alice', 'google'), 'EMAIL_PROVIDER_DELETED']
     ];
 
     test.each(actionCases)('%s writes expected action', async (_label, callHelper, expectedAction) => {
@@ -107,6 +119,46 @@ describe('auditService', () => {
 
         const [, entity] = (createEntity as any).mock.calls[0];
         expect(entity.action).toBe(expectedAction);
+    });
+
+    test('EMAIL_PROVIDER_SAVED records credentialsReplaced unredacted and no secret material', async () => {
+        await logEmailProviderSaved('user-1', 'alice', {
+            provider: 'generic',
+            host: 'smtp.example.com',
+            port: 465,
+            security: 'ssl',
+            username: 'alice',
+            fromEmail: 'alice@example.com',
+            credentialsReplaced: false,
+            // Extra fields must never be persisted even if a caller passes them by mistake
+            password: 'hunter2',
+            secretCiphertext: 'abcd'
+        } as any);
+
+        const [, entity] = (createEntity as any).mock.calls[0];
+        const details = JSON.parse(entity.details);
+
+        expect(entity.userId).toBe('user-1');
+        expect(entity.username).toBe('alice');
+        expect(details).toEqual({
+            provider: 'generic',
+            host: 'smtp.example.com',
+            port: 465,
+            security: 'ssl',
+            username: 'alice',
+            fromEmail: 'alice@example.com',
+            credentialsReplaced: false
+        });
+        expect(entity.details).not.toContain('hunter2');
+        expect(entity.details).not.toContain('abcd');
+        expect(entity.details).not.toContain('REDACTED');
+    });
+
+    test('EMAIL_PROVIDER_DELETED records only the provider', async () => {
+        await logEmailProviderDeleted('user-1', 'alice', 'yahoo');
+
+        const [, entity] = (createEntity as any).mock.calls[0];
+        expect(JSON.parse(entity.details)).toEqual({ provider: 'yahoo' });
     });
 });
 

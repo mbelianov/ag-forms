@@ -170,6 +170,13 @@ export async function deleteUser(request: HttpRequest, context: InvocationContex
             }
         }
 
+        // Hard-delete the user's email provider settings, including the encrypted secret (spec 7.5)
+        try {
+            await deleteEntity(USERS_TABLE, 'EMAIL_PROVIDER', userId, '*');
+        } catch {
+            // EMAIL_PROVIDER row may not exist; non-fatal
+        }
+
         // Audit events (fire-and-forget)
         logUserDeleted(tokenUser.userId, userId, targetUser.username).catch(() => {});
         if (examinations.length > 0 && reassignTo) {

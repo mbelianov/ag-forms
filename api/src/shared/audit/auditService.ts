@@ -385,4 +385,60 @@ export const logPasswordResetByAdmin = async (
     );
 };
 
+/**
+ * Log email provider settings saved (created or updated).
+ * Never receives the password or any ciphertext. `credentialsReplaced` is used instead of
+ * `secretChanged` because the sanitizer redacts keys containing "secret" (DEC-02).
+ * @param userId - Owner of the settings
+ * @param username - Username (optional, for readability)
+ * @param details - Non-secret connection metadata
+ */
+export const logEmailProviderSaved = async (
+    userId: string,
+    username: string,
+    details: {
+        provider: string;
+        host: string;
+        port: number;
+        security: string;
+        username: string;
+        fromEmail: string;
+        credentialsReplaced: boolean;
+    }
+): Promise<void> => {
+    await logAuditEvent(
+        'EMAIL_PROVIDER_SAVED',
+        userId,
+        {
+            provider: details.provider,
+            host: details.host,
+            port: details.port,
+            security: details.security,
+            username: details.username,
+            fromEmail: details.fromEmail,
+            credentialsReplaced: details.credentialsReplaced
+        },
+        username
+    );
+};
+
+/**
+ * Log email provider settings deleted
+ * @param userId - Owner of the settings
+ * @param username - Username (optional, for readability)
+ * @param provider - Provider type that was removed
+ */
+export const logEmailProviderDeleted = async (
+    userId: string,
+    username: string,
+    provider: string
+): Promise<void> => {
+    await logAuditEvent(
+        'EMAIL_PROVIDER_DELETED',
+        userId,
+        { provider },
+        username
+    );
+};
+
 // Made with Bob

@@ -97,7 +97,7 @@ Let a doctor save, read, delete and test their own mail provider settings.
 - `api/src/functions/users/DeleteUser.ts`
 - `api/src/tests/testUtils.ts`, `api/src/tests/TESTING.md`
 
-**Status**: `[ ] pending`
+**Status**: `[x] done`
 
 ---
 
@@ -298,3 +298,18 @@ Recorded in sub-task 0. No code was changed for these; they are implemented in t
   - `EmailProviderSettings`, `EmailProviderDto`, `EmailProviderUpdateRequest`, `EmailReportRequest`, `EmailReportResponse`, `EmailProviderPreset`, `EmailProviderType`, `EmailSecurityMode`.
 - Remember to implement DEC-01 in sub-task 2: add optional 4th `code = 'ERROR'` parameter to `errorResponse(message, statusCode = 400, details?, code = 'ERROR')` in `api/src/shared/http/responseHelpers.ts`.
 - When updating with an empty password and changed connection fields (7.3d), decrypt using stored old connection fields as AAD and re-encrypt with the new connection fields.
+
+**From sub-task 2 (for sub-task 3):**
+- Sub-task 2 done: `npm run build` clean; `npm test` 20 suites / 363 tests green (Azurite running). `console.error` output in test logs comes from intentional decryption-failure tests only.
+- DEC-01 implemented: `errorResponse(message, statusCode = 400, details?, code = 'ERROR')` in `api/src/shared/http/responseHelpers.ts`. Use e.g. `errorResponse('...', 502, undefined, 'EMAIL_AUTH_FAILED')`. Tests in `api/src/tests/utils/responseHelpers.test.ts`.
+- New handlers in `api/src/functions/profile/`: `GetEmailProvider.ts` (`getEmailProvider`), `SaveEmailProvider.ts` (`saveEmailProvider`, PUT), `DeleteEmailProvider.ts` (`deleteEmailProvider`). All on route `v1/profile/email-provider`, registered with `app.http`. Add `TestEmailProvider.ts` here for `v1/profile/email-provider/test`.
+- New shared module `api/src/shared/email/providerDto.ts` (re-exported from `index.ts`): `EMAIL_PROVIDER_PARTITION`, `USERS_TABLE`, and `toEmailProviderDto(entity)` (explicit allow-list; use it for any response that returns settings). `toEmailProviderDto` already maps `lastTestedAt` / `lastTestStatus` to `last_tested_at` / `last_test_status`.
+- Role/auth pattern used: `requireAuth(request)` (synchronous) then `requireRole(user, ['doctor', 'admin'])`; 401 `Authentication required`, 403 `Doctor or admin role required`. PUT checks `loadMasterKey('current')` first and returns a generic 500 `Email settings are temporarily unavailable` (no key name in the message). The test endpoint should fail closed the same way.
+- Row layout in `Users`: `PartitionKey = EMAIL_PROVIDER`, `RowKey = userId`; fields as in `EmailProviderSettings`. Read with `getEntity<EmailProviderSettings>(USERS_TABLE, EMAIL_PROVIDER_PARTITION, user.userId)`.
+- To decrypt in the test endpoint, build the AAD from the **stored row** (never the request): `{ userId: user.userId, provider: row.provider, host: row.host, port: Number(row.port), security: row.security, username: row.username }` and call `decryptSecret(row, aad)`. It returns `{ plaintext, keyRotated }`; when `keyRotated` is true, re-encrypt with `encryptSecret` and write back (spec 7.3b: "after a successful send or test"). `SaveEmailProvider` already re-encrypts on save when `keyRotated` is true.
+- Test endpoint must persist `lastTestedAt` and `lastTestStatus` on the row using `updateEntity` (needs the row's `etag`; handle `Concurrency conflict`). `SaveEmailProvider` clears both fields (sets `''`) when the connection fields or the password change, and `toEmailProviderDto` turns empty strings into `undefined`.
+- SSRF: `SaveEmailProvider` runs `validateHost` for `provider === 'generic'` only and returns `validationErrorResponse(['Host is not allowed'])` (no resolved address in the message). The send/test path must call `validateHost` again and connect to the resolved IP (spec 7.3 / plan sub-task 3).
+- Audit helpers added in `auditService.ts`: `logEmailProviderSaved(userId, username, { provider, host, port, security, username, fromEmail, credentialsReplaced })` and `logEmailProviderDeleted(userId, username, provider)`. Add `logEmailProviderTest(userId, username, result)` next to them; pass only the result string / failure code, never provider messages.
+- `DeleteUser.ts` hard-deletes `EMAIL_PROVIDER/{userId}` (non-fatal try/catch). `cleanupTestData()` in `testUtils.ts` sweeps the `EMAIL_PROVIDER` partition. Integration tests: `api/src/tests/integration/emailProvider.test.ts` (sets `EMAIL_CREDENTIALS_ENCRYPTION_KEY` itself in `beforeEach` and restores it in `afterAll`; no key is committed). Use `genericBody()` with host `8.8.8.8` there to pass the SSRF guard without DNS.
+- Behaviour to know: stale or bogus ETag on PUT returns 409 (via `conflictResponse`); unknown ETag format also maps to 409. DELETE is idempotent (200 when nothing stored) and writes the audit event only when a row existed. GET never returns 404.
+- Nothing in sub-task 2 touches Nodemailer or `/test`; `api/package.json` is unchanged.
