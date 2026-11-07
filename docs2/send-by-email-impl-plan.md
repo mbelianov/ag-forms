@@ -124,7 +124,21 @@ Add Nodemailer behind a small injectable wrapper, and expose `POST /v1/profile/e
 - Hosting check: ports 587, 465 and 25 reachable from SWA managed functions with TLS 1.3; authentication and delivery to custom hosts were **not** verified
 - `api/package.json`
 
-**Status**: `[ ] pending`
+**NFR-02 package check (2026-11-07)**
+
+| Check | `nodemailer` 10.3.1 | `@types/nodemailer` 8.0.2 |
+|---|---|---|
+| Latest stable | `npm view` dist-tag `latest` = 10.3.1 (published 2026-10-29) | latest = 8.0.2 (2026-10-04), not deprecated |
+| Maintenance | Repository `nodemailer/nodemailer`; releases every few days to weeks since 10.0.0 on 2026-09-04 (29 releases), latest 9 days ago | DefinitelyTyped, updated 2026-10-04 |
+| Licence | MIT-0 (permissive, compatible) | MIT |
+| Runtime | Node `>=20`; project runs Node 22; no runtime dependencies added | peer: `@types/node` only |
+| Known CVEs | `npm audit`: nodemailer not flagged | not flagged |
+
+Installed in `api/` as `"nodemailer": "^10.3.1"` and `"@types/nodemailer": "^8.0.2"` (lock file updated). No other new dependency.
+
+**`npm audit` baseline:** 18 vulnerabilities (7 low, 4 moderate, 6 high, 1 critical) both **before** (lock file at `HEAD`) and **after** this sub-task, so none is introduced here. All are in existing packages (`joi` ≤17.13.8, `@azure/identity`/`@azure/msal-node`, `handlebars`, `brace-expansion`, `browserslist`, `js-yaml`, `minimatch`/`glob`/`rimraf`, `deepmerge` via `jest`/`ts-jest`, `baseline-browser-mapping`). `joi` and `@azure/identity` are runtime dependencies and should be upgraded in a separate dependency-maintenance task (`npm audit fix` is available for most; the `jest`/`rimraf` ones need `--force` breaking changes). They were not changed here to keep this sub-task minimal and reviewable.
+
+**Status**: `[x] done`
 
 ---
 
@@ -313,3 +327,21 @@ Recorded in sub-task 0. No code was changed for these; they are implemented in t
 - `DeleteUser.ts` hard-deletes `EMAIL_PROVIDER/{userId}` (non-fatal try/catch). `cleanupTestData()` in `testUtils.ts` sweeps the `EMAIL_PROVIDER` partition. Integration tests: `api/src/tests/integration/emailProvider.test.ts` (sets `EMAIL_CREDENTIALS_ENCRYPTION_KEY` itself in `beforeEach` and restores it in `afterAll`; no key is committed). Use `genericBody()` with host `8.8.8.8` there to pass the SSRF guard without DNS.
 - Behaviour to know: stale or bogus ETag on PUT returns 409 (via `conflictResponse`); unknown ETag format also maps to 409. DELETE is idempotent (200 when nothing stored) and writes the audit event only when a row existed. GET never returns 404.
 - Nothing in sub-task 2 touches Nodemailer or `/test`; `api/package.json` is unchanged.
+
+**From sub-task 3 (for sub-task 4):**
+- Sub-task 3 done: `npm run build` clean; `npm test` 22 suites / 421 tests green (Azurite running). `npm audit` still reports the 18 pre-existing vulnerabilities (none from nodemailer); see the NFR-02 record under sub-task 3. Installed `nodemailer@^10.3.1` and `@types/nodemailer@^8.0.2`.
+- New module `api/src/shared/email/mailTransport.ts` (re-exported from `index.ts`). Use it for the real send; do not call `nodemailer` directly:
+  - `sendEmail(connection: SmtpConnectionConfig, mail: OutgoingMail, options?: { transportFactory, lookup, totalTimeoutMs, logger })` resolves when the provider accepted the message and throws `EmailSendError` (`.code` is `EMAIL_AUTH_FAILED` | `EMAIL_CONNECTION_FAILED` | `EMAIL_REJECTED`, `.message` is already the generic client text). Pass `{ logger: context }` so failures go to the invocation log (secret-free: password is redacted, provider response truncated to 200 chars).
+  - `SmtpConnectionConfig = { host, port, security, username, password }`; `OutgoingMail = { fromEmail, fromName?, to, subject, text, attachments?: [{ filename, content: Buffer, contentType? }] }`. `From` and `Reply-To` are both set from `fromName <fromEmail>`; attachment content type defaults to `application/pdf`.
+  - `EMAIL_FAILURE_MESSAGES[code]` holds the REQ-EML-05 client messages. Map a caught error with `errorResponse(EMAIL_FAILURE_MESSAGES[code], 502, undefined, code)`.
+  - The wrapper already sanitises subject, name, file name (CR/LF/control characters, quotes and slashes) and rejects a recipient that is not exactly one bare address (`EMAIL_REJECTED`, before any DNS lookup or connection). Sub-task 4 must still run `validateEmailReport` and the PDF checks (size, `%PDF-`) **before** calling it, and must map the 400/413/422 cases itself.
+  - SSRF: `sendEmail` re-runs `validateHost` at send time and connects to the resolved IP (preferring IPv4), with the original hostname as `tls.servername`. A blocked or unresolvable host throws `EMAIL_CONNECTION_FAILED` without opening a connection. IP-literal hosts connect to the literal.
+  - Transport options: STARTTLS → `requireTLS`; `ssl` → `secure`; `minVersion TLSv1.2`; `rejectUnauthorized: true`; connect/greeting timeout 10 s; socket timeout 30 s; plus a 30 s hard total timeout around `sendMail` (maps to `EMAIL_CONNECTION_FAILED`). `disableFileAccess`/`disableUrlAccess` are on.
+- Test seam (NFR-07): handlers cannot receive options, so tests call `setEmailTransportTestHooks({ transportFactory, lookup })` and must call `resetEmailTransportTestHooks()` in `afterEach`. Pattern in `api/src/tests/integration/emailProviderTest.test.ts` (`installFakeTransport`). A fake `lookup` returning a public IP is needed for any hostname (Google/Yahoo hosts); IP-literal hosts like `8.8.8.8` need none.
+- Test endpoint `api/src/functions/profile/TestEmailProvider.ts` (`testEmailProvider`, POST `v1/profile/email-provider/test`) is the reference flow for sub-task 4: `requireAuth` → role → `loadMasterKey('current')` fail-closed 500 → load `EMAIL_PROVIDER/{userId}` (missing → 409 `EMAIL_PROVIDER_NOT_CONFIGURED`) → AAD from the **stored row** → `decryptSecret` (failure → generic 500, no connection) → `sendEmail` → persist result → audit → 200 / 502.
+- Persisting the result uses `updateEntity` with a **partial** entity (`partitionKey`, `rowKey`, `lastTestedAt`, `lastTestStatus`, optional re-encrypted secret fields, `etag: row.etag`); the table client uses Merge mode, so other fields are kept. A failure to persist is logged and does not change the HTTP result. After a successful send with `keyRotated` the secret is re-encrypted (7.3b); sub-task 4 should do the same after a successful report send (spec: "after a successful send or test"), using the same merge-update pattern.
+- Audit: `logEmailProviderTest(userId, username, result)` added (`result` = `success` or the failure code). Sub-task 4 still has to extend `logExaminationEmailSent` (`auditService.ts:283`) and add `EXAMINATION_EMAIL_FAILED`; record only the failure code, never provider text.
+- Test recipient is `User.email` read from the `USER/{userId}` row (not from the token); a missing email returns 422. The test message has no attachment and no footer.
+- Success body of the test endpoint: `{ message: 'Test email sent', recipient_email, result: 'success' }` (200). Failures: 502 with `error.code` set; provider text, host and password never appear in the body (asserted in tests).
+- Note: `ESOCKET`/TLS/certificate/timeout errors all map to `EMAIL_CONNECTION_FAILED` by design (spec table); anything unrecognised also defaults to `EMAIL_CONNECTION_FAILED`.
+- `console.error` lines in test output come from intentional decryption-failure tests (tampered host, missing key).

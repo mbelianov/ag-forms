@@ -441,4 +441,23 @@ export const logEmailProviderDeleted = async (
     );
 };
 
+/**
+ * Log an email provider test (REQ-EML-06)
+ * @param userId - Owner of the settings
+ * @param username - Username (optional, for readability)
+ * @param result - 'success' or the mapped failure code (never a provider message)
+ */
+export const logEmailProviderTest = async (
+    userId: string,
+    username: string,
+    result: string
+): Promise<void> => {
+    await logAuditEvent(
+        'EMAIL_PROVIDER_TEST',
+        userId,
+        { result },
+        username
+    );
+};
+
 // Made with Bob

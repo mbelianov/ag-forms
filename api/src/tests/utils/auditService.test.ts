@@ -26,7 +26,8 @@ import {
     logExaminationsReassigned,
     logPasswordResetByAdmin,
     logEmailProviderSaved,
-    logEmailProviderDeleted
+    logEmailProviderDeleted,
+    logEmailProviderTest
 } from '../../shared/audit/auditService';
 import { createEntity } from '../../shared/storage/tableClient';
 
@@ -111,7 +112,8 @@ describe('auditService', () => {
             fromEmail: 'alice@gmail.com',
             credentialsReplaced: true
         }), 'EMAIL_PROVIDER_SAVED'],
-        ['logEmailProviderDeleted', () => logEmailProviderDeleted('user-1', 'alice', 'google'), 'EMAIL_PROVIDER_DELETED']
+        ['logEmailProviderDeleted', () => logEmailProviderDeleted('user-1', 'alice', 'google'), 'EMAIL_PROVIDER_DELETED'],
+        ['logEmailProviderTest', () => logEmailProviderTest('user-1', 'alice', 'success'), 'EMAIL_PROVIDER_TEST']
     ];
 
     test.each(actionCases)('%s writes expected action', async (_label, callHelper, expectedAction) => {
@@ -152,6 +154,14 @@ describe('auditService', () => {
         expect(entity.details).not.toContain('hunter2');
         expect(entity.details).not.toContain('abcd');
         expect(entity.details).not.toContain('REDACTED');
+    });
+
+    test('EMAIL_PROVIDER_TEST records only the result code', async () => {
+        await logEmailProviderTest('user-1', 'alice', 'EMAIL_AUTH_FAILED');
+
+        const [, entity] = (createEntity as any).mock.calls[0];
+        expect(entity.userId).toBe('user-1');
+        expect(JSON.parse(entity.details)).toEqual({ result: 'EMAIL_AUTH_FAILED' });
     });
 
     test('EMAIL_PROVIDER_DELETED records only the provider', async () => {
