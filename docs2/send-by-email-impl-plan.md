@@ -65,7 +65,7 @@ Build the pure, easily unit-tested building blocks without touching HTTP or stor
 - Node built-in `crypto` only (no custom algorithms)
 - `api/src/shared/validation/validation.ts`, `api/src/tests/utils/*.test.ts` for test style
 
-**Status**: `[ ] pending`
+**Status**: `[x] done`
 
 ---
 
@@ -284,3 +284,17 @@ Recorded in sub-task 0. No code was changed for these; they are implemented in t
 - Do not add any rate-limit or request-size-check code (DEC-03, DEC-04).
 - Sub-task 1 must have its own env var handling for `EMAIL_CREDENTIALS_ENCRYPTION_KEY` in tests (set it in the test setup, not in a committed file with a real key).
 - Plan and spec edits made in sub-task 0 (Decisions table, status, `credentialsReplaced`) are uncommitted at the time of writing; the user decides whether to commit them.
+
+**From sub-task 1 (for sub-task 2):**
+- Foundation completed and all 18 test suites passing.
+- Building blocks available in `api/src/shared/email/`:
+  - `encryptSecret(secret, aad, keyVersion?)` and `decryptSecret(encrypted, aad)` with HKDF-SHA256, AES-256-GCM, AAD binding (`userId`, `provider`, `host`, `port`, `security`, `username`), and previous key fallback.
+  - `loadMasterKey()` enforces 64 hex chars with no fallback.
+  - `EMAIL_PRESETS`, `getProviderPreset()`, `resolveProviderConnection()` and `DEFAULT_EMAIL_FOOTER`.
+  - `validateHost(host, lookupFn?)` and `isPrivateOrBlockedIp(ip)` for SSRF protection against loopback, private (RFC 1918), link-local (169.254.x.x/metadata), CGNAT, multicast, and ULA IPv6.
+- Validation available in `api/src/shared/validation/validation.ts`:
+  - `validateEmailProvider(data)` and `validateEmailReport(data)`.
+- Types exported from `api/src/types/index.ts`:
+  - `EmailProviderSettings`, `EmailProviderDto`, `EmailProviderUpdateRequest`, `EmailReportRequest`, `EmailReportResponse`, `EmailProviderPreset`, `EmailProviderType`, `EmailSecurityMode`.
+- Remember to implement DEC-01 in sub-task 2: add optional 4th `code = 'ERROR'` parameter to `errorResponse(message, statusCode = 400, details?, code = 'ERROR')` in `api/src/shared/http/responseHelpers.ts`.
+- When updating with an empty password and changed connection fields (7.3d), decrypt using stored old connection fields as AAD and re-encrypt with the new connection fields.

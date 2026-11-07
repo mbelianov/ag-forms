@@ -364,4 +364,200 @@ export const validateLogin = (data: any): ValidationResult => {
     return { valid: true, errors: [] };
 };
 
+// ── Email Provider & Report Validation Schemas ──────────────────────────────
+
+const pdfBase64Validator = (value: string, helpers: Joi.CustomHelpers) => {
+    if (!value || typeof value !== 'string') {
+        return helpers.error('any.required');
+    }
+    const cleanValue = value.replace(/[\r\n\s]/g, '');
+    const base64Regex = /^[A-Za-z0-9+/]+={0,2}$/;
+    if (cleanValue.length === 0 || cleanValue.length % 4 !== 0 || !base64Regex.test(cleanValue)) {
+        return helpers.message({ custom: 'PDF data must be valid base64 encoded string' });
+    }
+    const buffer = Buffer.from(cleanValue, 'base64');
+    if (buffer.length > 10 * 1024 * 1024) {
+        return helpers.message({ custom: 'PDF size must not exceed 10 MB' });
+    }
+    if (buffer.length < 5 || buffer.subarray(0, 5).toString('ascii') !== '%PDF-') {
+        return helpers.message({ custom: 'Invalid PDF payload: must start with %PDF- header' });
+    }
+    return value;
+};
+
+const emailProviderSchema = Joi.object({
+    provider: Joi.string()
+        .valid('google', 'yahoo', 'generic')
+        .required()
+        .messages({
+            'any.only': 'Provider must be one of: google, yahoo, generic',
+            'any.required': 'Provider is required'
+        }),
+    host: Joi.string()
+        .max(255)
+        .pattern(/^[a-zA-Z0-9.-]+$/)
+        .when('provider', {
+            is: 'generic',
+            then: Joi.required().messages({
+                'string.pattern.base': 'Host must be a valid hostname or IP without scheme, path or port',
+                'any.required': 'Host is required for generic provider'
+            }),
+            otherwise: Joi.optional().allow('', null)
+        }),
+    port: Joi.number()
+        .integer()
+        .min(1)
+        .max(65535)
+        .when('provider', {
+            is: 'generic',
+            then: Joi.required().messages({
+                'number.min': 'Port must be between 1 and 65535',
+                'number.max': 'Port must be between 1 and 65535',
+                'any.required': 'Port is required for generic provider'
+            }),
+            otherwise: Joi.optional().allow(null)
+        }),
+    security: Joi.string()
+        .valid('starttls', 'ssl')
+        .when('provider', {
+            is: 'generic',
+            then: Joi.required().messages({
+                'any.only': 'Security must be one of: starttls, ssl',
+                'any.required': 'Security is required for generic provider'
+            }),
+            otherwise: Joi.optional().allow('', null)
+        }),
+    username: Joi.string()
+        .min(1)
+        .max(254)
+        .pattern(/^[^\x00-\x1F\x7F]+$/)
+        .required()
+        .messages({
+            'string.min': 'Username must be at least 1 character long',
+            'string.max': 'Username must not exceed 254 characters',
+            'string.pattern.base': 'Username cannot contain control characters',
+            'any.required': 'Username is required'
+        }),
+    password: Joi.string()
+        .min(1)
+        .max(512)
+        .optional()
+        .allow('')
+        .messages({
+            'string.max': 'Password must not exceed 512 characters'
+        }),
+    from_email: Joi.string()
+        .email({ tlds: { allow: false } })
+        .max(254)
+        .required()
+        .custom((value, helpers) => {
+            const { provider, username } = helpers.state.ancestors[0] || {};
+            if ((provider === 'google' || provider === 'yahoo') && username && value.trim().toLowerCase() !== username.trim().toLowerCase()) {
+                return helpers.message({ custom: `For ${provider}, from_email must match username` });
+            }
+            return value;
+        })
+        .messages({
+            'string.email': 'From email must be a valid email address',
+            'string.max': 'From email must not exceed 254 characters',
+            'any.required': 'From email is required'
+        }),
+    from_name: Joi.string()
+        .max(100)
+        .pattern(/^[^\r\n]*$/)
+        .optional()
+        .allow('')
+        .messages({
+            'string.max': 'From name must not exceed 100 characters',
+            'string.pattern.base': 'From name cannot contain line breaks'
+        }),
+    footer: Joi.string()
+        .max(500)
+        .pattern(/^[^\x00-\x09\x0B\x0C\x0E-\x1F\x7F]*$/)
+        .optional()
+        .allow('')
+        .messages({
+            'string.max': 'Footer must not exceed 500 characters',
+            'string.pattern.base': 'Footer cannot contain control characters other than line breaks'
+        }),
+    etag: Joi.string().optional().allow('')
+});
+
+const emailReportSchema = Joi.object({
+    recipient_email: Joi.string()
+        .email({ tlds: { allow: false } })
+        .max(254)
+        .pattern(/^[^\r\n,;\s]+$/)
+        .optional()
+        .allow('', null)
+        .messages({
+            'string.email': 'Recipient email must be a valid email address',
+            'string.pattern.base': 'Only a single recipient email address is allowed without whitespace, commas, or line breaks',
+            'string.max': 'Recipient email must not exceed 254 characters'
+        }),
+    subject: Joi.string()
+        .max(200)
+        .pattern(/^[^\r\n]*$/)
+        .optional()
+        .allow('')
+        .messages({
+            'string.max': 'Subject must not exceed 200 characters',
+            'string.pattern.base': 'Subject cannot contain line breaks'
+        }),
+    message: Joi.string()
+        .max(2000)
+        .optional()
+        .allow('')
+        .messages({
+            'string.max': 'Message must not exceed 2000 characters'
+        }),
+    file_name: Joi.string()
+        .max(255)
+        .pattern(/^[^\r\n/\\]+$/)
+        .optional()
+        .allow('')
+        .messages({
+            'string.max': 'File name must not exceed 255 characters',
+            'string.pattern.base': 'File name cannot contain path separators or line breaks'
+        }),
+    pdf_base64: Joi.string()
+        .required()
+        .custom(pdfBase64Validator)
+        .messages({
+            'any.required': 'PDF data is required'
+        })
+});
+
+/**
+ * Validate email provider settings
+ * @param data - Email provider data to validate
+ * @returns ValidationResult
+ */
+export const validateEmailProvider = (data: any): ValidationResult => {
+    const result = emailProviderSchema.validate(data, { abortEarly: false });
+    if (result.error) {
+        return {
+            valid: false,
+            errors: result.error.details.map(detail => detail.message)
+        };
+    }
+    return { valid: true, errors: [] };
+};
+
+/**
+ * Validate email report send request
+ * @param data - Email report request data to validate
+ * @returns ValidationResult
+ */
+export const validateEmailReport = (data: any): ValidationResult => {
+    const result = emailReportSchema.validate(data, { abortEarly: false });
+    if (result.error) {
+        return {
+            valid: false,
+            errors: result.error.details.map(detail => detail.message)
+        };
+    }
+    return { valid: true, errors: [] };
+};
+
 // Made with Bob
