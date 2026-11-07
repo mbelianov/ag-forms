@@ -368,3 +368,37 @@ For an FT twins exam, the same blob also carries `twin2_ft_biometry`, `twin2_ft_
   - **Option B — Keep in model, hide in form (current state):** Leave the field in the data model and API layer. Existing notes are preserved and still visible on the detail page/PDF if present. New exams simply have an empty `notes` field. No migration needed.
 - **Priority:** P3 · Low — no functional or clinical impact; purely a housekeeping decision
 - **Status:** Deferred — Option B is the current state. Revisit when deciding whether to fully retire the `notes` field.
+
+---
+
+## KI-013 · "Send examination by email" — known limitations of the first release
+
+- **Affects:** `POST /v1/examinations/{id}/email-report`, `/v1/profile/email-provider*`, frontend `/email-settings` and the Email Report dialog. Design record: `docs2/send-by-email-req-spec.md` (sections 13 and 14).
+- **Limitations (accepted for this release):**
+  1. **KL-01 · No patient consent record.** The system does not store whether the patient agreed to receive the report by email. GDPR consent handling remains a known gap (see also KI-006).
+  2. **KL-02 · Unprotected PDF.** The PDF is sent without a password and stays in the doctor's Sent folder and in the patient's mailbox.
+  3. **KL-03 · No Outlook / Microsoft 365 preset.** Only Google and Yahoo presets exist. The Generic option works only where the account still allows app-password SMTP authentication. OAuth is out of scope.
+  4. **KL-04 · No email history for doctors.** Only admins can see sends and failures, in the audit log (`EXAMINATION_EMAIL_SENT`, `EXAMINATION_EMAIL_FAILED`).
+  5. **KL-05 · Acceptance is not delivery.** `202` / `delivery_status: "accepted"` means the SMTP server accepted the message. No bounce handling, no read tracking.
+  6. **KL-06 · PDF content is not verified.** The PDF is generated in the browser and uploaded; the server checks only that it is a PDF of at most 10 MB, not that it matches the stored examination.
+- **Additional limitations introduced during implementation:**
+  - **No rate limiting** on `email-report` or the provider `test` endpoint (decision A-08; test case TC-EMAIL-021 was removed). Abuse is bounded only by the doctor/admin role, the provider's own limits and the audit log.
+  - **Master key sits in application settings** (`EMAIL_CREDENTIALS_ENCRYPTION_KEY`) next to `JWT_SECRET`. Someone who can read both the settings and the `Users` table can decrypt stored app passwords. No Key Vault integration. See `docs2/03-security-architecture.md`, "Email Provider Credentials".
+  - **PR previews share production settings and storage.** The key must be set in the SWA application settings before release; a preview deployment uses the same key and the same stored credentials.
+  - **Hosted behaviour not yet verified.** Unit and integration tests mock the SMTP transport. Real authentication and delivery through the SWA-managed API (outbound ports 587/465, a real PDF under 500 KB through the SWA proxy) is the end-to-end pass of sub-task 8.
+  - **Key rotation is manual.** `EMAIL_CREDENTIALS_ENCRYPTION_KEY_PREVIOUS` lets old rows still decrypt; they are re-encrypted lazily (on save, successful test or successful send). Rows that are never used again stay on the previous key until the user saves them again; remove `_PREVIOUS` only after that. `keyVersion` is not a key selector.
+  - **Audit sanitizer is not a reliable secret filter.** Its blocked-field list contains mixed-case names that never match lowercased keys. New email events avoid sensitive field names (`credentialsReplaced`) instead of relying on it.
+- **Priority:** P2 · Accepted limitations, documented so they are not mistaken for defects.
+- **Status:** Open — revisit KL-01 with the GDPR work, and the rate limit if abuse is observed.
+
+---
+
+## KI-014 · `npm audit` reports vulnerabilities in dependencies (pre-existing)
+
+- **Files:** `api/package.json`, `frontend/package.json` and their lock files.
+- **Symptom:** `npm audit` in `api/` reports **18** vulnerabilities (7 low, 4 moderate, 6 high, 1 critical); `frontend/` reports **26**. The counts were identical before and after the email feature was added (checked in sub-task 1); none of the findings come from `nodemailer`, the only dependency added by the feature.
+- **Affected packages (api):** `joi` (<= 17.13.8), `@azure/identity` / `@azure/msal-node` — both are **runtime** dependencies; `handlebars`, `brace-expansion`, `browserslist`, `js-yaml`, `minimatch` / `glob` / `rimraf`, `deepmerge` (through `jest` / `ts-jest`) and `baseline-browser-mapping` are dev/test tooling.
+- **Risk:** The runtime findings (`joi`, `@azure/identity`) are relevant to the deployed API; the dev-tooling findings do not ship to production.
+- **Fix:** Upgrade the runtime packages to the patched versions and re-run the full backend suite; upgrade or replace dev tooling as part of normal maintenance. Do not use `npm audit fix --force` blindly.
+- **Priority:** P2 · Required by the security policy (critical within 24 h, high within 30 days) — schedule a dedicated dependency-update task; not part of the email feature.
+- **Status:** Open — not addressed by the email feature.

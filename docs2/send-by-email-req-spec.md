@@ -1,7 +1,7 @@
 # Send Examination by Email — Requirements Specification
 
 **Version:** 1.0
-**Status:** Approved for implementation planning — all stakeholder questions and assumptions confirmed; outbound SMTP from the hosting verified (NFR-03, see section 14)
+**Status:** Implemented in sub-tasks 1–7 on branch `feature/email` (backend, frontend, tests, configuration and documentation). Hosted end-to-end verification (sub-task 8) is pending. Where the implementation deviates from the approved text below, the deviation is listed in section 15 and takes precedence. Outbound SMTP from the hosting was verified (NFR-03, see section 14).
 **Scope:** Doctor sends the PDF version of an examination to the patient by email, using the doctor's own personal mailbox as the delivery provider. Includes the doctor's profile section where the mailbox provider is configured.
 
 ---
@@ -46,7 +46,7 @@ Legend: ✅ implemented · ⚠️ partially implemented / defective · ❌ not i
 | E-04 | "Email Report" button + modal (recipient, subject, message), shown to `admin`/`doctor` only, on the examination detail page | ⚠️ | `frontend/src/reports/EmailReportButton.tsx`, `ExaminationDetailPage.tsx:55,229,383` |
 | E-05 | Endpoint `POST /v1/examinations/{id}/email-report`, role-guarded (`doctor`, `admin`), loads exam + patient, rejects deleted exam, rejects patient without email | ⚠️ | `api/src/functions/system/EmailExaminationReport.ts` |
 | E-06 | Audit event `EXAMINATION_EMAIL_SENT` (`examinationId`, `recipientEmail`) | ✅ | `api/src/shared/audit/auditService.ts:283` |
-| E-07 | Audit sanitiser redacts keys containing `password`, `secret`, `token`, `apiKey` | ✅ | `auditService.ts:92` |
+| E-07 | Audit sanitiser redacts keys containing `password`, `secret`, `token`, `apiKey` | ⚠️ Partly: the list has mixed-case entries (e.g. `apiKey`) that never match the lowercased key; see section 15 | `auditService.ts:92` |
 | E-08 | Role model `admin` / `doctor` / `viewer`, cookie JWT auth, `requireAuth` / `requireRole` | ✅ | `api/src/shared/auth/authMiddleware.ts` |
 | E-09 | Profile dropdown in header with "Change Password" entry and a Carbon page pattern to copy | ✅ | `frontend/src/components/Layout.tsx:124-141`, `features/auth/ChangePasswordPage.tsx` |
 | E-10 | Soft-delete convention, ETag-in-body update convention, partition-key-typed storage in `Users` table | ✅ | `AGENTS.md`, `api/src/functions/users/*` |
@@ -116,7 +116,7 @@ Notes:
 
 | # | Requirement |
 |---|---|
-| 1.1 | A new page `Profile` (route `/profile`, `ProtectedRoute`, any authenticated non-viewer) shall contain an **Email Provider** section. The header profile dropdown shall get a new entry **Email Settings** next to "Change Password" that navigates to it. The entry is hidden for `viewer`. |
+| 1.1 | A new page **Email Settings** (route `/email-settings`, `ProtectedRoute` with `allowedRoles` doctor/admin; see section 15) shall contain the **Email Provider** form. The header profile dropdown shall get a new entry **Email Settings** next to "Change Password" that navigates to it. The entry is hidden for `viewer`. |
 | 1.2 | The section shall offer a **Provider** selector with three options: **Google (Gmail)**, **Yahoo Mail**, **Generic SMTP**. |
 | 1.3 | Selecting **Google** pre-fills and locks the server fields: host `smtp.gmail.com`, port `587`, security `STARTTLS`. |
 | 1.4 | Selecting **Yahoo** pre-fills and locks: host `smtp.mail.yahoo.com`, port `587`, security `STARTTLS`. |
@@ -232,7 +232,7 @@ All endpoints act on the **authenticated user only**; there is no user id in the
 | 3.3 | **Recipient resolution:** if `recipient_email` is absent, use `Patient.email`. If present, validate it and use it instead (override, D-05). If neither exists → `422` "No recipient email available". |
 | 3.4 | **Exactly one recipient.** Comma/semicolon/whitespace-separated lists, CR/LF and display-name forms are rejected. No CC/BCC. |
 | 3.5 | **Examination status:** examinations in **any status** (`draft`, `completed`, `reviewed`) may be emailed; the doctor decides. The server does not block by status. The audit record includes `examinationStatus`. Deleted examination → `404`/`400` as today. *(Assumption A-04, confirmed.)* |
-| 3.6 | **PDF validation:** `pdf_base64` must be valid base64, decode to at most **10 MB**, and start with the bytes `%PDF-`. Violations → `400` (`413` for size). |
+| 3.6 | **PDF validation:** `pdf_base64` must be valid base64, decode to at most **10 MB**, and start with the bytes `%PDF-`. Violations → `400` (including oversize; `413` is not used, see section 15). |
 | 3.7 | **Provider required:** if the caller has no provider settings → `409` with code `EMAIL_PROVIDER_NOT_CONFIGURED`. The UI turns this into a message with a link to the profile section. |
 | 3.8 | **Message composition:** `From` = provider `from_name <from_email>`; `Reply-To` = same; `To` = resolved recipient; subject = request subject or default `"Examination report — {examination type label} — {exam date}"` (the default contains no patient name or MRN and must not hard-code "Prenatal"); plain-text body = optional doctor message followed by the **doctor's profile footer** (REQ-EML-01 1.6a; built-in default footer if none is set). Attachment named `file_name` or default `{mrn}_{examDate}.pdf`, `application/pdf`. |
 | 3.9 | Subject and name headers are sanitised against header injection (strip CR/LF); subject max 200 chars, message max 2000 chars. |
@@ -313,7 +313,7 @@ Audit writes must not block or fail the primary operation. Existing `GetAuditLog
 | 7.3 | **Per-doctor key derivation and encryption (D-09):** (a) The **master key** is the environment variable `EMAIL_CREDENTIALS_ENCRYPTION_KEY` (32 random bytes as 64 hex characters). It is never committed and has **no default / fallback**: if it is missing or malformed, provider endpoints and sending fail closed with `500` and a server log. (b) On every save of a secret, generate a random 16-byte **salt** and a random 12-byte **IV**. (c) Derive a 32-byte **data key** with HKDF-SHA256 from the master key, the salt, and the context string `email-provider-secret\|v{keyVersion}\|{userId}`. (d) Encrypt with **AES-256-GCM** using the data key, binding the **connection identity** as additional authenticated data (AAD): `userId`, `provider`, `host`, `port`, `security` and `username`, serialised in a fixed, unambiguous order and format (for example canonical JSON with a fixed key order). (e) Store `secretCiphertext`, `secretIv`, `secretAuthTag`, `secretSalt` and `keyVersion` in the doctor's row. Uses Node built-in `crypto` only; no custom cryptography. |
 | 7.3a | **Binding to the owner and to the connection:** on decrypt, `userId` is taken from the row key (never from the request), and `provider`, `host`, `port`, `security` and `username` are read from the same row; all are used for key derivation (`userId`) and as AAD (all six). A row copied to another user, a modified `userId`, **a modified `provider`, `host`, `port`, `security` or `username`** (for example redirecting the login to a server the attacker controls), a wrong master key, a changed salt/IV or a tampered ciphertext must all fail authentication and be treated as a decryption failure (`500`, server log, no detail to the client, and **no SMTP connection is opened**). `userId` of an existing row is immutable. |
 | 7.3d | **Changing connection fields:** because the connection identity is part of the AAD, a save that changes `provider`, `host`, `port`, `security` or `username` must **re-encrypt the secret**. If the doctor leaves the password empty ("keep existing"), the server first decrypts the stored secret with the **old** values, then re-encrypts it with the **new** values in the same write. If the old secret cannot be decrypted, the save is rejected and the doctor is asked to enter the password again. Changes to `fromEmail`, `fromName` and `footer` do not affect the AAD and do not require re-encryption. |
-| 7.3b | **Key rotation:** `keyVersion` identifies the master key used for a row. The current key is `EMAIL_CREDENTIALS_ENCRYPTION_KEY`; during a rotation the old key is supplied in `EMAIL_CREDENTIALS_ENCRYPTION_KEY_PREVIOUS`. Rows written with the previous version are still decrypted, and are **re-encrypted with the current key** the next time the settings are saved or after a successful send or test. Only one previous key is supported at a time. |
+| 7.3b | **Key rotation:** (as implemented: `keyVersion` is *not* a key selector, see section 15.) The current key is `EMAIL_CREDENTIALS_ENCRYPTION_KEY`; during a rotation the old key is supplied in `EMAIL_CREDENTIALS_ENCRYPTION_KEY_PREVIOUS`. Rows written with the previous **master key** are still decrypted, and are **re-encrypted with the current key** the next time the settings are saved or after a successful send or test. Only one previous key is supported at a time. |
 | 7.3c | **Master key compromise:** the master key and a copy of the table together allow all data keys to be re-derived; per-doctor derivation limits the impact of copied rows, key reuse and partial leaks, but not of a stolen master key. Moving the master key to a managed vault is a possible later enhancement and is out of scope. |
 | 7.4 | Decryption happens only inside the send/test functions, in memory, per request. The derived data key and the plaintext secret are never logged, cached, returned or stored beyond the request. |
 | 7.5 | On user soft-delete (`DeleteUser`), the `EMAIL_PROVIDER/{userId}` row is hard-deleted (INV-07). |
@@ -350,7 +350,7 @@ Audit writes must not block or fail the primary operation. Existing `GetAuditLog
 | `api/src/types/index.ts` | New `EmailProviderSettings` type. |
 | `api/package.json`, `local.settings.json`, deployment docs | SMTP library; `EMAIL_CREDENTIALS_ENCRYPTION_KEY`; optional `EMAIL_CREDENTIALS_ENCRYPTION_KEY_PREVIOUS`. |
 | `frontend/src/reports/EmailReportButton.tsx` | Contract fix, pre-fill, override note, not-configured state, status gating, error mapping. |
-| `frontend/src/features/profile/*` (new), `App.tsx`, `Layout.tsx` | Profile page, route, menu entry. |
+| `frontend/src/features/profile/EmailSettingsPage.tsx` (new), `App.tsx`, `Layout.tsx` | Email Settings page, route `/email-settings`, menu entry. |
 | `frontend/src/services/*` (new `emailProviderService.ts`) | API client; ETag in body per convention. |
 | `docs2/04-api-specification.md`, `docs2/TEST-CASES.md`, `docs2/03-security-architecture.md` | Reconcile with this spec (G-12). |
 | `api/src/tests/**` | Update the existing simulation test; add provider-settings, sending, encryption, validation, SSRF tests. |
@@ -480,3 +480,34 @@ All open questions have been answered. No open questions remain at the time of w
 **Decision:** presets in A-01 and requirements 1.3 / 1.4 stay unchanged (587 with STARTTLS). Port 465 is available as a fallback if a provider changes its policy.
 
 **Not covered:** SMTP authentication with an app password, message acceptance by the providers, other generic SMTP servers (the Generic option is any host the doctor enters), and the request-size limit of NFR-04 / R-02. A single run was captured; a second run was not recorded.
+
+---
+
+## 15. Implementation Record and Deviations (sub-tasks 1–7)
+
+This section records where the implementation differs from the text above or makes it more precise. It was verified against the code in sub-task 7. Where it conflicts with an earlier section, **this section is authoritative**.
+
+**Status of verification.** Backend (Azurite integration + unit) and frontend suites pass; the SMTP transport is mocked in tests. Real authentication and message acceptance by Gmail/Yahoo, and the request-size behaviour through the SWA proxy, are verified only in sub-task 8 (section 14 "Not covered").
+
+| # | Topic | Specified | Implemented |
+|---|-------|-----------|-------------|
+| D-01 | Settings page route | New `Profile` page, `/profile`, `features/profile/*` | Page `EmailSettingsPage` in `frontend/src/features/profile/`, route **`/email-settings`** (doctor/admin only), menu entry "Email Settings" in `Layout.tsx`. There is no general Profile page. |
+| D-02 | Machine-readable error code on the client | Code available on `error.code` | The axios interceptor in `api.ts` sets **`error.apiErrorCode`** (the envelope `error.code`); the existing `error.code` is not touched. Mapping to messages is in `frontend/src/utils/emailErrors.ts`. |
+| D-03 | Error envelope codes | Specific codes for every failure | Only `EMAIL_PROVIDER_NOT_CONFIGURED` (409), `EMAIL_AUTH_FAILED`, `EMAIL_CONNECTION_FAILED`, `EMAIL_REJECTED` (502) are specific. All other errors use the generic `ERROR`; clients rely on the HTTP status. |
+| D-04 | `recipient_email` in the request | Optional override | The dialog **omits** `recipient_email` when the doctor left the patient's address unchanged; the server then uses `Patient.email` and returns `recipient_overridden: false`. |
+| D-05 | Oversize PDF | 400 / 413 | **400** `Validation failed` (decoded size > 10 MB); 413 is never returned by the application. Behaviour of the SWA proxy for large bodies is a sub-task 8 check. |
+| D-06 | Validation error shape | - | 400 with `details.errors`; invalid recipient is **400**, not 422. 422 is used only for "No recipient email available" (send) and "No account email available" (test). |
+| D-07 | `keyVersion` | Identifies the master key used for a row (7.3b) | `CURRENT_KEY_VERSION = 1`, stored per row and included in the HKDF info string (`email-provider-secret\|v{keyVersion}\|{userId}`). It is **not** a selector between master keys. Decryption tries `EMAIL_CREDENTIALS_ENCRYPTION_KEY`, then `EMAIL_CREDENTIALS_ENCRYPTION_KEY_PREVIOUS`; a success with the previous key triggers re-encryption with the current key on a successful **save, test or send**. |
+| D-08 | Master key checks | Fail closed | `PUT` and `POST .../test` return 500 "Email settings are temporarily unavailable" when the key is missing or malformed. `GET` and `DELETE` do not read the key. The send endpoint checks it only after the recipient and the stored provider have been resolved. |
+| D-09 | Save response | - | `PUT` returns the same DTO as `GET` including the **new `etag`**; a stale or invalid `etag` returns 409. Field names: `secret_set`, `from_email`, `from_name`, `last_tested_at`, `last_test_status`. |
+| D-10 | Password reuse after connection change | Rejected if undecryptable (7.3d) | 400 "Stored password cannot be reused. Please enter the password again." |
+| D-11 | Test endpoint | Sends to `User.email` | Success `200 { message: "Test email sent", recipient_email, result: "success" }`. Missing account email → 422 "No account email available". A failure maps to the same 502 codes and persists `lastTestedAt` / `lastTestStatus`. |
+| D-12 | Delete | Confirm and delete | Idempotent: `200 "Email provider settings removed"` even when nothing existed; `EMAIL_PROVIDER_DELETED` is audited only when a row existed. `DeleteUser` also removes the row (errors are logged, not fatal). |
+| D-13 | Audit sanitiser (E-07) | Redacts keys containing `password`, `secret`, `token`, `apiKey` | The sanitiser lowercases the key and tests `includes(field)` against a list that contains mixed-case entries (`passwordHash`, `accessToken`, `apiKey`, ...), which therefore never match. The email events avoid sensitive names (`credentialsReplaced`) and never receive secrets. Fixing the sanitiser is out of scope (see decision DEC-02 in the implementation plan). |
+| D-14 | Rate limiting | Dropped (A-08) | Not implemented, as decided. TC-EMAIL-021 removed. See `KNOWN-ISSUES.md` KI-013. |
+| D-15 | Preset hosts | Fixed on the server | Confirmed: for `google` / `yahoo` the submitted host/port/security are ignored and the preset values stored. The SSRF guard (`hostGuard.ts`) applies on save for `generic` only and again at send time for every provider. |
+| D-16 | Hosting description | - | The API runs as **Azure Static Web Apps managed functions** (`api_location: api`, Node 22), not a separate Function App. Application settings are set in the Azure portal; PR previews share production settings and storage. |
+
+**Known limitations (section 13) are unchanged** and are mirrored, together with the additional limitations found during implementation, in `docs2/KNOWN-ISSUES.md` KI-013.
+
+**Related documents updated in sub-task 7:** `04-api-specification.md`, `03-security-architecture.md`, `05-deployment-guide.md`, `TEST-CASES.md`, `KNOWN-ISSUES.md`, `EMAIL-SETUP-GUIDE.md` (new), `README-SWA.md`, `dev-workflow.md`, `api/local.settings.json.example`.

@@ -16,7 +16,7 @@
 4. [Examination Management (40 Cases)](#3-examination-management-40-cases)
 5. [Search Functionality (15 Cases)](#4-search-functionality-15-cases)
 6. [PDF Report Generation (10 Cases)](#5-pdf-report-generation-10-cases)
-7. [Email Report Delivery (10 Cases)](#6-email-report-delivery-10-cases)
+7. [Email Report Delivery (25 Cases)](#6-email-report-delivery-25-cases)
 8. [Security & Authorization (20 Cases)](#7-security--authorization-20-cases)
 9. [Edge Cases & Error Scenarios (20 Cases)](#8-edge-cases--error-scenarios-20-cases)
 10. [Test Execution Guidelines](#test-execution-guidelines)
@@ -32,10 +32,10 @@
 | Examination Management | 39 | P0 |
 | Search Functionality | 15 | P1 |
 | PDF Report Generation | 10 | P0 |
-| Email Report Delivery | 10 | P1 |
+| Email Report Delivery | 25 | P1 |
 | Security & Authorization | 20 | P0 |
 | Edge Cases & Error Scenarios | 20 | P2 |
-| **TOTAL** | **179** | - |
+| **TOTAL** | **194** | - |
 
 ### Test Coverage by Role
 
@@ -1473,19 +1473,28 @@
 
 ---
 
-## 6. EMAIL REPORT DELIVERY (10 Cases)
+## 6. EMAIL REPORT DELIVERY (25 Cases)
 
-**TC-
-EMAIL-001: Email Report to Patient**
-- **Precondition:** Patient has email, examination completed
+Doctors send the PDF report from their **own** mailbox (Gmail, Yahoo or a Generic SMTP server configured on `/email-settings`). The endpoint is `POST /api/v1/examinations/{id}/email-report` and returns `202` with `delivery_status: "accepted"` (accepted by the SMTP server, not a read receipt). TC-EMAIL-001 to 010 are the original cases, re-based on the implemented contract; TC-EMAIL-011 to 025 come from `send-by-email-req-spec.md` section 8. TC-EMAIL-021 was removed (rate limit dropped, decision A-08); the number is kept as a placeholder so numbering matches the spec.
+
+**Automated coverage (run with `npm test`):**
+- Backend: `api/src/tests/integration/emailProvider.test.ts`, `emailProviderTest.test.ts`, `emailReport.test.ts`; `api/src/tests/utils/emailCrypto.test.ts`, `emailValidation.test.ts`, `hostGuard.test.ts`, `presets.test.ts`.
+- Frontend: `frontend/src/reports/EmailReportButton.test.tsx`, `frontend/src/features/profile/EmailSettingsPage.test.tsx`, `frontend/src/services/emailProviderService.test.ts`, `frontend/src/utils/emailErrors.test.ts`.
+- Real delivery through a hosted mail provider and the SWA proxy is **not** automated. It is the manual end-to-end pass of sub-task 8.
+
+**Prerequisite for every manual case:** the doctor has saved a working provider on **Email Settings** (menu item, route `/email-settings`) using an app password, and `EMAIL_CREDENTIALS_ENCRYPTION_KEY` is set in the environment.
+
+**TC-EMAIL-001: Email Report to Patient**
+- **Precondition:** Patient has email, examination exists, provider configured
 - **Steps:**
   1. Open examination
   2. Click "Email Report"
-  3. Confirm recipient email
+  3. Confirm recipient email (pre-filled from the patient)
   4. Click "Send"
 - **Expected Result:**
-  - 202 Accepted
-  - Email sent to patient
+  - Request carries `recipient_email` (only when changed) and `pdf_base64`
+  - 202 Accepted, `delivery_status: "accepted"`
+  - Email with the PDF attached arrives from the doctor's own address
   - Success message displayed
 - **Priority:** P1
 - **Role:** Doctor
@@ -1503,10 +1512,11 @@ EMAIL-001: Email Report to Patient**
 **TC-EMAIL-003: Email to Patient Without Email Address**
 - **Precondition:** Patient has no email
 - **Steps:**
-  1. Attempt to email report
+  1. Open the Email Report dialog without entering a recipient
+  2. Send (or call the API without `recipient_email`)
 - **Expected Result:**
-  - Error
-  - "Patient email not available"
+  - Dialog asks for a recipient; the API returns 422 "No recipient email available"
+  - Nothing is sent
 - **Priority:** P1
 - **Role:** Doctor
 
@@ -1515,27 +1525,24 @@ EMAIL-001: Email Report to Patient**
   1. Modify recipient email to invalid format
   2. Send
 - **Expected Result:**
-  - 422 error
-  - "Invalid recipient email"
+  - 400 "Validation failed" with the recipient field in `details.errors`
+  - Nothing is sent
 - **Priority:** P1
 - **Role:** Doctor
 
-**TC-EMAIL-005: Email Report for Draft Examination**
-- **Steps:**
-  1. Attempt to email draft examination
-- **Expected Result:**
-  - Error
-  - "Examination must be completed"
+**TC-EMAIL-005: Email Report for Draft Examination (superseded)**
+- **Note:** Superseded by TC-EMAIL-020. Draft examinations are allowed (decision A-04); the dialog only shows a warning.
 - **Priority:** P1
 - **Role:** Doctor
 
 **TC-EMAIL-006: Email Delivery Failure**
 - **Steps:**
-  1. Mock SMTP failure
+  1. Make the SMTP server fail (unreachable host, bad credentials or rejected recipient; automated tests mock the transport)
   2. Attempt to send email
 - **Expected Result:**
-  - 502 Bad Gateway
-  - "Email delivery failed"
+  - 502 Bad Gateway with `error.code` `EMAIL_CONNECTION_FAILED`, `EMAIL_AUTH_FAILED` or `EMAIL_REJECTED`
+  - A localised message is shown, no password or server response text is exposed
+  - Audit entry `EXAMINATION_EMAIL_FAILED` with `failureCode`
 - **Priority:** P2
 - **Role:** System Test
 
@@ -1572,8 +1579,191 @@ EMAIL-001: Email Report to Patient**
   1. Generate large PDF (with images)
   2. Email report
 - **Expected Result:**
-  - Email sent successfully OR
-  - Size limit error
+  - Email sent successfully for PDFs up to the 10 MB limit OR
+  - 400 "Validation failed" for a larger payload (not 413)
+- **Priority:** P2
+- **Role:** Doctor
+
+**TC-EMAIL-011: Save Google Settings; GET Never Returns Secret**
+- **Steps:**
+  1. Open Email Settings, choose Google, enter address and app password, save
+  2. Call `GET /api/v1/profile/email-provider`
+- **Expected Result:**
+  - Save returns the settings and a new `etag`
+  - GET returns `secret_set: true` and no password or ciphertext
+- **Priority:** P0
+- **Role:** Doctor
+
+**TC-EMAIL-012: Server Overwrites Host/Port for Presets**
+- **Steps:**
+  1. Save with `provider: google` and a different `host`/`port` in the request
+- **Expected Result:**
+  - Stored host/port are the preset values (`smtp.gmail.com`, 587/STARTTLS), not the submitted ones
+- **Priority:** P1
+- **Role:** Doctor
+
+**TC-EMAIL-013: Generic Host to Loopback/Private/Metadata Address Rejected**
+- **Steps:**
+  1. Save Generic settings with host `127.0.0.1`, `10.0.0.5`, `169.254.169.254` or `localhost`
+- **Expected Result:**
+  - 400 "Host is not allowed"; nothing saved
+  - At send time the host is resolved again and a private result is refused
+- **Priority:** P0
+- **Role:** Doctor
+
+**TC-EMAIL-014: Secret Stored Encrypted**
+- **Steps:**
+  1. Save settings, then inspect the `Users` row `EMAIL_PROVIDER/{userId}` in Table Storage
+- **Expected Result:**
+  - Row holds ciphertext, IV, salt, tag and `keyVersion`, never the plaintext
+  - Decrypts correctly with the configured key; a wrong master key fails
+- **Priority:** P0
+- **Role:** System Test
+
+**TC-EMAIL-014a: Row Bound to User and Context**
+- **Steps:**
+  1. Copy the row to another user's `userId`, change `userId`, change salt/IV, or tamper with ciphertext/tag
+- **Expected Result:**
+  - Every variant fails to decrypt (AES-GCM authentication fails)
+- **Priority:** P0
+- **Role:** System Test
+
+**TC-EMAIL-014b: Fresh Salt and IV per Save**
+- **Steps:**
+  1. Save the same password twice
+- **Expected Result:**
+  - Ciphertext, IV and salt differ
+- **Priority:** P1
+- **Role:** System Test
+
+**TC-EMAIL-014c: Key Rotation with `_PREVIOUS`**
+- **Steps:**
+  1. Save with key A; set key B as `EMAIL_CREDENTIALS_ENCRYPTION_KEY` and key A as `EMAIL_CREDENTIALS_ENCRYPTION_KEY_PREVIOUS`
+  2. Send a test email
+- **Expected Result:**
+  - The row still decrypts; after a successful test or send it is re-encrypted with key B
+- **Priority:** P1
+- **Role:** System Test
+
+**TC-EMAIL-014d: Missing or Malformed Master Key Fails Closed**
+- **Steps:**
+  1. Unset the key or set it to a value that is not 64 hex characters
+  2. Call PUT, test and send
+- **Expected Result:**
+  - 500 "Email settings are temporarily unavailable"; no secret in the response or logs
+  - GET and DELETE still work
+- **Priority:** P0
+- **Role:** System Test
+
+**TC-EMAIL-014e: Tampering with Connection Fields**
+- **Steps:**
+  1. Change `host`, `port`, `security`, `provider` or `username` directly in the stored row
+  2. Send
+- **Expected Result:**
+  - Decryption fails; no SMTP connection is attempted
+- **Priority:** P0
+- **Role:** System Test
+
+**TC-EMAIL-014f: Changing Host with Empty Password**
+- **Steps:**
+  1. Save a changed `host` and leave the password empty
+- **Expected Result:**
+  - Server re-encrypts the existing secret with the new values and sending keeps working
+  - If the stored secret cannot be decrypted: 400 "Stored password cannot be reused. Please enter the password again."
+- **Priority:** P1
+- **Role:** Doctor
+
+**TC-EMAIL-014g: Changing Only fromName or Footer**
+- **Steps:**
+  1. Change only `fromName` or `footer`, save, send
+- **Expected Result:**
+  - No re-encryption needed; sending works
+- **Priority:** P2
+- **Role:** Doctor
+
+**TC-EMAIL-015: User Isolation**
+- **Steps:**
+  1. As doctor A, try to read, change, delete or use doctor B's settings
+- **Expected Result:**
+  - Each user only ever reaches their own row (there is no `userId` parameter); a viewer receives 403
+- **Priority:** P0
+- **Role:** Doctor
+
+**TC-EMAIL-016: Send Without Provider**
+- **Steps:**
+  1. As a doctor with no saved provider, send a report
+- **Expected Result:**
+  - 409 `EMAIL_PROVIDER_NOT_CONFIGURED`; UI offers a link to Email Settings
+- **Priority:** P1
+- **Role:** Doctor
+
+**TC-EMAIL-017: Recipient Override Is Audited**
+- **Steps:**
+  1. Send with a recipient different from the patient's address
+- **Expected Result:**
+  - Response has `recipient_overridden: true`; audit `EXAMINATION_EMAIL_SENT` has `recipientOverridden: true`
+- **Priority:** P1
+- **Role:** Doctor
+
+**TC-EMAIL-018: Multiple Addresses / CRLF Rejected**
+- **Steps:**
+  1. Send with `a@x.com,b@x.com` or an address containing CR/LF
+- **Expected Result:**
+  - 400 "Validation failed"; nothing is sent
+- **Priority:** P0
+- **Role:** Doctor
+
+**TC-EMAIL-019: Non-PDF and Oversized Payload Rejected**
+- **Steps:**
+  1. Send `pdf_base64` that does not decode to a PDF, then one larger than 10 MB
+- **Expected Result:**
+  - 400 "Validation failed" in both cases
+- **Priority:** P1
+- **Role:** Doctor
+
+**TC-EMAIL-020: Draft Examination Can Be Sent**
+- **Steps:**
+  1. Open a `draft` examination and send the report
+- **Expected Result:**
+  - Dialog shows a draft warning; send succeeds; audit records `examinationStatus: draft`
+  - Supersedes TC-EMAIL-005
+- **Priority:** P1
+- **Role:** Doctor
+
+**TC-EMAIL-021: *(Removed)***
+- **Note:** The per-user rate limit was dropped (decision A-08). No rate limiting is implemented on the email endpoints, so there is nothing to test. See KNOWN-ISSUES KI-013.
+
+**TC-EMAIL-022: Provider Auth Failure**
+- **Steps:**
+  1. Save a wrong app password and send (or press the test button)
+- **Expected Result:**
+  - 502 `EMAIL_AUTH_FAILED`; message tells the doctor to create a new app password
+  - No secret in the response, logs or audit entry
+- **Priority:** P0
+- **Role:** Doctor
+
+**TC-EMAIL-023: Deleting a User Removes Their Provider Row**
+- **Steps:**
+  1. Admin deletes a doctor who has saved settings
+- **Expected Result:**
+  - `EMAIL_PROVIDER/{userId}` row is gone
+- **Priority:** P1
+- **Role:** Administrator
+
+**TC-EMAIL-024: Cyrillic Content Arrives Intact**
+- **Steps:**
+  1. Send a report for a patient with a Cyrillic name and a Cyrillic custom message
+- **Expected Result:**
+  - Subject, body and attachment name display correctly (UTF-8)
+- **Priority:** P1
+- **Role:** Doctor
+
+**TC-EMAIL-025: Test-Email Button**
+- **Steps:**
+  1. On Email Settings press "Send test email"
+- **Expected Result:**
+  - 200 "Test email sent" to the doctor's own account address; failure maps to the same 502 codes and stores `lastTestStatus`
+  - 422 "No account email available" if the account has no email
 - **Priority:** P2
 - **Role:** Doctor
 

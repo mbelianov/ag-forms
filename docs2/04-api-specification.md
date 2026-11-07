@@ -14,9 +14,10 @@
 2. [Authentication Endpoints](#authentication-endpoints)
 3. [Patient Endpoints](#patient-endpoints)
 4. [Examination Endpoints](#examination-endpoints)
-5. [User Management Endpoints](#user-management-endpoints)
-6. [Audit Log Endpoints](#audit-log-endpoints)
-7. [Error Handling](#error-handling)
+5. [Email Provider Endpoints](#email-provider-endpoints)
+6. [User Management Endpoints](#user-management-endpoints)
+7. [Audit Log Endpoints](#audit-log-endpoints)
+8. [Error Handling](#error-handling)
 
 ---
 
@@ -799,9 +800,9 @@ There is therefore no `/examinations/:id/pdf` endpoint in the current API baseli
 
 ### POST /examinations/:id/email-report
 
-Send the generated examination PDF report to the patient's email address.
+Send the generated examination PDF report by email, using the **calling doctor's own mailbox** (the provider saved through the [email provider endpoints](#email-provider-endpoints)).
 
-This endpoint accepts a client-generated PDF payload and delivery metadata, validates authorization, verifies the patient email, and sends the report through the configured email provider.
+Roles: `doctor`, `admin`. Examinations in any status (`draft`, `completed`, `reviewed`) may be sent; deleted examinations return `404`. The PDF is generated in the browser and uploaded; the server validates it but cannot verify that its content matches the stored examination. Nothing (PDF, message) is persisted. The request is synchronous: it returns after the provider's SMTP server accepted or rejected the message (connect timeout 10 s, total 30 s).
 
 **Request:**
 
@@ -813,13 +814,21 @@ Content-Type: application/json
 
 ```json
 {
-  "recipient_email": "maria.ivanova@email.bg",
-  "subject": "Your ultrasound report",
-  "message": "Please find your ultrasound report attached.",
-  "file_name": "examination_770e8400_2026-06-12.pdf",
+  "recipient_email": "other.address@example.com",
+  "subject": "Examination report — Prenatal ultrasound — 2026-06-12",
+  "message": "Please find the report attached.",
+  "file_name": "MRN-maria-ivanova-2026-000001_2026-06-12.pdf",
   "pdf_base64": "<base64-encoded-pdf>"
 }
 ```
+
+| Field | Required | Rule |
+|---|---|---|
+| `recipient_email` | no | Override for this send only; never saved to the patient. Exactly one bare address (max 254); lists, whitespace, `,`, `;`, CR/LF and display-name forms are rejected. When absent, the patient's profile email is used. The web client omits the field when the doctor kept the profile address, so `recipient_overridden` is `true` only for a real override. |
+| `subject` | no | Max 200, no line breaks. Default: `Examination report — {examination type label} — {YYYY-MM-DD}` (no patient name, no MRN). |
+| `message` | no | Max 2000. Plain text. The doctor's saved footer (or the built-in default footer) is appended. |
+| `file_name` | no | Max 255, no path separators or line breaks. Default: `{mrn}_{examDate}.pdf`. |
+| `pdf_base64` | yes | Valid base64; decoded size at most 10 MB; must start with `%PDF-`. |
 
 **Response (202 Accepted):**
 
@@ -827,9 +836,10 @@ Content-Type: application/json
 {
   "success": true,
   "data": {
-    "message": "Report email accepted for delivery",
-    "recipient_email": "maria.ivanova@email.bg",
-    "delivery_status": "accepted"
+    "message": "Report accepted for delivery",
+    "recipient_email": "other.address@example.com",
+    "delivery_status": "accepted",
+    "recipient_overridden": true
   },
   "meta": {
     "timestamp": "2026-06-12T11:35:00Z",
@@ -838,12 +848,133 @@ Content-Type: application/json
 }
 ```
 
-**Errors:**
-- `400 Bad Request`: Missing or invalid email payload
-- `403 Forbidden`: User not allowed to send the report
-- `404 Not Found`: Examination or patient not found
-- `422 Unprocessable Entity`: Invalid recipient email
-- `502 Bad Gateway`: Email provider delivery failure
+`delivery_status: "accepted"` means the provider's SMTP server accepted the message. It does not guarantee inbox delivery; there is no bounce or read tracking.
+
+**Errors** (all validation happens before any SMTP connection is opened):
+
+| Status | `error.code` | Message / meaning |
+|---|---|---|
+| 400 | `ERROR` | `Validation failed`, with `error.details.errors[]` (invalid or oversize `pdf_base64`, not a PDF, bad subject/message/file name, invalid or multiple recipients). Oversize is `400`, not `413`. |
+| 401 | `ERROR` | `Authentication required` |
+| 403 | `ERROR` | `Doctor or admin role required` |
+| 404 | `ERROR` | `Examination not found` (missing or soft-deleted) or `Patient not found` |
+| 409 | `EMAIL_PROVIDER_NOT_CONFIGURED` | `Configure your email provider in your profile` — the caller has no saved provider |
+| 422 | `ERROR` | `No recipient email available` (no patient profile email and no override) |
+| 500 | `ERROR` | `Email settings are temporarily unavailable` — master key missing/malformed or the stored secret cannot be decrypted; details only in server logs |
+| 502 | `EMAIL_AUTH_FAILED` | `Your mail provider rejected the login. For Google/Yahoo use an app password` |
+| 502 | `EMAIL_CONNECTION_FAILED` | `Could not reach your mail server` (DNS, TCP, TLS, timeout, blocked host; also the default for unrecognised failures) |
+| 502 | `EMAIL_REJECTED` | `Your mail provider rejected the message` (sender, recipient, size) |
+
+Raw SMTP responses, host names and credentials are never returned to the client.
+
+**Audit:** `EXAMINATION_EMAIL_SENT` (`examinationId`, `patientId`, `examinationStatus`, `recipientEmail`, `patientProfileEmail`, `recipientOverridden`, `fromEmail`, `pdfSizeKB`, `deliveryStatus`) and `EXAMINATION_EMAIL_FAILED` (`examinationId`, `recipientEmail`, `failureCode`). Neither contains the PDF, the message or any secret.
+
+---
+
+## Email Provider Endpoints
+
+Each doctor (or admin) stores **one** SMTP connection for sending reports from their own mailbox. All four endpoints act on the **authenticated user only** (no user id in the path); roles `doctor` and `admin`, `viewer` receives `403`. Nothing the endpoints return ever contains the password or any ciphertext field.
+
+The row is stored in table `Users` with `PartitionKey = EMAIL_PROVIDER`, `RowKey = {userId}`; only the password is encrypted (see `03-security-architecture.md`, *Email provider credentials*).
+
+### GET /profile/email-provider
+
+Returns the caller's settings, or `{ "configured": false }` when nothing is saved (never `404`).
+
+```json
+{
+  "success": true,
+  "data": {
+    "configured": true,
+    "provider": "google",
+    "host": "smtp.gmail.com",
+    "port": 587,
+    "security": "starttls",
+    "username": "dr.ivanova@gmail.com",
+    "from_email": "dr.ivanova@gmail.com",
+    "from_name": "Dr. Maria Ivanova",
+    "footer": "Dr. Maria Ivanova, Clinic Name, +359 ...",
+    "secret_set": true,
+    "last_tested_at": "2026-11-07T10:00:00.000Z",
+    "last_test_status": "success",
+    "etag": "W/\"datetime'2026-11-07T10%3A00%3A00.0000000Z'\""
+  },
+  "meta": { "timestamp": "2026-11-07T10:00:01Z", "request_id": "req_..." }
+}
+```
+
+`last_tested_at` / `last_test_status` are omitted until a test was run and are cleared whenever the connection fields or the password change. `last_test_status` is `success` or an `EMAIL_*` failure code.
+
+### PUT /profile/email-provider
+
+Creates or updates the caller's settings.
+
+```json
+{
+  "provider": "google",
+  "host": "smtp.example.com",
+  "port": 587,
+  "security": "starttls",
+  "username": "dr.ivanova@gmail.com",
+  "password": "abcd efgh ijkl mnop",
+  "from_email": "dr.ivanova@gmail.com",
+  "from_name": "Dr. Maria Ivanova",
+  "footer": "Clinic Name, +359 ...",
+  "etag": "<etag from GET, required on update>"
+}
+```
+
+| Field | Rule |
+|---|---|
+| `provider` | `google`, `yahoo` or `generic` (required) |
+| `host`, `port`, `security` | For `google` / `yahoo` the server **overwrites** them with the preset (`smtp.gmail.com` / `smtp.mail.yahoo.com`, port `587`, `starttls`); client values are ignored. For `generic` all three are required: hostname without scheme/path/port, port 1–65535, `starttls` or `ssl`. |
+| Host guard (generic) | The host must not resolve to loopback, private (RFC 1918), link-local / metadata (169.254.0.0/16), carrier-grade NAT, multicast or other reserved addresses (IPv4 and IPv6). Rejected with `400` `Host is not allowed`. Re-checked at send time. |
+| `username` | 1–254 chars, no control characters |
+| `password` | Max 512. **Required on create**; on update an empty/absent value keeps the stored secret. Trimmed; for `google` internal spaces are removed (app passwords are shown with spaces). |
+| `from_email` | Valid single address, max 254; for `google` / `yahoo` it must equal `username` |
+| `from_name` | Optional, max 100, no line breaks |
+| `footer` | Optional, max 500, plain text, line breaks allowed, other control characters rejected |
+| `etag` | Required on update (ETag in the body, per project convention) |
+
+Behaviour:
+- Changing `provider`, `host`, `port`, `security` or `username` with an empty password makes the server decrypt the stored secret with the **old** values and re-encrypt it with the **new** ones in the same write. If the old secret cannot be decrypted the request fails with `400` ("Stored password cannot be reused. Please enter the password again.").
+- A secret written with the previous master key is re-encrypted with the current key on save.
+- Success returns `200` with the same body as `GET` (including the new `etag`).
+
+Errors: `400` validation (`error.details.errors[]`, or missing ETag / unusable stored password), `401`, `403`, `409` stale or invalid ETag (concurrency conflict — **not** "not configured" for this method), `500` `Email settings are temporarily unavailable` (master key missing or malformed; nothing is written).
+
+Audit: `EMAIL_PROVIDER_SAVED` (`provider`, `host`, `port`, `security`, `username`, `fromEmail`, `credentialsReplaced`).
+
+### DELETE /profile/email-provider
+
+Hard-deletes the caller's row, including the encrypted secret. Idempotent: returns `200` `{ "message": "Email provider settings removed" }` also when nothing was stored. Audit `EMAIL_PROVIDER_DELETED` (`provider`) is written only when a row existed. Deleting a user account also purges that user's row.
+
+### POST /profile/email-provider/test
+
+Sends a short test message (no attachment, no footer) from the saved settings to the caller's own account email (`User.email`; nothing is taken from the request body).
+
+Success `200`:
+
+```json
+{
+  "success": true,
+  "data": { "message": "Test email sent", "recipient_email": "dr.ivanova@gmail.com", "result": "success" },
+  "meta": { "timestamp": "2026-11-07T10:00:00Z", "request_id": "req_..." }
+}
+```
+
+The result (`lastTestedAt`, `lastTestStatus`) is persisted on the row, also for failures. Errors: `401`, `403`, `409` `EMAIL_PROVIDER_NOT_CONFIGURED`, `422` `No account email available`, `500` `Email settings are temporarily unavailable`, `502` `EMAIL_AUTH_FAILED` / `EMAIL_CONNECTION_FAILED` / `EMAIL_REJECTED` (same messages as above). Audit: `EMAIL_PROVIDER_TEST` (`result` = `success` or the failure code).
+
+### Email error codes
+
+| Code | HTTP | Meaning |
+|---|---|---|
+| `EMAIL_PROVIDER_NOT_CONFIGURED` | 409 | The caller has no saved provider (test and send) |
+| `EMAIL_AUTH_FAILED` | 502 | Provider rejected the login |
+| `EMAIL_CONNECTION_FAILED` | 502 | Cannot connect, TLS failure, timeout or blocked host |
+| `EMAIL_REJECTED` | 502 | Provider rejected the message |
+
+All other errors, including the email endpoints' `400`, `401`, `403`, `404`, `422`, `500`, use the generic `code: "ERROR"` of the shared response helper. Clients read `error.code` for the four codes above and `error.message` otherwise.
 
 ---
 
@@ -1056,9 +1187,16 @@ Cookie: session_token=<signed-token>
 | `AUTHORIZATION_ERROR` | Insufficient permissions |
 | `NOT_FOUND` | Resource not found |
 | `CONFLICT` | Resource conflict or concurrency mismatch |
-| `RATE_LIMIT_EXCEEDED` | Too many requests |
+| `RATE_LIMIT_EXCEEDED` | Too many requests (not implemented for the email endpoints, see decision A-08 in `send-by-email-req-spec.md`) |
+| `EMAIL_PROVIDER_NOT_CONFIGURED` | Sender has no email provider saved (HTTP 409) |
+| `EMAIL_AUTH_FAILED` | SMTP server rejected the login (HTTP 502) |
+| `EMAIL_CONNECTION_FAILED` | SMTP server unreachable, TLS failure or timeout (HTTP 502) |
+| `EMAIL_REJECTED` | SMTP server rejected the sender, recipient or message (HTTP 502) |
+
 | `INTERNAL_ERROR` | Server error |
 | `ACCOUNT_LOCKED` | Account temporarily locked |
+
+> Only the `EMAIL_*` codes above are emitted as specific `error.code` values by the email endpoints. All other errors use the generic code `ERROR`; rely on the HTTP status.
 
 ### Example Error Responses
 

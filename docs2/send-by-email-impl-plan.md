@@ -265,7 +265,7 @@ Make the feature deployable and keep the documentation truthful.
 - `.github/workflows/deploy-production.yml`, `deploy-preview.yml`, `README-SWA.md`
 - Spec sections 13 and 14
 
-**Status**: `[ ] pending`
+**Status**: `[x] done`
 
 ---
 
@@ -427,3 +427,15 @@ Recorded in sub-task 0. No code was changed for these; they are implemented in t
 - For `TEST-CASES.md`: TC-EMAIL-020 (draft warning) and TC-EMAIL-016 (no provider) now have automated frontend coverage in `frontend/src/reports/EmailReportButton.test.tsx`; the backend side is in `api/src/tests/integration/emailReport.test.ts`.
 - Housekeeping: `npm test` in `frontend/` rewrites `docs2/conformance-results.csv/.txt`. Restore them (`git checkout -- docs2/conformance-results.csv docs2/conformance-results.txt`) before committing in sub-task 7 unless the change is intended.
 - Known limitations unchanged: no end-to-end verification against real providers yet (sub-task 8); the 5 s auto-close after success is a UI convenience only.
+
+**From sub-task 7 (for sub-task 8):**
+- Sub-task 7 done (docs/config only; no application code changed). From `api/`: `npm run build` clean, `npm test` 23 suites / 455 tests green (Azurite running). From `frontend/`: `npm test` 11 files / 125 tests, `npm run lint`, `npm run build` green. `docs2/conformance-results.csv/.txt` restored with `git checkout`. Commit is on `feature/email`, not pushed.
+- Documentation delivered: `api/local.settings.json.example` (placeholder key entry), `README-SWA.md` (env table, key setup, "Key rotation"), `dev-workflow.md`, `docs2/04-api-specification.md` (email-report rewrite, Email Provider endpoints, `EMAIL_*` codes), `docs2/03-security-architecture.md` ("Email Provider Credentials": encryption, SSRF guard, audit actions, master-key compromise), `docs2/05-deployment-guide.md` (SWA managed functions, Node 22, real workflows, SWA application settings, email key rules), `docs2/TEST-CASES.md` (section 6 now 25 cases, total 194), `docs2/KNOWN-ISSUES.md` (KI-013 email limitations, KI-014 pre-existing `npm audit`), `docs2/EMAIL-SETUP-GUIDE.md` (new, Gmail/Yahoo app-password guide), `docs2/06-local-dev-setup.md`, `docs2/README.md`, and spec section 15 "Implementation Record and Deviations" (D-01..D-16; status line updated).
+- **Setup required before sub-task 8:**
+  1. Generate a key (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) and set `EMAIL_CREDENTIALS_ENCRYPTION_KEY` in the Azure portal (Static Web App > Environment variables) for the target environment. Keep a copy in a secret store. Without it `PUT`, `/test` and `email-report` return a generic 500 "Email settings are temporarily unavailable".
+  2. Previews (`pr-N`) share production app settings and the production storage account. Create a **dedicated test doctor account** and use **test mailboxes only**; no real doctors' secrets and no real patient data. Remove the test provider row and test patient/examination afterwards (Email Settings > Remove, or delete the test user).
+  3. Prepare two throw-away mailboxes (one Gmail, one Yahoo) with 2-step verification and an app password each (see `docs2/EMAIL-SETUP-GUIDE.md`), plus a recipient mailbox. For the Generic scenario, a public SMTP host that accepts app-password auth (private/loopback hosts are rejected by design).
+  4. Deploy the branch as a preview (`deploy-preview.yml`, PR from `feature/email`) so frontend `/email-settings` and the API are both live; the app needs `JWT_SECRET`, `AZURE_STORAGE_CONNECTION_STRING` and `ALLOWED_ORIGIN` already set (they are shared with production).
+- Scenarios to run and record in spec section 14: save settings (Google, Yahoo); Send test email (arrives in the doctor's `User.email` inbox; set a real test address on the test doctor first, otherwise 422 "No account email available"); send report with PDF attached and footer present; override recipient (response `recipient_overridden: true`, audit shows it); wrong app password (502 `EMAIL_AUTH_FAILED`, localized message, `EXAMINATION_EMAIL_FAILED` in audit); Generic host; draft examination send; a real PDF below 500 KB (and one larger, up to ~2-3 MB) through the SWA proxy to settle the NFR-04 / D-05 question (SWA may reject large bodies before the app sees them); Cyrillic patient name/message (TC-EMAIL-024); viewer gets 403 / no button.
+- Known wording nit found while documenting (not fixed, out of scope): `frontend/src/utils/emailErrors.ts` message for `EMAIL_PROVIDER_NOT_CONFIGURED` says "Configure your email provider in your profile", while the page is "Email Settings" (`/email-settings`). The docs say Email Settings. Consider changing the string in sub-task 8 if the E2E reviewer finds it confusing (update `emailErrors.test.ts` accordingly).
+- If sub-task 8 finds a failure, open an issue; do not change documented behaviour silently — update spec section 15 and the affected docs.
