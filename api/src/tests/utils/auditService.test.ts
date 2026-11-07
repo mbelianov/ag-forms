@@ -20,6 +20,7 @@ import {
     logExaminationUpdated,
     logExaminationDeleted,
     logExaminationEmailSent,
+    logExaminationEmailFailed,
     logUserCreated,
     logPasswordChanged,
     logUserDeleted,
@@ -97,7 +98,18 @@ describe('auditService', () => {
         ['logExaminationCreated', () => logExaminationCreated('user-1', 'exam-1', 'patient-1'), 'EXAMINATION_CREATED'],
         ['logExaminationUpdated', () => logExaminationUpdated('user-1', 'exam-1', ['status']), 'EXAMINATION_UPDATED'],
         ['logExaminationDeleted', () => logExaminationDeleted('user-1', 'exam-1'), 'EXAMINATION_DELETED'],
-        ['logExaminationEmailSent', () => logExaminationEmailSent('user-1', 'exam-1', 'recipient@example.com'), 'EXAMINATION_EMAIL_SENT'],
+        ['logExaminationEmailSent', () => logExaminationEmailSent('user-1', 'alice', {
+            examinationId: 'exam-1',
+            patientId: 'patient-1',
+            examinationStatus: 'completed',
+            recipientEmail: 'recipient@example.com',
+            patientProfileEmail: 'profile@example.com',
+            recipientOverridden: false,
+            fromEmail: 'doctor@gmail.com',
+            pdfSizeKB: 42,
+            deliveryStatus: 'accepted'
+        }), 'EXAMINATION_EMAIL_SENT'],
+        ['logExaminationEmailFailed', () => logExaminationEmailFailed('user-1', 'exam-1', 'recipient@example.com', 'EMAIL_AUTH_FAILED'), 'EXAMINATION_EMAIL_FAILED'],
         ['logUserCreated', () => logUserCreated('admin-1', 'user-2', 'doctor2', 'doctor'), 'USER_CREATED'],
         ['logPasswordChanged', () => logPasswordChanged('user-1', 'alice'), 'PASSWORD_CHANGED'],
         ['logUserDeleted', () => logUserDeleted('admin-1', 'user-2', 'doctor2'), 'USER_DELETED'],
@@ -169,6 +181,51 @@ describe('auditService', () => {
 
         const [, entity] = (createEntity as any).mock.calls[0];
         expect(JSON.parse(entity.details)).toEqual({ provider: 'yahoo' });
+    });
+
+    test('EXAMINATION_EMAIL_SENT records all REQ-EML-06 fields and no secret material', async () => {
+        await logExaminationEmailSent('user-1', 'dr.alice', {
+            examinationId: 'exam-99',
+            patientId: 'patient-99',
+            examinationStatus: 'draft',
+            recipientEmail: 'override@example.com',
+            patientProfileEmail: 'profile@example.com',
+            recipientOverridden: true,
+            fromEmail: 'dr.alice@gmail.com',
+            pdfSizeKB: 123,
+            deliveryStatus: 'accepted'
+        });
+
+        const [, entity] = (createEntity as any).mock.calls[0];
+        expect(entity.action).toBe('EXAMINATION_EMAIL_SENT');
+        expect(entity.userId).toBe('user-1');
+        expect(entity.username).toBe('dr.alice');
+        const details = JSON.parse(entity.details);
+        expect(details).toEqual({
+            examinationId: 'exam-99',
+            patientId: 'patient-99',
+            examinationStatus: 'draft',
+            recipientEmail: 'override@example.com',
+            patientProfileEmail: 'profile@example.com',
+            recipientOverridden: true,
+            fromEmail: 'dr.alice@gmail.com',
+            pdfSizeKB: 123,
+            deliveryStatus: 'accepted'
+        });
+    });
+
+    test('EXAMINATION_EMAIL_FAILED records only code, examId, recipient — no provider message', async () => {
+        await logExaminationEmailFailed('user-1', 'exam-42', 'patient@example.com', 'EMAIL_AUTH_FAILED');
+
+        const [, entity] = (createEntity as any).mock.calls[0];
+        expect(entity.action).toBe('EXAMINATION_EMAIL_FAILED');
+        expect(entity.userId).toBe('user-1');
+        const details = JSON.parse(entity.details);
+        expect(details).toEqual({
+            examinationId: 'exam-42',
+            recipientEmail: 'patient@example.com',
+            failureCode: 'EMAIL_AUTH_FAILED'
+        });
     });
 });
 

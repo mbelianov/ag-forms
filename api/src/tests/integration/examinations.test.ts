@@ -55,7 +55,7 @@ describe('Examinations Integration', () => {
         const response = await createExamination(request, context);
         const body = parseBody(response);
 
-        // Should succeed — examination created with MRN
+        // Should succeed ï¿½ examination created with MRN
         expect(response.status).toBe(201);
         expect(body.success).toBe(true);
         expect(body.data.examination.patientId).toBe(patient.patientId);
@@ -130,7 +130,7 @@ describe('Examinations Integration', () => {
         const response = await updateExamination(request, context);
         const body = parseBody(response);
 
-        // Should succeed — examination updated
+        // Should succeed ï¿½ examination updated
         expect(response.status).toBe(200);
         expect(body.success).toBe(true);
         expect(body.data.examination.status).toBe('completed');
@@ -161,25 +161,18 @@ describe('Examinations Integration', () => {
         expect(primaryEntity.isDeleted).toBe(true);
     });
 
-    test('should simulate email report sending', async () => {
-        const doctor = await createTestUser('doctor');
+    test('should reject unauthenticated email-report request with 401', async () => {
         const patient = await createTestPatient();
         const examination = await createTestExamination(patient.patientId);
 
         const request = mockHttpRequest('POST', {
-            pdfData: Buffer.from('fake-pdf-content').toString('base64')
-        }, {
-            cookie: `session_token=${doctor.token}`
+            pdf_base64: Buffer.from('%PDF-fake').toString('base64')
         });
         (request as any).params = { id: examination.examinationId };
         const context = mockInvocationContext();
 
         const response = await emailExaminationReport(request, context);
-        const body = parseBody(response);
-
-        expect(response.status).toBe(200);
-        expect(body.data.message).toContain('Email simulated successfully');
-        expect(body.data.details.mode).toBe('simulation');
+        expect(response.status).toBe(401);
     });
 
     test('should reject non-admin deletion', async () => {
@@ -392,7 +385,7 @@ describe('Examinations Integration', () => {
         const table = getTableClient('Examinations');
         const persisted = await table.getEntity<any>('EXAM', examination.examinationId);
 
-        // First update with valid ETag — consumes it
+        // First update with valid ETag ï¿½ consumes it
         const firstRequest = mockHttpRequest('PUT', {
             status: 'completed',
             etag: persisted.etag
@@ -403,7 +396,7 @@ describe('Examinations Integration', () => {
         const firstResponse = await updateExamination(firstRequest, mockInvocationContext());
         expect(firstResponse.status).toBe(200);
 
-        // Second update with the now-stale original ETag — expect 409
+        // Second update with the now-stale original ETag ï¿½ expect 409
         const staleRequest = mockHttpRequest('PUT', {
             status: 'reviewed',
             etag: persisted.etag

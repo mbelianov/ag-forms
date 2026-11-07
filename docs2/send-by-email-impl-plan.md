@@ -167,7 +167,7 @@ Replace the simulation in `EmailExaminationReport.ts` with real sending using th
 - `api/src/constants/examinationTypes.ts` (exam type label for the default subject)
 - `api/src/tests/integration/examinations.test.ts`
 
-**Status**: `[ ] pending`
+**Status**: `[x] done`
 
 ---
 
@@ -345,3 +345,48 @@ Recorded in sub-task 0. No code was changed for these; they are implemented in t
 - Success body of the test endpoint: `{ message: 'Test email sent', recipient_email, result: 'success' }` (200). Failures: 502 with `error.code` set; provider text, host and password never appear in the body (asserted in tests).
 - Note: `ESOCKET`/TLS/certificate/timeout errors all map to `EMAIL_CONNECTION_FAILED` by design (spec table); anything unrecognised also defaults to `EMAIL_CONNECTION_FAILED`.
 - `console.error` lines in test output come from intentional decryption-failure tests (tampered host, missing key).
+
+**From sub-task 4 (for sub-tasks 5 and 6):**
+- Sub-task 4 done: `npm run build` clean; `npm test` 23 suites / 455 tests green (Azurite running). `console.error` output in test logs comes from intentional decryption-failure tests only.
+- `api/src/functions/system/EmailExaminationReport.ts` is fully rewritten — simulation removed.
+- **Exact request contract (POST `/v1/examinations/{id}/email-report`):**
+  ```json
+  {
+    "recipient_email": "optional override address",
+    "subject":         "optional, max 200 chars",
+    "message":         "optional, max 2000 chars",
+    "file_name":       "optional attachment name, max 255 chars",
+    "pdf_base64":      "required, valid base64, ≤10 MB decoded, must start %PDF-"
+  }
+  ```
+- **Exact response on success (202):**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message":             "Report accepted for delivery",
+      "recipient_email":     "<resolved address>",
+      "delivery_status":     "accepted",
+      "recipient_overridden": true | false
+    },
+    "meta": { "timestamp": "...", "request_id": "..." }
+  }
+  ```
+- **Error codes the frontend must handle (all wrapped in `{ success: false, error: { code, message } }`):**
+  - `400` `Validation failed` (invalid/missing `pdf_base64`, oversize, non-PDF, bad subject/message, invalid/multi/CRLF recipient)
+  - `401` `Authentication required`
+  - `403` `Doctor or admin role required`
+  - `404` `Examination not found` (missing or soft-deleted)
+  - `422` `No recipient email available` (no patient profile email and no override)
+  - `409` `code: EMAIL_PROVIDER_NOT_CONFIGURED` — doctor has no saved provider; frontend shows "Go to Email Settings" link
+  - `500` `Email settings are temporarily unavailable` — master key missing/malformed; generic; no retry
+  - `502` `code: EMAIL_AUTH_FAILED` — wrong credentials / app password expired
+  - `502` `code: EMAIL_CONNECTION_FAILED` — SMTP unreachable, TLS failure, timeout
+  - `502` `code: EMAIL_REJECTED` — provider rejected the message (envelope, size, sender policy)
+- **Defaults used server-side** (the frontend should match these visually):
+  - Subject: `Examination report — {exam type label} — {YYYY-MM-DD}` (no patient name, no MRN; label from `EXAM_TYPES`)
+  - Attachment name: `{mrn}_{examDate}.pdf`
+  - Footer: doctor's saved profile footer, or `DEFAULT_EMAIL_FOOTER` ("The examination report is attached as a PDF. This message is confidential and intended only for the addressee.")
+- `logExaminationEmailSent` signature changed to `(userId, username, details: { examinationId, patientId, examinationStatus, recipientEmail, patientProfileEmail, recipientOverridden, fromEmail, pdfSizeKB, deliveryStatus })`. If any other code called the old 3-arg form, update it.
+- New `logExaminationEmailFailed(userId, examinationId, recipientEmail, failureCode)` added; the action string is `EXAMINATION_EMAIL_FAILED`.
+- New integration test file: `api/src/tests/integration/emailReport.test.ts` (23 tests, fake transport, no network).

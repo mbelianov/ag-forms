@@ -282,13 +282,55 @@ export const logExaminationDeleted = async (
  */
 export const logExaminationEmailSent = async (
     userId: string,
-    examinationId: string,
-    recipientEmail: string
+    username: string,
+    details: {
+        examinationId: string;
+        patientId: string;
+        examinationStatus: string;
+        recipientEmail: string;
+        patientProfileEmail: string | null;
+        recipientOverridden: boolean;
+        fromEmail: string;
+        pdfSizeKB: number;
+        deliveryStatus: string;
+    }
 ): Promise<void> => {
     await logAuditEvent(
         'EXAMINATION_EMAIL_SENT',
         userId,
-        { examinationId, recipientEmail }
+        {
+            examinationId: details.examinationId,
+            patientId: details.patientId,
+            examinationStatus: details.examinationStatus,
+            recipientEmail: details.recipientEmail,
+            patientProfileEmail: details.patientProfileEmail,
+            recipientOverridden: details.recipientOverridden,
+            fromEmail: details.fromEmail,
+            pdfSizeKB: details.pdfSizeKB,
+            deliveryStatus: details.deliveryStatus
+        },
+        username
+    );
+};
+
+/**
+ * Log examination email send failure (REQ-EML-06 EXAMINATION_EMAIL_FAILED).
+ * Records only the failure code — never the provider message or the secret.
+ * @param userId - User ID who attempted the send
+ * @param examinationId - Examination ID
+ * @param recipientEmail - Recipient address (may be the override; never a provider message)
+ * @param failureCode - One of the REQ-EML-05 codes
+ */
+export const logExaminationEmailFailed = async (
+    userId: string,
+    examinationId: string,
+    recipientEmail: string,
+    failureCode: string
+): Promise<void> => {
+    await logAuditEvent(
+        'EXAMINATION_EMAIL_FAILED',
+        userId,
+        { examinationId, recipientEmail, failureCode }
     );
 };
 
