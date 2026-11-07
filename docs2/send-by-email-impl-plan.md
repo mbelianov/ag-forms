@@ -195,7 +195,12 @@ Give doctors a page to manage their provider settings.
 - `frontend/src/services/api.ts`, `patientService.ts`
 - Carbon design guidance in `.bob/skills/carbon-design-system`
 
-**Status**: `[ ] pending`
+**Decisions and results (2026-11-07)**
+- Route guard: `ProtectedRoute` got an optional `allowedRoles` list (3 lines; `requiredRole` is unchanged). Chosen over an in-page guard because the route stays declarative and the redirect behaviour is the same as for admin pages. Route `/email-settings` uses `allowedRoles={['doctor', 'admin']}`.
+- New frontend test dependencies (devDependencies only, latest stable, MIT, Node 22 compatible): `jsdom@31.0.0`, `@testing-library/react@16.3.3`, `@testing-library/dom@10.4.2`. No runtime dependency added. `npm audit` total in `frontend/` is 26 both before and after (none from the new packages). Component tests opt in to jsdom per file with `// @vitest-environment jsdom`; `vite.config.ts` is unchanged, so the existing node-environment tests are not affected.
+- Route is `/email-settings` (not `/profile` from spec 1.1): the page is a single section, so no wider Profile page was built.
+
+**Status**: `[x] done`
 
 ---
 
@@ -390,3 +395,15 @@ Recorded in sub-task 0. No code was changed for these; they are implemented in t
 - `logExaminationEmailSent` signature changed to `(userId, username, details: { examinationId, patientId, examinationStatus, recipientEmail, patientProfileEmail, recipientOverridden, fromEmail, pdfSizeKB, deliveryStatus })`. If any other code called the old 3-arg form, update it.
 - New `logExaminationEmailFailed(userId, examinationId, recipientEmail, failureCode)` added; the action string is `EXAMINATION_EMAIL_FAILED`.
 - New integration test file: `api/src/tests/integration/emailReport.test.ts` (23 tests, fake transport, no network).
+**From sub-task 5 (for sub-task 6):**
+- Sub-task 5 done: from `frontend/` `npm test` 9 files / 92 tests, `npm run lint` and `npm run build` are green (the build's >500 kB chunk warning is pre-existing). Page route is `/email-settings`; menu entry "Email Settings" in `Layout.tsx` for doctor/admin only. Link target for the "Go to Email Settings" link in the report dialog: `/email-settings`.
+- **Read the provider status** with `emailProviderService.getProvider()` (`frontend/src/services/emailProviderService.ts`, envelope already unwrapped). It returns `EmailProviderSettings` (`frontend/src/types/index.ts`): `{ configured: false }` when nothing is saved, otherwise `configured`, `provider`, `host`, `port`, `security`, `username`, `from_email`, `from_name`, `footer`, `secret_set`, `last_tested_at`, `last_test_status`, `etag`. Use `from_name` / `from_email` for the read-only "From: Dr. … <address>" line (4.4) and `configured` for the not-configured state (4.3). Viewers get 403 from this endpoint; the button is already hidden for them.
+- **Read error codes** in two equivalent ways:
+  1. From a service error: `emailProviderService` errors carry `error.code` (`EMAIL_PROVIDER_NOT_CONFIGURED`, `EMAIL_AUTH_FAILED`, `EMAIL_CONNECTION_FAILED`, `EMAIL_REJECTED`, or `undefined` for generic errors) and keep the server text in `error.message`.
+  2. From any raw axios error (e.g. the examination service for `email-report`): the response interceptor in `api.ts` sets `error.apiErrorCode` (undefined for the generic `ERROR` code), and `getApiErrorCode(err)` is exported from `api.ts`. The code is deliberately **not** put on `error.code` because axios already uses that property (`ERR_CANCELED`, `ERR_NETWORK`, …); existing `error.message` handling is unchanged.
+  - Helper `getEmailErrorCode(err)` / `getEmailErrorMessage(err, fallback)` / `EMAIL_ERROR_MESSAGES` in `frontend/src/utils/emailErrors.ts` read `err.code`, `err.apiErrorCode` (raw axios error) and `err.cause.apiErrorCode` (service-wrapped error) and map the four codes to the REQ-EML-05 texts. `EmailReportButton` currently calls `api.post` directly and catches the raw axios error, so `getEmailErrorMessage(err, 'Failed to send report')` works there as is, and `error.message` of a raw axios error is still the axios text, so use the helper rather than `e.message` for coded failures.
+  - `EMAIL_PROVIDER_NOT_CONFIGURED` is HTTP 409 for both the test endpoint and `email-report`; for `PUT` a 409 means a stale ETag (`isConcurrencyConflict`), not a missing provider.
+- Other statuses for `email-report` (400 validation with `details.errors`, 404, 422 `No recipient email available`, 500 `Email settings are temporarily unavailable`) carry no REQ-EML-05 code; show `error.message` for them.
+- Shared constants: `DEFAULT_EMAIL_FOOTER` and the preset data are in `frontend/src/constants/emailProviders.ts` (not needed by the report button; the server applies the footer).
+- Test setup for component tests: put `// @vitest-environment jsdom` on the first line of the test file; `jsdom`, `@testing-library/react` and `@testing-library/dom` are installed. Carbon `TextArea` with a counter needs a `ResizeObserver` stub (`vi.stubGlobal`, see `EmailSettingsPage.test.tsx`). Mock `../contexts/AuthContext` (`useAuth`) and the service module with `vi.hoisted` + `vi.mock`. Use `cleanup()` in `afterEach` (no global setup file exists).
+- Not changed: `EmailReportButton.tsx` and the examination service still use the old contract.

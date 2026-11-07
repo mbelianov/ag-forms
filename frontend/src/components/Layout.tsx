@@ -57,6 +57,11 @@ export default function Layout({ children }: LayoutProps) {
     navigate('/change-password');
   };
 
+  const handleEmailSettings = () => {
+    setUserMenuOpen(false);
+    navigate('/email-settings');
+  };
+
   const lastLoginStr = formatLastLogin(user?.last_login);
 
   return (
@@ -121,6 +126,26 @@ export default function Layout({ children }: LayoutProps) {
                         </div>
                       )}
                     </div>
+                    {(user.role === 'doctor' || user.role === 'admin') && (
+                      <button
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          padding: '0.75rem 1rem',
+                          textAlign: 'left',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          color: '#161616',
+                        }}
+                        onClick={handleEmailSettings}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f4'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
+                      >
+                        Email Settings
+                      </button>
+                    )}
                     <button
                       style={{
                         display: 'block',
