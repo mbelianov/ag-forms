@@ -277,7 +277,7 @@ All endpoints act on the **authenticated user only**; there is no user id in the
 
 | Condition | HTTP | Code | Message shown to user |
 |---|---|---|---|
-| Provider settings missing | 409 | `EMAIL_PROVIDER_NOT_CONFIGURED` | Configure your email provider in your profile |
+| Provider settings missing | 409 | `EMAIL_PROVIDER_NOT_CONFIGURED` | Configure your email provider in Email Settings |
 | Provider rejected credentials | 502 | `EMAIL_AUTH_FAILED` | Your mail provider rejected the login. For Google/Yahoo use an app password |
 | Cannot connect / timeout / TLS failure | 502 | `EMAIL_CONNECTION_FAILED` | Could not reach your mail server |
 | Provider rejected message (size, sender, recipient) | 502 | `EMAIL_REJECTED` | Your mail provider rejected the message |

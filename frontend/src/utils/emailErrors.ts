@@ -2,7 +2,7 @@ import type { EmailErrorCode } from '../types';
 
 /** User-facing texts for the REQ-EML-05 error codes (shared by the settings page and the report dialog). */
 export const EMAIL_ERROR_MESSAGES: Record<EmailErrorCode, string> = {
-  EMAIL_PROVIDER_NOT_CONFIGURED: 'Configure your email provider in your profile',
+  EMAIL_PROVIDER_NOT_CONFIGURED: 'Configure your email provider in Email Settings',
   EMAIL_AUTH_FAILED: 'Your mail provider rejected the login. For Google/Yahoo use an app password',
   EMAIL_CONNECTION_FAILED: 'Could not reach your mail server',
   EMAIL_REJECTED: 'Your mail provider rejected the message',

@@ -238,7 +238,7 @@ describe('EmailSettingsPage', () => {
     ['EMAIL_AUTH_FAILED', 'Your mail provider rejected the login. For Google/Yahoo use an app password'],
     ['EMAIL_CONNECTION_FAILED', 'Could not reach your mail server'],
     ['EMAIL_REJECTED', 'Your mail provider rejected the message'],
-    ['EMAIL_PROVIDER_NOT_CONFIGURED', 'Configure your email provider in your profile'],
+    ['EMAIL_PROVIDER_NOT_CONFIGURED', 'Configure your email provider in Email Settings'],
   ])('maps test email error %s to a clear message', async (code, text) => {
     serviceMock.sendTestEmail.mockRejectedValue(codeError(code, 'raw server text'));
     await renderPage(configured);

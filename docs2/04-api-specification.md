@@ -858,7 +858,7 @@ Content-Type: application/json
 | 401 | `ERROR` | `Authentication required` |
 | 403 | `ERROR` | `Doctor or admin role required` |
 | 404 | `ERROR` | `Examination not found` (missing or soft-deleted) or `Patient not found` |
-| 409 | `EMAIL_PROVIDER_NOT_CONFIGURED` | `Configure your email provider in your profile` — the caller has no saved provider |
+| 409 | `EMAIL_PROVIDER_NOT_CONFIGURED` | `Configure your email provider in Email Settings` — the caller has no saved provider |
 | 422 | `ERROR` | `No recipient email available` (no patient profile email and no override) |
 | 500 | `ERROR` | `Email settings are temporarily unavailable` — master key missing/malformed or the stored secret cannot be decrypted; details only in server logs |
 | 502 | `EMAIL_AUTH_FAILED` | `Your mail provider rejected the login. For Google/Yahoo use an app password` |

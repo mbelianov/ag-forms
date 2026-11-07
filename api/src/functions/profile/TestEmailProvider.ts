@@ -63,7 +63,7 @@ export async function testEmailProvider(request: HttpRequest, context: Invocatio
         const row = await getEntity<EmailProviderSettings>(USERS_TABLE, EMAIL_PROVIDER_PARTITION, user.userId);
         if (!row) {
             return errorResponse(
-                'Configure your email provider in your profile',
+                'Configure your email provider in Email Settings',
                 409,
                 undefined,
                 'EMAIL_PROVIDER_NOT_CONFIGURED'
