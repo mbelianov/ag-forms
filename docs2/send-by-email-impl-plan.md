@@ -230,7 +230,18 @@ Make the button usable end to end with the new contract and the confirmation req
 - `frontend/src/reports/printService.ts`
 - `frontend/src/features/examinations/ExaminationDetailPage.tsx`
 
-**Status**: `[ ] pending`
+**Decisions and results (2026-11-07)**
+- New service method `examinationService.emailReport(id, body)` (`frontend/src/services/examinationService.ts`) with types `EmailReportRequest` / `EmailReportResponse` in `frontend/src/types/index.ts`. The thrown error keeps the axios error as `cause`, so `getEmailErrorMessage()` maps the REQ-EML-05 codes. `EmailReportButton` no longer imports `api` directly.
+- `ExaminationDetailPage.tsx` needed **no change**: the button still receives `examination` only and is already gated by `canEdit` (admin/doctor). The component also returns `null` for other roles (defence in depth) and loads the patient itself via `patientService.getPatient(examination.patientId)` when the dialog opens, in parallel with `emailProviderService.getProvider()`.
+- `recipient_email` is sent **only when it differs from the patient's profile email** (case-insensitive) or the patient has none. This keeps the server-side `recipientOverridden` audit flag truthful: re-typing the profile address is not an override. `message` is omitted when empty.
+- Subject default is built from `getExamTypeLabel()` and the first 10 chars of `examDate`, same format as the server. Attachment name `{mrn}_{examDate}.pdf` is sent explicitly as `file_name`.
+- Recipient validation is client-side convenience only (single address, no whitespace, `,`, `;`, `<`, `>`); the server remains authoritative.
+- Carbon `InlineNotification` throws on interactive children, so the "Go to Email Settings" link is rendered directly below the not-configured notification, not inside it. `EMAIL_PROVIDER_NOT_CONFIGURED` returned by the send call also switches the dialog to that state.
+- After success the dialog auto-closes through `useAutoNotification` (5 s, stable `closeDialog`); the primary button stays disabled meanwhile so a second send is impossible. The Modal always sets `preventCloseOnClickOutside` (Carbon warns otherwise for transactional modals); closing via Cancel/X is blocked while sending.
+- Tests: `frontend/src/reports/EmailReportButton.test.tsx` (30 tests, jsdom opt-in, services mocked). Validation from `frontend/`: `npm test` 11 files / 125 tests, `npm run lint` and `npm run build` green (the >500 kB chunk warning is pre-existing). No new dependency.
+- Side effect to know: `npm test` rewrites `docs2/conformance-results.csv/.txt` (conformance test output); they were restored with `git checkout` and are not part of this change.
+
+**Status**: `[x] done`
 
 ---
 
@@ -406,4 +417,13 @@ Recorded in sub-task 0. No code was changed for these; they are implemented in t
 - Other statuses for `email-report` (400 validation with `details.errors`, 404, 422 `No recipient email available`, 500 `Email settings are temporarily unavailable`) carry no REQ-EML-05 code; show `error.message` for them.
 - Shared constants: `DEFAULT_EMAIL_FOOTER` and the preset data are in `frontend/src/constants/emailProviders.ts` (not needed by the report button; the server applies the footer).
 - Test setup for component tests: put `// @vitest-environment jsdom` on the first line of the test file; `jsdom`, `@testing-library/react` and `@testing-library/dom` are installed. Carbon `TextArea` with a counter needs a `ResizeObserver` stub (`vi.stubGlobal`, see `EmailSettingsPage.test.tsx`). Mock `../contexts/AuthContext` (`useAuth`) and the service module with `vi.hoisted` + `vi.mock`. Use `cleanup()` in `afterEach` (no global setup file exists).
-- Not changed: `EmailReportButton.tsx` and the examination service still use the old contract.
+- Not changed: `EmailReportButton.tsx` and the examination service still use the old contract. *(Superseded: reworked in sub-task 6.)*
+
+**From sub-task 6 (for sub-task 7):**
+- Sub-task 6 done: from `frontend/` `npm test` 11 files / 125 tests, `npm run lint`, `npm run build` green; no backend or dependency change. Commit is on `feature/email`, not pushed.
+- User-facing behaviour to document (matches REQ-EML-04): "Email Report" button for admin/doctor on the examination page, enabled for all statuses; dialog loads patient + provider status; read-only "From: name <address>"; recipient pre-filled from the patient profile and editable (note "Different from the patient's email in the profile — this will be recorded in the audit log"); draft warning; button **Confirm and send** is the only action that generates the PDF and calls the API; success text "Report accepted for delivery to {address}"; not-configured state with a "Go to Email Settings" link (`/email-settings`).
+- Request body actually sent by the frontend: `{ recipient_email?, subject, message?, file_name, pdf_base64 }`. `recipient_email` is **omitted** when the recipient equals the patient's profile email (case-insensitive), so `recipient_overridden` / `recipientOverridden` in the audit is `true` only for a real override. Worth stating in `04-api-specification.md` (the field is optional) and in the audit description.
+- Error texts shown (from `frontend/src/utils/emailErrors.ts`): the four REQ-EML-05 messages for the codes; for 400/404/422/500 without a code the server `error.message` is shown (e.g. "No recipient email available", "Email settings are temporarily unavailable").
+- For `TEST-CASES.md`: TC-EMAIL-020 (draft warning) and TC-EMAIL-016 (no provider) now have automated frontend coverage in `frontend/src/reports/EmailReportButton.test.tsx`; the backend side is in `api/src/tests/integration/emailReport.test.ts`.
+- Housekeeping: `npm test` in `frontend/` rewrites `docs2/conformance-results.csv/.txt`. Restore them (`git checkout -- docs2/conformance-results.csv docs2/conformance-results.txt`) before committing in sub-task 7 unless the change is intended.
+- Known limitations unchanged: no end-to-end verification against real providers yet (sub-task 8); the 5 s auto-close after success is a UI convenience only.

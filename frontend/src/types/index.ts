@@ -290,4 +290,22 @@ export interface EmailProviderTestResult {
   result: string;
 }
 
+/** POST /v1/examinations/{id}/email-report body (REQ-EML-03 3.2). */
+export interface EmailReportRequest {
+  /** Override address; omit to let the server use the patient's profile email. */
+  recipient_email?: string;
+  subject: string;
+  message?: string;
+  file_name: string;
+  pdf_base64: string;
+}
+
+/** POST /v1/examinations/{id}/email-report 202 payload. */
+export interface EmailReportResponse {
+  message: string;
+  recipient_email: string;
+  delivery_status: 'accepted';
+  recipient_overridden: boolean;
+}
+
 // Made with Bob
