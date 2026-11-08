@@ -18,7 +18,10 @@
 | **[06-local-dev-setup.md](06-local-dev-setup.md)** | Step-by-step local development environment setup (Node.js, Azure Functions Core Tools, Azurite) |
 | **[REQUIREMENTS.md](REQUIREMENTS.md)** | Consolidated requirements: all REQ, FLAG, DR1–DR4, and FR items with current implementation status and one-paragraph summaries |
 | **[KNOWN-ISSUES.md](KNOWN-ISSUES.md)** | Confirmed bugs deferred for later resolution, with current status (updated from code review) |
-| **[TEST-CASES.md](TEST-CASES.md)** | 180 manual test cases covering authentication, patient management, examination management, search, PDF generation, email delivery, security, and edge cases |
+| **[TEST-CASES.md](TEST-CASES.md)** | 194 manual test cases covering authentication, patient management, examination management, search, PDF generation, email delivery, security, and edge cases |
+| **[EMAIL-SETUP-GUIDE.md](EMAIL-SETUP-GUIDE.md)** | User guide for sending reports by email: Gmail/Yahoo app passwords, Email Settings page, troubleshooting |
+| **[send-by-email-req-spec.md](send-by-email-req-spec.md)** / **[send-by-email-impl-plan.md](send-by-email-impl-plan.md)** | Requirements specification (with implementation record) and implementation plan for the send-examination-by-email feature |
+
 
 ---
 

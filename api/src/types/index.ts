@@ -302,4 +302,103 @@ export interface AuthResult {
     message?: string;
 }
 
+// ── Email Provider & Sending Types ──────────────────────────────────────────
+
+export type EmailProviderType = 'google' | 'yahoo' | 'generic';
+export type EmailSecurityMode = 'starttls' | 'ssl';
+
+/**
+ * Email provider settings entity
+ * PartitionKey: "EMAIL_PROVIDER"
+ * RowKey: userId (UUID)
+ */
+export interface EmailProviderSettings extends BaseEntity {
+    provider: EmailProviderType;
+    host: string;
+    port: number;
+    security: EmailSecurityMode;
+    username: string;
+    fromEmail: string;
+    fromName?: string;
+    footer?: string;
+    secretCiphertext: string;
+    secretIv: string;
+    secretAuthTag: string;
+    secretSalt: string;
+    keyVersion: number;
+    lastTestedAt?: string;
+    lastTestStatus?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+/**
+ * Public response DTO for GET /v1/profile/email-provider
+ * Secret/ciphertext is never included.
+ */
+export interface EmailProviderDto {
+    configured: boolean;
+    provider?: EmailProviderType;
+    host?: string;
+    port?: number;
+    security?: EmailSecurityMode;
+    username?: string;
+    from_email?: string;
+    from_name?: string;
+    footer?: string;
+    secret_set?: boolean;
+    last_tested_at?: string;
+    last_test_status?: string;
+    etag?: string;
+}
+
+/**
+ * Request body for PUT /v1/profile/email-provider
+ */
+export interface EmailProviderUpdateRequest {
+    provider: EmailProviderType;
+    host?: string;
+    port?: number;
+    security?: EmailSecurityMode;
+    username: string;
+    password?: string;
+    from_email: string;
+    from_name?: string;
+    footer?: string;
+    etag?: string;
+}
+
+/**
+ * Request body for POST /v1/examinations/{id}/email-report
+ */
+export interface EmailReportRequest {
+    recipient_email?: string;
+    subject?: string;
+    message?: string;
+    file_name?: string;
+    pdf_base64: string;
+}
+
+/**
+ * Response body for POST /v1/examinations/{id}/email-report (202 Accepted)
+ */
+export interface EmailReportResponse {
+    message: string;
+    recipient_email: string;
+    delivery_status: 'accepted';
+    recipient_overridden: boolean;
+}
+
+/**
+ * Provider preset configuration definition
+ */
+export interface EmailProviderPreset {
+    id: EmailProviderType;
+    label: string;
+    host: string;
+    port: number;
+    security: EmailSecurityMode;
+    isLocked: boolean;
+}
+
 // Made with Bob

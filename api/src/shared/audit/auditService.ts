@@ -282,13 +282,55 @@ export const logExaminationDeleted = async (
  */
 export const logExaminationEmailSent = async (
     userId: string,
-    examinationId: string,
-    recipientEmail: string
+    username: string,
+    details: {
+        examinationId: string;
+        patientId: string;
+        examinationStatus: string;
+        recipientEmail: string;
+        patientProfileEmail: string | null;
+        recipientOverridden: boolean;
+        fromEmail: string;
+        pdfSizeKB: number;
+        deliveryStatus: string;
+    }
 ): Promise<void> => {
     await logAuditEvent(
         'EXAMINATION_EMAIL_SENT',
         userId,
-        { examinationId, recipientEmail }
+        {
+            examinationId: details.examinationId,
+            patientId: details.patientId,
+            examinationStatus: details.examinationStatus,
+            recipientEmail: details.recipientEmail,
+            patientProfileEmail: details.patientProfileEmail,
+            recipientOverridden: details.recipientOverridden,
+            fromEmail: details.fromEmail,
+            pdfSizeKB: details.pdfSizeKB,
+            deliveryStatus: details.deliveryStatus
+        },
+        username
+    );
+};
+
+/**
+ * Log examination email send failure (REQ-EML-06 EXAMINATION_EMAIL_FAILED).
+ * Records only the failure code — never the provider message or the secret.
+ * @param userId - User ID who attempted the send
+ * @param examinationId - Examination ID
+ * @param recipientEmail - Recipient address (may be the override; never a provider message)
+ * @param failureCode - One of the REQ-EML-05 codes
+ */
+export const logExaminationEmailFailed = async (
+    userId: string,
+    examinationId: string,
+    recipientEmail: string,
+    failureCode: string
+): Promise<void> => {
+    await logAuditEvent(
+        'EXAMINATION_EMAIL_FAILED',
+        userId,
+        { examinationId, recipientEmail, failureCode }
     );
 };
 
@@ -382,6 +424,81 @@ export const logPasswordResetByAdmin = async (
         'PASSWORD_RESET_BY_ADMIN',
         performedByUserId,
         { targetUserId, targetUsername }
+    );
+};
+
+/**
+ * Log email provider settings saved (created or updated).
+ * Never receives the password or any ciphertext. `credentialsReplaced` is used instead of
+ * `secretChanged` because the sanitizer redacts keys containing "secret" (DEC-02).
+ * @param userId - Owner of the settings
+ * @param username - Username (optional, for readability)
+ * @param details - Non-secret connection metadata
+ */
+export const logEmailProviderSaved = async (
+    userId: string,
+    username: string,
+    details: {
+        provider: string;
+        host: string;
+        port: number;
+        security: string;
+        username: string;
+        fromEmail: string;
+        credentialsReplaced: boolean;
+    }
+): Promise<void> => {
+    await logAuditEvent(
+        'EMAIL_PROVIDER_SAVED',
+        userId,
+        {
+            provider: details.provider,
+            host: details.host,
+            port: details.port,
+            security: details.security,
+            username: details.username,
+            fromEmail: details.fromEmail,
+            credentialsReplaced: details.credentialsReplaced
+        },
+        username
+    );
+};
+
+/**
+ * Log email provider settings deleted
+ * @param userId - Owner of the settings
+ * @param username - Username (optional, for readability)
+ * @param provider - Provider type that was removed
+ */
+export const logEmailProviderDeleted = async (
+    userId: string,
+    username: string,
+    provider: string
+): Promise<void> => {
+    await logAuditEvent(
+        'EMAIL_PROVIDER_DELETED',
+        userId,
+        { provider },
+        username
+    );
+};
+
+/**
+ * Log an email provider test (REQ-EML-06)
+ * @param userId - Owner of the settings
+ * @param username - Username (optional, for readability)
+ * @param result - 'success' or the mapped failure code (never a provider message)
+ */
+export const logEmailProviderTest = async (
+    userId: string,
+    username: string,
+    result: string
+): Promise<void> => {
+    await logAuditEvent(
+        'EMAIL_PROVIDER_TEST',
+        userId,
+        { result },
+        username
     );
 };
 

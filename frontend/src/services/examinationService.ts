@@ -1,9 +1,11 @@
 import api from './api';
-import type { 
-  Examination, 
-  CreateExaminationRequest, 
-  UpdateExaminationRequest, 
-  ExaminationsListResponse 
+import type {
+  Examination,
+  CreateExaminationRequest,
+  UpdateExaminationRequest,
+  ExaminationsListResponse,
+  EmailReportRequest,
+  EmailReportResponse
 } from '../types';
 
 export interface GetExaminationsOptions {
@@ -169,6 +171,25 @@ class ExaminationService {
       await api.delete(`${this.EXAMINATIONS_BASE_URL}/${id}`);
     } catch (err) {
       throw new Error(extractMessage(err, 'Failed to delete examination'), { cause: err });
+    }
+  }
+
+  /**
+   * Email the examination PDF to a recipient through the caller's own mail provider.
+   * On failure the thrown error keeps the axios error as `cause`, so
+   * `getEmailErrorMessage()` can map the REQ-EML-05 codes (EMAIL_AUTH_FAILED, ...).
+   * @param id - Examination ID
+   * @param data - Request body per REQ-EML-03 3.2
+   */
+  async emailReport(id: string, data: EmailReportRequest): Promise<EmailReportResponse> {
+    try {
+      const response = await api.post<EmailReportResponse>(
+        `${this.EXAMINATIONS_BASE_URL}/${id}/email-report`,
+        data
+      );
+      return response.data;
+    } catch (err) {
+      throw new Error(extractMessage(err, 'Failed to send report'), { cause: err });
     }
   }
 

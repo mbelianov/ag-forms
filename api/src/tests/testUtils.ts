@@ -266,6 +266,9 @@ export async function cleanupTestData(): Promise<void> {
         for await (const entity of usersTable.listEntities({ queryOptions: { filter: `PartitionKey eq 'USERNAME'` } })) {
             try { await usersTable.deleteEntity('USERNAME', entity.rowKey as string, { etag: '*' }); } catch {}
         }
+        for await (const entity of usersTable.listEntities({ queryOptions: { filter: `PartitionKey eq 'EMAIL_PROVIDER'` } })) {
+            try { await usersTable.deleteEntity('EMAIL_PROVIDER', entity.rowKey as string, { etag: '*' }); } catch {}
+        }
     } catch {}
 
     // Full sweep of PATIENT partition to catch any untracked patients

@@ -15,6 +15,7 @@ import CreateExaminationPage from './features/examinations/CreateExaminationPage
 import ExaminationDetailPage from './features/examinations/ExaminationDetailPage';
 import EditExaminationPage from './features/examinations/EditExaminationPage';
 import ChangePasswordPage from './features/auth/ChangePasswordPage';
+import EmailSettingsPage from './features/profile/EmailSettingsPage';
 import UsersPage from './features/users/UsersPage';
 import CreateUserPage from './features/users/CreateUserPage';
 import EditUserPage from './features/users/EditUserPage';
@@ -118,6 +119,15 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <ChangePasswordPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* Email provider settings — doctor and admin only (REQ-EML-01) */}
+        <Route
+          path="/email-settings"
+          element={
+            <ProtectedRoute allowedRoles={['doctor', 'admin']}>
+              <EmailSettingsPage />
             </ProtectedRoute>
           }
         />

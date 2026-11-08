@@ -3,18 +3,23 @@ import type { ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Loading } from '@carbon/react';
 
+type Role = 'admin' | 'doctor' | 'viewer';
+
 interface ProtectedRouteProps {
   children: ReactNode;
-  requiredRole?: 'admin' | 'doctor' | 'viewer';
+  requiredRole?: Role;
+  /** Any one of these roles may enter (e.g. ['doctor', 'admin']). */
+  allowedRoles?: Role[];
 }
 
 /**
  * Protected Route component that checks authentication status and optional role.
  * Redirects to login if not authenticated.
- * Redirects to dashboard if authenticated but role doesn't match.
+ * Redirects to dashboard if authenticated but role doesn't match
+ * `requiredRole` (single role) or `allowedRoles` (any of a list).
  * Shows loading state while checking authentication.
  */
-export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+export default function ProtectedRoute({ children, requiredRole, allowedRoles }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading, user } = useAuth();
 
   // Show loading state while checking authentication
@@ -40,6 +45,9 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
   // Redirect to dashboard if role requirement not met
   if (requiredRole && user?.role !== requiredRole) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  if (allowedRoles && (!user || !allowedRoles.includes(user.role))) {
     return <Navigate to="/dashboard" replace />;
   }
 

@@ -241,4 +241,71 @@ export interface LoginResponse {
   token: string;
 }
 
+// Email provider types (mirror api/src/types/index.ts; REQ-EML-02)
+export type EmailProviderType = 'google' | 'yahoo' | 'generic';
+export type EmailSecurityMode = 'starttls' | 'ssl';
+
+/** Error codes returned in error.code by the email endpoints (REQ-EML-05). */
+export type EmailErrorCode =
+  | 'EMAIL_PROVIDER_NOT_CONFIGURED'
+  | 'EMAIL_AUTH_FAILED'
+  | 'EMAIL_CONNECTION_FAILED'
+  | 'EMAIL_REJECTED';
+
+/** GET /v1/profile/email-provider — the password or ciphertext is never returned. */
+export interface EmailProviderSettings {
+  configured: boolean;
+  provider?: EmailProviderType;
+  host?: string;
+  port?: number;
+  security?: EmailSecurityMode;
+  username?: string;
+  from_email?: string;
+  from_name?: string;
+  footer?: string;
+  secret_set?: boolean;
+  last_tested_at?: string;
+  last_test_status?: string;
+  etag?: string;
+}
+
+/** PUT /v1/profile/email-provider body; the ETag travels in the body. */
+export interface SaveEmailProviderRequest {
+  provider: EmailProviderType;
+  host?: string;
+  port?: number;
+  security?: EmailSecurityMode;
+  username: string;
+  password?: string;
+  from_email: string;
+  from_name?: string;
+  footer?: string;
+  etag?: string;
+}
+
+/** POST /v1/profile/email-provider/test success payload. */
+export interface EmailProviderTestResult {
+  message: string;
+  recipient_email: string;
+  result: string;
+}
+
+/** POST /v1/examinations/{id}/email-report body (REQ-EML-03 3.2). */
+export interface EmailReportRequest {
+  /** Override address; omit to let the server use the patient's profile email. */
+  recipient_email?: string;
+  subject: string;
+  message?: string;
+  file_name: string;
+  pdf_base64: string;
+}
+
+/** POST /v1/examinations/{id}/email-report 202 payload. */
+export interface EmailReportResponse {
+  message: string;
+  recipient_email: string;
+  delivery_status: 'accepted';
+  recipient_overridden: boolean;
+}
+
 // Made with Bob

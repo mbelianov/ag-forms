@@ -100,6 +100,16 @@ Create `api/local.settings.json` for local development configuration:
 }
 ```
 
+To use the **send-by-email** feature locally, copy `api/local.settings.json.example` instead (it lists every variable) and add `JWT_SECRET` and `EMAIL_CREDENTIALS_ENCRYPTION_KEY`. Generate a fresh 64-hex-character key for the second one:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Without `EMAIL_CREDENTIALS_ENCRYPTION_KEY` the Email Settings page cannot save or test a provider (the API fails closed with a 500). Never reuse a production key locally. See `README-SWA.md` and `EMAIL-SETUP-GUIDE.md`.
+
+
+
 **Security Note**: `local.settings.json` should be in `.gitignore` (already configured).
 
 ## Step 6: Start Azurite Storage Emulator

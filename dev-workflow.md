@@ -208,3 +208,7 @@ git push origin hotfix/describe-the-fix
 
 `api/local.settings.json` is git-ignored — never commit it.
 Copy `api/local.settings.json.example` to get started locally.
+
+Generate the email encryption key with
+`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Generation, rotation and
+the "set it in the Azure portal before release" rule are described in [`README-SWA.md`](README-SWA.md#email-encryption-key-email_credentials_encryption_key).

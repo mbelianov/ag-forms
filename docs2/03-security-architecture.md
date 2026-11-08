@@ -318,12 +318,12 @@ Error responses must remain generic and must not disclose internal authorization
 
 Azure Storage provides encryption at rest by default. The design requires:
 - Azure Storage encryption enabled
-- Key material protected in Azure Function App environment settings
+- Key material protected in Azure Static Web Apps application settings (the API runs as SWA managed functions)
 - Customer-managed keys considered if compliance requires them
 - Tables and any supporting storage resources restricted to authorized identities only
 
 Sensitive data handling rules:
-- Do not store secrets in Azure Tables
+- Do not store secrets in Azure Tables, **with one documented exception**: the doctor's email app password, stored only as AES-256-GCM ciphertext (see [Email Provider Credentials](#email-provider-credentials))
 - Do not store plaintext passwords
 - Do not store unnecessary PII in logs
 - Store only required medical and operational data
@@ -345,18 +345,58 @@ Non-compliant patterns:
 
 ### Secrets Management
 
-All secrets must be stored in protected Azure Function App environment settings or equivalent secure Azure-managed application configuration.
+All secrets must be stored in protected Azure Static Web Apps application settings (the API runs as SWA managed functions) or equivalent secure Azure-managed application configuration.
 
 Examples of secrets:
-- Token signing keys
+- Token signing keys (`JWT_SECRET`)
 - Storage connection settings if managed identity is unavailable
-- SMTP credentials or transactional email provider credentials for report delivery
+- The email credential master key (`EMAIL_CREDENTIALS_ENCRYPTION_KEY` and optional `_PREVIOUS`). Per-doctor SMTP/app passwords are **not** application settings; they are stored encrypted per user (see [Email Provider Credentials](#email-provider-credentials))
 - Encryption configuration
+
+Pull-request preview environments share the production application settings and storage, so a secret set for production is also reachable from previews.
 
 Preferred access pattern:
 - Azure Functions use **managed identity**
 - Managed identity is granted access to Storage
 - Secrets are injected securely through platform-managed application settings
+
+### Email Provider Credentials
+
+The "send examination by email" feature lets each doctor or admin send reports from their **own** mailbox (Gmail, Yahoo or a Generic SMTP server). The SMTP credential (preferably a provider app password) therefore has to be kept by the application. Design:
+
+**Storage.** One row per user in the `Users` table: `PartitionKey = EMAIL_PROVIDER`, `RowKey = {userId}`. The row holds provider, host, port, security, username, from-name, footer, the encrypted secret (ciphertext, IV, salt, auth tag), `keyVersion`, and `lastTestedAt` / `lastTestStatus`. The user's own account password is never involved. The row is removed when the user is deleted (`DeleteUser`, non-fatal on error).
+
+**Encryption.**
+- Algorithm: AES-256-GCM with a fresh random 16-byte salt and 12-byte IV on every save.
+- Per-save key: HKDF derived from the master key, salt and the info string `email-provider-secret|v{keyVersion}|{userId}`.
+- AAD (authenticated, not encrypted): canonical JSON of `host`, `port`, `provider`, `security`, `userId` and `username`. Copying a row to another user, or editing any of those fields in storage, makes decryption fail before any SMTP connection is attempted.
+- Master key: environment variable `EMAIL_CREDENTIALS_ENCRYPTION_KEY`, 64 hex characters (32 bytes), set in the SWA application settings. **No fallback value exists.** If it is missing or malformed, saving, testing and sending fail closed with a generic 500 and nothing is encrypted or sent. `GET` and `DELETE` of provider settings do not need the key.
+- Rotation: optional `EMAIL_CREDENTIALS_ENCRYPTION_KEY_PREVIOUS`. Decryption tries the current key, then the previous key; a row that only the previous key opens is re-encrypted with the current key after a successful save, test or send. `keyVersion` (currently `1`) is stored per row and is part of the HKDF info string; it is **not** a selector between master keys. Procedure: `README-SWA.md`, "Key rotation".
+- Write-only secret: the API never returns the password or ciphertext (`secret_set: true/false` only). An empty password on update keeps the stored secret, re-encrypted when connection fields change.
+
+**Master-key compromise.** The master key lives in application settings next to `JWT_SECRET`, so anyone who can read both the settings and the `Users` table can decrypt every stored app password. Mitigations: restrict Azure portal access, rotate the key (and ask doctors to revoke and re-create app passwords if compromise is suspected), and prefer provider app passwords, which can be revoked without changing the mailbox password. A Key Vault or HSM-backed design is out of scope for this release.
+
+**Outbound connection guard (SSRF).**
+- Presets (Google, Yahoo) are fixed on the server: submitted host/port are ignored.
+- Generic hosts are rejected on save (400 "Host is not allowed") and resolved again at send time; the connection goes to the resolved IP with `tls.servername` set to the hostname, so DNS changes between check and use cannot redirect traffic.
+- Blocked IPv4: `0/8`, `10/8`, `100.64/10`, `127/8`, `169.254/16` (cloud metadata), `172.16/12`, `192.0.0/24`, `192.0.2/24`, `192.168/16`, `198.18/15`, `198.51.100/24`, `203.0.113/24`, multicast and reserved ranges.
+- Blocked IPv6: `::1`, `::`, IPv4-mapped private addresses, `fe80::/10`, `fc00::/7`, `ff00::/8`, `100::/64`, `2001:db8::/32`.
+
+**Transport.** STARTTLS (`requireTLS`) or implicit TLS (`secure`), minimum TLS 1.2, certificate validation always on (`rejectUnauthorized: true`). Connect timeout 10 s, socket timeout 30 s, overall hard timeout 30 s. SMTP errors are mapped to `EMAIL_AUTH_FAILED`, `EMAIL_CONNECTION_FAILED` or `EMAIL_REJECTED`; raw SMTP responses are never returned to the client.
+
+**Input validation.** Recipient must be a single valid address (no comma lists, no CR/LF); the attachment must be a PDF of at most 10 MB; single-line fields (from-name, subject) reject CR/LF and all free-text fields are length-limited. Only `doctor` and `admin` roles may call the email endpoints (viewer receives 403), and every endpoint operates only on the caller's own provider row (there is no user id parameter).
+
+**Audit actions.**
+
+| Action | Written when | Notable fields |
+|--------|--------------|----------------|
+| `EMAIL_PROVIDER_SAVED` | Settings saved | provider, host, port, security, `credentialsReplaced` (no secret) |
+| `EMAIL_PROVIDER_DELETED` | Settings deleted and a row existed | - |
+| `EMAIL_PROVIDER_TEST` | Test email attempted | `result` |
+| `EXAMINATION_EMAIL_SENT` | SMTP server accepted the message | examinationId, recipientEmail, `recipientOverridden`, `examinationStatus` |
+| `EXAMINATION_EMAIL_FAILED` | Send failed after provider resolution | examinationId, recipientEmail, `failureCode` |
+
+Passwords, ciphertext and master keys are never written to audit entries or logs. The audit sanitizer lowercases keys and checks them against its blocked-field list; the list contains mixed-case entries (for example `passwordHash`) that therefore never match, so the new events deliberately use field names that avoid any blocked substring (hence `credentialsReplaced`, not `secretReplaced`). Do not rely on the sanitizer as the only defence.
 
 ### Managed Identity
 
@@ -482,6 +522,8 @@ Implementation options:
 - Azure Front Door or WAF rate limiting
 - Function-level throttling logic
 - Storage-backed counters for abuse detection
+
+Implemented today: login lockout only (5 failed attempts, 30 minutes, stored on the `USER` entity). The email endpoints (`email-report`, provider `test`) have **no** rate limit and no per-request size cap beyond the 10 MB PDF validation (decision A-08 in `send-by-email-req-spec.md`; see KNOWN-ISSUES KI-013). Abuse is bounded only by the authenticated doctor/admin role requirement, the provider's own sending limits and the audit trail.
 
 ### Security Headers
 

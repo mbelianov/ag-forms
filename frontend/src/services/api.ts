@@ -20,6 +20,21 @@ api.interceptors.request.use(
   }
 );
 
+/**
+ * Read the machine-readable code (error.code in the backend envelope, e.g. EMAIL_AUTH_FAILED)
+ * from a failed request. Returns undefined for the generic 'ERROR' code.
+ * Not stored on error.code itself: axios already uses that property (e.g. ERR_CANCELED).
+ */
+export function getApiErrorCode(err: unknown): string | undefined {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const e = (err as { response?: { data?: { error?: { code?: unknown } | string } } }).response?.data?.error;
+    if (e && typeof e === 'object' && typeof e.code === 'string' && e.code !== 'ERROR') {
+      return e.code;
+    }
+  }
+  return undefined;
+}
+
 // Response interceptor — unwrap the backend's { success, data, meta } envelope
 // so every service reads response.data and gets the inner payload directly.
 api.interceptors.response.use(
@@ -31,6 +46,9 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Expose the backend error code to callers as error.apiErrorCode (error.message is untouched)
+    error.apiErrorCode = getApiErrorCode(error);
+
     // Handle common errors
     if (error.response?.status === 401) {
       // Unauthorized - redirect to login

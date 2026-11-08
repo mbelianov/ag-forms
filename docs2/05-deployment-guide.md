@@ -37,7 +37,7 @@
 │  └───────────────────────┬──────────────────────────────────────┘  │
 │                          │ HTTPS/TLS 1.2+                          │
 │  ┌───────────────────────▼──────────────────────────────────────┐  │
-│  │ Azure Functions                                              │  │
+│  │ SWA managed functions (api_location: api)                    │  │
 │  │ - HTTP-triggered API endpoints                               │  │
 │  │ - On-demand PDF rendering                                    │  │
 │  │ - Scheduled maintenance functions                            │  │
@@ -50,7 +50,7 @@
 │                                                                    │
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │ Supporting Services                                          │  │
-│  │ - Protected Function App environment settings                │  │
+│  │ - SWA application settings (secrets)                         │  │
 │  │ - Application Insights                                       │  │
 │  │ - Azure Monitor Alerts                                       │  │
 │  │ - Optional Azure Front Door + WAF                            │  │
@@ -72,7 +72,7 @@
 - Separate environments by resource group and configuration
 - Use infrastructure as code for repeatable provisioning
 - Use managed identities instead of embedded credentials
-- Keep backend secrets in protected Azure Function App environment settings
+- Keep backend secrets in Azure Static Web Apps application settings (the API runs as SWA managed functions)
 - Keep document rendering in the client when server-side persistence or compliance controls are not required
 
 ---
@@ -88,9 +88,9 @@
 - **Storage:** Managed static asset hosting
 
 #### Backend API
-- **Platform:** Azure Functions
-- **Runtime:** Node.js 20.x LTS
-- **Plan:** Consumption Plan or Premium Plan depending on latency and scaling requirements
+- **Platform:** Azure Static Web Apps managed functions (`api_location: api`); no separate Function App is provisioned
+- **Runtime:** Node.js 22 (as set in the GitHub Actions workflows)
+- **Plan:** Included in the Static Web Apps plan (the free tier is in use)
 - **Scaling:** Automatic platform scaling
 - **Execution Model:** HTTP triggers for CRUD and calculations, plus scheduled maintenance functions
 
@@ -104,9 +104,9 @@
 | Resource | Purpose |
 |----------|---------|
 | Azure Static Web App | Frontend hosting |
-| Azure Function App | API, authentication, validation, and calculations |
+| SWA managed functions (part of the Static Web App) | API, authentication, validation, and calculations |
 | Azure Storage Account | Tables |
-| Azure Function App environment settings | Protected backend secrets and signing keys |
+| SWA application settings | Protected backend secrets, signing keys and the email credential master key |
 | Application Insights | Telemetry and tracing |
 | Log Analytics Workspace | Centralized operational analysis |
 | Azure Monitor Alerts | Alerting |
@@ -140,7 +140,7 @@ Example naming pattern:
 
 ```text
 swa-ultrasound-prod
-func-ultrasound-prod
+(no separate Function App: the API is deployed with the Static Web App)
 stultrasoundprod
 kv-ultrasound-prod
 appi-ultrasound-prod
@@ -148,19 +148,20 @@ law-ultrasound-prod
 afd-ultrasound-prod
 ```
 
-### Function App Structure
+### API (Managed Functions) Structure
 
-The Function App hosts:
+The SWA managed functions host:
 - Authentication endpoints
 - Patient endpoints
 - Examination endpoints
 - User management endpoints
 - Audit log endpoints
+- Email provider settings and examination email delivery endpoints (`/v1/profile/email-provider*`, `/v1/examinations/{id}/email-report`)
 - Scheduled maintenance functions for cleanup and retention
 
 ### Managed Identity Configuration
 
-The Function App must use a system-assigned or user-assigned managed identity.
+Managed functions in Static Web Apps do not offer a managed identity for the storage connection; the API uses `AZURE_STORAGE_CONNECTION_STRING` from the SWA application settings (treat it as a secret). The guidance below applies only if the API is ever moved to a standalone Function App.
 
 Required permissions:
 - Storage Table Data Contributor
@@ -197,7 +198,7 @@ Recommended tables:
 ### Storage Security
 
 Required controls:
-- Use managed identity for Function App access
+- Use RBAC and a protected connection string (managed identity applies only to a standalone Function App; the current deployment reads the connection string from SWA application settings)
 - Restrict access using RBAC
 - Enable encryption at rest
 
@@ -207,7 +208,7 @@ Initial setup tasks:
 1. Provision storage account
 2. Create required tables
 3. Seed initial admin user through a controlled bootstrap process
-4. Store signing keys and secrets in protected Azure Function App environment settings
+4. Store signing keys and secrets in SWA application settings
 
 ### Bootstrap Admin User
 
@@ -226,7 +227,7 @@ No plaintext password should be committed to source control or documentation.
 
 ### Environment Variables
 
-#### Azure Functions
+#### API application settings (SWA managed functions)
 
 ```text
 NODE_ENV=production
@@ -240,11 +241,17 @@ TABLES_PATIENTS=Patients
 TABLES_EXAMINATIONS=Examinations
 TABLES_AUDIT_LOGS=AuditLogs
 
+JWT_SECRET=<generate-with-node-crypto-randomBytes-64>
+AZURE_STORAGE_CONNECTION_STRING=<storage-connection-string>
+ALLOWED_ORIGIN=https://<your-swa-hostname>
+
+# Send-by-email (see README-SWA.md). Must be set before release; no fallback, fails closed.
+EMAIL_CREDENTIALS_ENCRYPTION_KEY=<64-hex-chars-generate-with-node-crypto-randomBytes-32>
+# Optional, only during key rotation:
+# EMAIL_CREDENTIALS_ENCRYPTION_KEY_PREVIOUS=<old-64-hex-key>
 
 TOKEN_EXPIRATION_HOURS=8
 PASSWORD_HASH_ALGORITHM=argon2id
-RATE_LIMIT_WINDOW_SECONDS=900
-RATE_LIMIT_MAX=100
 
 APPLICATIONINSIGHTS_CONNECTION_STRING=<provided-by-platform-or-secure-config>
 ```
@@ -263,14 +270,24 @@ VITE_ENABLE_DEBUG=false
 
 Secrets must not be stored in source control.
 
-Store in protected Azure Function App environment settings:
-- Token signing key
-- SMTP or transactional email provider credentials for report delivery
+Store in the Azure portal under Static Web App > Settings > Environment variables (application settings):
+- Token signing key (`JWT_SECRET`)
+- Storage connection string (`AZURE_STORAGE_CONNECTION_STRING`)
+- **Email credential master key** (`EMAIL_CREDENTIALS_ENCRYPTION_KEY`, optional `EMAIL_CREDENTIALS_ENCRYPTION_KEY_PREVIOUS` during rotation)
 - Any third-party integration secrets
-- Any fallback storage connection secrets if managed identity is unavailable
+
+Per-doctor SMTP credentials (Gmail/Yahoo app passwords) are **not** application settings: each doctor enters them on the Email Settings page and they are stored encrypted with the master key above (see `03-security-architecture.md`).
+
+Email key rules:
+- Generate it once: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` (64 hex characters). Never commit it and never reuse the example/test keys.
+- There is no fallback: if it is missing or malformed, saving or testing provider settings and sending reports fail closed with a generic 500.
+- **Set it in the Azure portal before the release that contains the email feature.** PR preview environments share the production application settings and storage.
+- Back the key up in your secret store; losing it makes every stored app password unreadable (doctors must re-enter them). Rotation procedure: `README-SWA.md`.
+
+Outbound network: the API must reach the doctors' SMTP servers on port 587 (STARTTLS) or 465 (TLS). This was checked for Gmail and Yahoo (spec section 14); real authentication and delivery is verified in the hosted end-to-end pass.
 
 Preferred pattern:
-- Function App reads secrets from protected application settings
+- The API reads secrets from SWA application settings
 - Frontend receives only non-sensitive public configuration
 
 ### Local Development Configuration
@@ -292,7 +309,7 @@ Use GitHub Actions to:
 2. Run tests and security checks
 3. Build frontend
 4. Deploy frontend to Azure Static Web Apps
-5. Deploy Azure Functions to Function App
+5. Deploy the API as SWA managed functions (same `Azure/static-web-apps-deploy` step as the frontend)
 6. Apply infrastructure changes through Bicep or Terraform
 7. Run smoke tests after deployment
 
@@ -308,115 +325,41 @@ Use GitHub Actions to:
 | Deploy App | Deploy frontend and functions |
 | Smoke Test | Validate critical paths |
 
-### Example GitHub Actions Workflow
+### Actual GitHub Actions Workflows
+
+The repository does **not** deploy a separate Function App. The API is deployed as Azure Static Web Apps (SWA) **managed functions** by the same action that deploys the frontend. The authoritative files are in `.github/workflows/`:
+
+| Workflow | Trigger | What it does |
+|----------|---------|--------------|
+| `ci.yml` | pull requests / pushes | Unit tests only (`api` `src/tests/utils`) with a test-only `JWT_SECRET_TEST`. It has **no** email key; email unit tests set their own test key. Integration tests (Azurite) are run locally. |
+| `deploy-production.yml` | push to `master` | Builds and deploys frontend + API to the production SWA |
+| `deploy-preview.yml` | pull requests | Same build, deployed to a `pr-{number}` preview environment; closing the PR removes it |
+
+Essential part of `deploy-production.yml`:
 
 ```yaml
-name: Azure Serverless CI/CD
+- uses: actions/setup-node@v5.0.0
+  with:
+    node-version: '22'
 
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
-
-jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install frontend dependencies
-        run: cd frontend && npm ci
-
-      - name: Install api dependencies
-        run: cd api && npm ci
-
-      - name: Run frontend tests
-        run: cd frontend && npm test
-
-      - name: Run api tests
-        run: cd api && npm test
-
-      - name: Run linting
-        run: |
-          cd frontend && npm run lint
-          cd ../api && npm run lint
-
-      - name: Run dependency audit
-        run: |
-          cd frontend && npm audit --audit-level=high
-          cd ../api && npm audit --audit-level=high
-
-  deploy-infra:
-    needs: validate
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Azure login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Deploy Bicep
-        run: |
-          az deployment group create \
-            --resource-group rg-ultrasound-prod \
-            --template-file infra/main.bicep \
-            --parameters @infra/prod.parameters.json
-
-  deploy-functions:
-    needs: deploy-infra
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Azure login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install api dependencies
-        run: cd api && npm ci
-
-      - name: Deploy Azure Functions
-        uses: Azure/functions-action@v1
-        with:
-          app-name: func-ultrasound-prod
-          package: api
-
-  deploy-frontend:
-    needs: deploy-infra
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy Static Web App
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: upload
-          app_location: frontend
-          output_location: dist
+- name: Deploy to Azure Static Web Apps
+  uses: Azure/static-web-apps-deploy@v1
+  with:
+    azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+    repo_token: ${{ secrets.GITHUB_TOKEN }}
+    action: upload
+    app_location: frontend
+    output_location: dist
+    api_location: api
+    app_build_command: "npm ci && VITE_APP_VERSION=${{ github.sha }} VITE_DEPLOY_ENV=production npm run build"
+    api_build_command: "npm ci && npm run build"
 ```
+
+Notes:
+- `api_location: api` makes SWA host the compiled Azure Functions (Node 22) behind `/api/*`. `host.json` must keep `routePrefix: "api"`.
+- Application settings (`JWT_SECRET`, `AZURE_STORAGE_CONNECTION_STRING`, `ALLOWED_ORIGIN`, `EMAIL_CREDENTIALS_ENCRYPTION_KEY`, ...) are **not** set by the workflow. They live in the Azure portal: Static Web App > Settings > Environment variables / Application settings.
+- **Preview environments share the production application settings and the production storage account.** A PR preview therefore uses the same email key and can read and write the same stored provider rows. Test accordingly.
+- A dependency audit (`npm audit`) is not part of the workflow; see `KNOWN-ISSUES.md` KI-014.
 
 ### Infrastructure as Code
 
@@ -427,7 +370,7 @@ Preferred options:
 Provision through IaC:
 - Resource groups
 - Static Web App
-- Function App
+- (Function App: not used)
 - Storage account
 - Application Insights
 - Alerts
@@ -534,7 +477,7 @@ Production recommendations:
 ### Operational Runbook Topics
 
 The operations team should maintain procedures for:
-- Rotating signing keys in protected Function App settings
+- Rotating signing keys and the email credential master key in SWA application settings (see `README-SWA.md`, 'Key rotation')
 - Resetting user passwords securely
 - Investigating authentication spikes
 - Rebuilding lookup entities
@@ -551,7 +494,7 @@ The operations team should maintain procedures for:
 - [ ] Infrastructure templates validated
 - [ ] Azure resources provisioned or updated
 - [ ] Environment variables configured
-- [ ] Protected Function App environment settings configured
+- [ ] SWA application settings configured, including `JWT_SECRET`, `AZURE_STORAGE_CONNECTION_STRING`, `ALLOWED_ORIGIN` and `EMAIL_CREDENTIALS_ENCRYPTION_KEY` (64 hex chars, set **before** release)
 - [ ] Managed identity permissions assigned
 - [ ] Storage tables created
 - [ ] Backup and retention strategy configured
@@ -562,16 +505,14 @@ The operations team should maintain procedures for:
 ### Deployment
 
 - [ ] Deploy infrastructure changes
-- [ ] Deploy Azure Functions
-- [ ] Deploy frontend to Azure Static Web Apps
-- [ ] Verify Function App configuration
-- [ ] Verify protected Function App environment settings
+- [ ] Deploy frontend and API together to Azure Static Web Apps (`deploy-production.yml`)
+- [ ] Verify SWA application settings (email key present; no value copied into source control)
 - [ ] Verify storage access
 - [ ] Run smoke tests
 - [ ] Test authentication flow
 - [ ] Test patient and examination workflows
 - [ ] Test client-side PDF generation and print workflow
-- [ ] Test secure email delivery of PDF reports to patient email addresses
+- [ ] Test email delivery: save a Gmail/Yahoo app password on Email Settings, press 'Send test email', then send a report to a test mailbox (hosted end-to-end check, sub-task 8)
 - [ ] Monitor logs and alerts for errors
 
 ### Post-Deployment

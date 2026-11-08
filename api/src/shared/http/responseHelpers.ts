@@ -51,17 +51,19 @@ export const successResponse = <T = any>(
  * @param message - Error message
  * @param statusCode - HTTP status code (default: 400)
  * @param details - Additional error details (optional)
+ * @param code - Machine-readable error code (default: 'ERROR')
  * @returns HttpResponseInit
  */
 export const errorResponse = (
     message: string,
     statusCode: number = 400,
-    details?: any
+    details?: any,
+    code: string = 'ERROR'
 ): HttpResponseInit => {
     const response: ApiResponse = {
         success: false,
         error: {
-            code: 'ERROR',
+            code,
             message,
             ...(details && { details })
         },
