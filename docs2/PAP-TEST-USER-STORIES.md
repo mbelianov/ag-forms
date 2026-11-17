@@ -4,7 +4,7 @@ This document compiles the user stories, sequence & lifecycle diagrams, and tech
 
 The PAP Test workflow features a multi-device, multi-platform architecture:
 1. **Doctors** register the initial patient material collection in a web portal.
-2. **Lab Specialists** process and sign off on cytological results using **either** a responsive desktop web interface **or** a dedicated, focused **Android Mobile App**.
+2. **Lab Specialists** process and sign off on cytological results using **either** a responsive desktop web interface **or** dedicated, focused mobile applications (**Android and iOS**).
 3. **Lab Specialists** digitally sign finalized examinations using officially supported Qualified Electronic Signature (QES) cloud services (**B-Trust** or **Evrotrust**).
 4. **Doctors** review, print, and email finalized reports containing specialized treatment plans back on the web portal.
 
@@ -19,7 +19,7 @@ sequenceDiagram
     participant API as Backend API
     participant DB as Azure Table Storage
     participant QES as QES Provider (Evrotrust/B-Trust API)
-    actor Specialist as Specialist (Web/Android App)
+    actor Specialist as Specialist (Web/Mobile App)
 
     Note over Doctor, DB: Step 1: Collection & Registration
     Doctor->>API: POST /v1/examinations (examinationType: "pap_test", status: "draft")
@@ -30,7 +30,7 @@ sequenceDiagram
     Specialist->>API: GET /v1/examinations?examination_type=pap_test&status=draft
     API->>DB: Scan or Query draft partition
     DB-->>API: Return draft list
-    API-->>Specialist: Return JSON list of drafts (Desktop or Android Mobile)
+    API-->>Specialist: Return JSON list of drafts (Desktop or Mobile App)
     Specialist->>Specialist: Selects sample, fills cytological Bethesda fields
     Specialist->>API: PUT /v1/examinations/{id} (status: "completed", data: labResults, etag)
     API->>DB: Update exam data & set status to completed (concurrency check via ETag)
@@ -86,24 +86,24 @@ sequenceDiagram
 **Title**: Authenticate Specialist and Display Draft PAP Tests List
 
 **As a** Lab Specialist,
-**I need to** securely log in to either the Desktop Web App or the dedicated Android Mobile App and view a list of pending PAP Tests in draft status,
+**I need to** securely log in to either the Desktop Web App or the dedicated Mobile Apps (Android & iOS) and view a list of pending PAP Tests in draft status,
 **So that** I can easily identify which patient samples are ready for laboratory analysis regardless of my active device.
 
 **Acceptance Criteria**:
 1. The specialist login screen enforces a TLS 1.2+ connection using a username and password. The credential verification is integrated with the central `api/src/functions/Login.ts` endpoint.
 2. The user profile is validated on the server side: only users with `role: 'specialist'` (or `'lab_specialist'`) are allowed access. Other roles are rejected with a `403 Forbidden` error.
-3. Upon authentication, both platforms display a list of PAP tests in `draft` status, fetched via `GET /v1/examinations?examinationType=pap_test&status=draft` from the backend.
+3. Upon authentication, both web and mobile platforms display a list of PAP tests in `draft` status, fetched via `GET /v1/examinations?examinationType=pap_test&status=draft` from the backend.
 4. The list displays the following information:
    * **Sample ID / Barcode**
    * **Patient Name** (retrieved from denormalized `patientName`)
    * **Collection Date**
    * **Material Source**
-5. Tapping/clicking a search/filter bar allows the specialist to scan a barcode (mobile camera / scanner) or type a Sample ID to immediately find a specific draft.
+5. Tapping/clicking a search/filter bar allows the specialist to scan a barcode (using mobile camera/scanner) or type a Sample ID to immediately find a specific draft.
 6. The list uses server-side pagination with the Azure continuation token model, loading subsequent entries via a "Load More" action or infinite scroll.
 
 **Edge Cases & Considerations**:
 * **Session Expiry**: If the JWT signature expires or is revoked, the app/web page must immediately clear session details, terminate the session, and redirect to the login screen.
-* **Offline Access (Mobile)**: On mobile boot, if no internet connection is detected, the Android app displays a clear offline indicator and loads the last-cached list from the local encrypted SQLite database.
+* **Offline Access (Mobile)**: On mobile boot, if no internet connection is detected, the iOS/Android apps display a clear offline indicator and load the last-cached list from the local encrypted database.
 
 ---
 
@@ -111,7 +111,7 @@ sequenceDiagram
 **Title**: Cytological Evaluation and PAP Test Processing
 
 **As a** Lab Specialist,
-**I need to** open a draft PAP Test on the Desktop Web App or Android phone, view its collection details, and input cytological findings,
+**I need to** open a draft PAP Test on the Desktop Web App or Mobile phone (Android or iOS), view its collection details, and input cytological findings,
 **So that** the lab analysis is recorded on the test record.
 
 **Acceptance Criteria**:
@@ -224,20 +224,24 @@ sequenceDiagram
 
 ## 4. Non-Functional & Security Stories
 
-### Story 8: Mobile Synchronization and Data Integrity
-**Title**: Android App Offline Capabilities and Local SQLite Integrity
+### Story 8: Mobile Synchronization and Data Integrity (Android & iOS)
+**Title**: Android & iOS Offline Capabilities and Local Cache Integrity
 
 **As a** Lab Specialist,
-**I need the** mobile app to securely store my evaluations locally when the internet goes offline and synchronize them automatically once connection is restored,
+**I need the** mobile apps (Android & iOS) to securely store my evaluations locally when the internet goes offline and synchronize them automatically once connection is restored,
 **So that** my diagnostic progress is never lost due to wireless drops.
 
 **Acceptance Criteria**:
-1. The Android application implements a local cache using an encrypted database (e.g., Room with SQLCipher or native device-level encryption).
+1. The mobile applications implement local caches using highly secure encrypted databases:
+   * **Android**: Room with SQLCipher and hardware-backed device keys.
+   * **iOS**: SwiftData / CoreData encrypted using iOS Data Protection APIs (with `FileProtectionType.completeUntilFirstUserAuthentication` or SQLCipher).
 2. When the device transitions from online to offline, the application allows the Specialist to continue filling out forms, storing pending updates locally.
-3. A background service monitors network connectivity using standard Android connection broadcasts.
+3. A platform-native background capability monitors network connectivity (e.g., Android `ConnectivityManager` broadcasts, iOS `Network` NWPathMonitor).
 4. When online status is restored, the application syncs local updates sequentially.
 5. If an `etag` mismatch occurs during sync, the app halts sync for that specific record, prompts a conflict resolution UI to the specialist, and moves on to sync the next record.
-6. The app utilizes Android's WorkManager framework to guarantee sync completion even if the app is closed or backgrounded.
+6. The applications utilize native background processing frameworks to guarantee synchronization completes even if the app is closed or backgrounded:
+   * **Android**: WorkManager API with network constraints.
+   * **iOS**: BackgroundTasks framework (`BGProcessingTask` / `BGAppRefreshTask`).
 
 ---
 
