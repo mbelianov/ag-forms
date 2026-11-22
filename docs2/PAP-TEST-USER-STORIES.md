@@ -273,6 +273,7 @@ Derived UI states of a `pap_test`:
 * **PDF no longer available (blob not found)**: Print and Email are replaced by "Recreate PDF" (Story 7) with an informational message; the API returns HTTP 410 "PDF no longer available", never a server error (Story 12, criterion 6).
 * **Empty/short password**: with protection on, a password shorter than 8 characters is rejected server-side as well as in the modal.
 * **Signature stays valid**: because the PDF is wrapped, not re-encrypted, the embedded signature remains intact inside the ZIP in both modes.
+* **Verified in spike O-4:** the AES-256 ZIP extracts a byte-identical PDF in 7-Zip (a wrong password fails), and Windows' built-in extraction rejects it as expected; the plain ZIP opens with .NET, `tar.exe` and 7-Zip. WinRAR and the Windows Explorer GUI still need a manual check (O-15).
 * **Unencrypted option**: it is a conscious doctor decision, requires explicit confirmation and is audit-logged (`zipEncrypted: false`). Legacy ZipCrypto is **not** offered as a middle option (weak encryption; also not openable by macOS Archive Utility).
 * **SMTP not configured / mail rejected**: existing error responses apply; status unchanged.
 * The sending of the email is audit-logged; the treatment text and password are never logged.
@@ -343,7 +344,12 @@ Derived UI states of a `pap_test`:
    * `POST /v1/examinations/{id}/email-report-zip` – email the signed PDF inside a ZIP (Story 6). Request body: `recipient_email`, `subject`, `message` (treatment text), `encrypt_zip` (boolean, default `true`), `zip_password` (required when `encrypt_zip=true`, ignored otherwise). It reuses the existing email-sending building blocks (caller's saved SMTP provider settings, recipient/subject/message validation, `delivery_status: 'accepted'` response, audit event), but is a **separate** function and route. On `202 Accepted` it sets the exam `status` to `reviewed`.
 5. The email-zip endpoint validates before opening any SMTP connection: exam exists, not deleted, `pap_test`, `isSigned=true`, stored PDF is readable (410 if blob not found), recipient email format and length limits, `zip_password` of at least 8 characters when `encrypt_zip=true`, and total attachment size within the SMTP limit.
 6. The ZIP contains the **unchanged** signed PDF (file name `{mrn}_{examDate}.pdf`). With `encrypt_zip=true` it is encrypted with **AES-256** (WinZip AES; no ZipCrypto); with `encrypt_zip=false` it is a plain ZIP. It is created in memory, never written to storage, and the password is never logged or persisted.
-7. **Library choices are made in the technical spike (O-4)**: server-side PDF rendering with Cyrillic, and ZIP creation (AES-256 and plain). Dependencies must follow the project's package-security rules (latest stable, actively maintained, compatible licence, lock file updated, vulnerability scan before adoption).
+7. **Libraries (decided in the technical spike O-4, see [`O-4-TECHNICAL-SPIKE-REPORT.md`](O-4-TECHNICAL-SPIKE-REPORT.md))**:
+   * **PDF:** `pdfmake` (MIT; 0.3.15 at spike time, pulls in `pdfkit`) with the **Roboto** fonts bundled in the package, which cover the whole Bulgarian alphabet; no extra font package. `pdfkit` alone is the fallback if the SWA size limit proves too tight (about 12 MB smaller, but pagination and layout would have to be hand-written).
+   * **ZIP:** `@zip.js/zip.js` (BSD-3-Clause; 2.25.0 at spike time) for both modes. Required settings: `zip.configure({ useWebWorkers: false })`; encrypted mode uses `password` with `encryptionStrength: 3` (AES-256) and `zipCrypto: false`; plain mode passes no password. It works from CommonJS, matching the backend `tsconfig`.
+   * **Hardening:** `pdfmake` must be configured to deny all URL and local-file access (`setUrlAccessPolicy` / `setLocalAccessPolicy` returning `false` for everything); the report uses only the bundled fonts.
+   * **Adoption conditions:** add both packages to `api/` with the lock file updated and `npm audit --omit=dev` re-run (the spike found 0 findings for the new packages). The pre-existing runtime findings in `joi`, `@azure/identity` and `fast-xml-parser` (KI-014) are fixed first (O-12). The spike measured about +30 MB for the API's production `node_modules` (51.8 MB to 82 MB), so the SWA API size limit must be confirmed on a preview deployment (O-13).
+   * **Dependency rule unchanged:** latest stable, actively maintained, compatible licence, lock file updated, vulnerability scan before adoption.
 
 ---
 
@@ -381,7 +387,7 @@ Derived UI states of a `pap_test`:
 6. Session expiry and logout clear client-side state.
 7. **Performance targets**:
    * Draft list of 50 rows loads in **< 3 s** on 4G.
-   * A single sign request (`POST /v1/examinations/{id}/sign`: render + QES sign + blob upload + Table update) completes in **< 3 s**. This target **must be verified with the real QES provider** (see Story 14); measurements against the mock are only a baseline for the platform part (render, upload, Table write). If the real provider exceeds the target, the bulk design (concurrency, progress, resume) remains valid and the target or concurrency is revisited.
+   * A single sign request (`POST /v1/examinations/{id}/sign`: render + QES sign + blob upload + Table update) completes in **< 3 s**. This target **must be verified with the real QES provider** (see Story 14); measurements against the mock are only a baseline for the platform part (render, upload, Table write). Spike O-4 measured only the PDF render (about 100 ms cold, about 60 ms warm) and ZIP creation (about 55 ms cold) on a developer machine; the end-to-end figure on a deployed instance is open item O-16. If the real provider exceeds the target, the bulk design (concurrency, progress, resume) remains valid and the target or concurrency is revisited.
    * The UI remains interactive during bulk signing at all times (no blocking dialog).
 
 ---
@@ -410,11 +416,12 @@ Derived UI states of a `pap_test`:
 8. Deleting a **single examination** (soft delete of the Table records) also **permanently deletes its PDF blob** if one exists (404 ignored).
 9. Deleting a **patient** permanently deletes **all** PDF blobs of that patient; all other linked objects are soft-deleted per existing convention. Purging soft-deleted rows is future work.
 10. Blob deletion failures during exam/patient delete do not roll back the soft delete and are logged; the leftover blob is removed by the retention rule at the latest (the user is not informed, O-8; the failure is logged and audited).
-11. Blob names are deterministic enough to be matched to exams (e.g., `pap/{examinationId}/{guid}.pdf`) and are never exposed to clients as direct URLs.
+11. Blob names are deterministic enough to be matched to exams and are never exposed to clients as direct URLs. The convention is **container `pap-pdfs`, blob name `pap/{examinationId}/{guid}.pdf`**; the lifecycle rules in [`infra/pap-pdf-storage/lifecycle-policy.template.json`](../infra/pap-pdf-storage/lifecycle-policy.template.json) filter on the prefix `pap-pdfs/pap/`, so the application and the policy must change together.
 
 **Known limits of the lifecycle approach (accepted):**
 * Lifecycle policies run roughly **once a day** with no guaranteed time, so physical deletion can happen up to about a day after the nominal retention end; until then the PDF is still served. Retention is housekeeping, not a hard serving cutoff (product-owner decision: no stored expiry date).
-* The storage account must support **lifecycle policies and blob index tags** (general-purpose v2 without hierarchical namespace) and must not have blob **soft delete/versioning** that would keep deleted PDFs longer than the retention period; both are verified in the spike (O-4) and in the deployment runbook.
+* The storage account must support **lifecycle policies and blob index tags** (general-purpose v2 without hierarchical namespace) and must not have blob **soft delete/versioning** that would keep deleted PDFs longer than the retention period. Spike O-4 confirmed from Microsoft documentation that lifecycle policies support block blobs on general-purpose v2 accounts, that `blobIndexMatch` is a supported lifecycle filter, and that blob index tags are **not integrated with lifecycle management on hierarchical-namespace accounts**. It also confirmed with the Azurite emulator that the application-side flow works (upload with tag `state=pending`, switch to `committed`, `findBlobsByTags`, a read of a missing blob answers HTTP 404, and `deleteIfExists()` on a missing blob does not throw). Azurite does **not** run lifecycle policies, and the **real account has not been checked yet** (O-14). The checks and the policy are in [`infra/pap-pdf-storage/`](../infra/pap-pdf-storage/); the deployment runbook step is in [`05-deployment-guide.md`](05-deployment-guide.md).
+* A new or edited lifecycle policy can take **up to 24 hours** to take effect. A storage account has **one** lifecycle policy, so the PAP rules must be merged with any rules already on the account.
 * If `PAP_PDF_RETENTION_DAYS` is changed later, the lifecycle rule must be updated with it; the new value applies to all existing blobs at the next lifecycle run, and the application needs no data migration because it relies on blob existence only (criterion 6).
 
 ---
@@ -457,7 +464,19 @@ Acceptance criteria are subject to a separate design discussion (authoritative i
 
 | ID | Open item | Needed by |
 |----|-----------|-----------|
-| O-4 | **Technical spike (libraries and platform checks)**: select libraries during the spike; none is chosen yet. Starting candidates from a registry check (Nov 2026, all maintained, permissive licences): PDF – `pdfmake`, `pdfkit`; ZIP with AES-256 – `@zip.js/zip.js`. Excluded: `pdf-lib` (last release 2022), `archiver-zip-encrypted` (last release Mar 2024), ZipCrypto. The spike must answer: (1) package size and cold start within SWA managed-function limits, (2) Cyrillic rendering with an embedded font, (3) AES ZIP opens in 7-Zip/WinRAR and plain ZIP in Windows Explorer, (4) `npm audit` clean, (5) storage account supports lifecycle rules with blob-index-tag filters and has no soft delete/versioning that outlives the retention period. | Story 9, 12 |
+| O-12 | **Fix the pre-existing runtime audit findings** (`joi`, `@azure/identity` / `@azure/msal-node`, `fast-xml-parser`; KI-014) before the new dependencies are added, so the PAP work starts from a clean baseline. Do not use `npm audit fix --force` blindly. | Story 9 (before adoption) |
+| O-13 | **Confirm the SWA managed-function API size limit** on a preview deployment (`deploy-preview.yml`) that includes `pdfmake` and `@zip.js/zip.js` (about +30 MB on disk). Microsoft documents a 45 s request limit and a 250 MB per-environment storage quota on the Free plan, but no specific API size limit was found. Fallback: `pdfkit` alone, or trimming `@zip.js/zip.js`. | Story 9 |
+| O-14 | **Run [`infra/pap-pdf-storage/verify-storage-account.ps1`](../infra/pap-pdf-storage/verify-storage-account.ps1) against the real storage account** (read-only first, then `-Apply`) and record the result in the deployment runbook. It was not run during the spike (no Azure login). The same value must be used for `-RetentionDays` and `PAP_PDF_RETENTION_DAYS`. Also check that the account has no other lifecycle rules (one policy per account). | Story 12 |
+| O-15 | **Manual client checks:** open the plain ZIP in Windows Explorer (Windows 10 and 11) and the AES-256 ZIP in WinRAR. 7-Zip, .NET and `tar.exe` were verified in the spike; WinRAR and the Explorer GUI were not. | Story 6, 9 |
+| O-16 | **Measure the end-to-end sign time** (render + mock QES + blob upload + Table write) on a deployed instance. The spike measured only render (about 100 ms cold) and ZIP (about 55 ms cold) on a developer machine. Combine with the real-provider measurement of Story 14. | Story 5, 11 |
+
+**O-4 (technical spike): RESOLVED.** Report: [`O-4-TECHNICAL-SPIKE-REPORT.md`](O-4-TECHNICAL-SPIKE-REPORT.md); test harness: `spikes/O-4/` on branch `spike/O-4-technical-spike`. Outcome:
+* **Libraries:** `pdfmake` (PDF, bundled Roboto) and `@zip.js/zip.js` (ZIP); excluded `pdf-lib`, `archiver-zip-encrypted`, ZipCrypto (Story 9, criterion 7).
+* **(1) Size and cold start:** about +30 MB in the API's production `node_modules`; about 0.1 s cold-start cost per library on a developer machine. SWA API size limit not confirmed (O-13).
+* **(2) Cyrillic:** passed for both PDF candidates (embedded font, text round-trip, visual check of the `pdfmake` output).
+* **(3) ZIP:** the AES-256 ZIP opens in 7-Zip with the password (byte-identical PDF), a wrong password fails, and Windows' built-in extraction rejects it as expected. The plain ZIP opens with .NET, `tar.exe` and 7-Zip. WinRAR and Explorer GUI not tested (O-15).
+* **(4) Audit:** 0 findings for the new packages. The existing API has 4 findings (3 high) unrelated to this work (O-12).
+* **(5) Storage:** blob-tag flow and missing-blob handling verified on Azurite; platform support confirmed from documentation; the real account is still to be checked (O-14).
 
 **Resolved by product-owner decisions:**
 * O-6: offline editing on mobile is **deferred** to a later iteration (listed under "Other items deferred").

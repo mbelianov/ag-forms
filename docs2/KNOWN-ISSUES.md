@@ -402,3 +402,4 @@ For an FT twins exam, the same blob also carries `twin2_ft_biometry`, `twin2_ft_
 - **Fix:** Upgrade the runtime packages to the patched versions and re-run the full backend suite; upgrade or replace dev tooling as part of normal maintenance. Do not use `npm audit fix --force` blindly.
 - **Priority:** P2 · Required by the security policy (critical within 24 h, high within 30 days) — schedule a dedicated dependency-update task; not part of the email feature.
 - **Status:** Open — not addressed by the email feature.
+- **Update (PAP spike O-4):** an audit of `api/package-lock.json` with `--omit=dev` (22 Nov 2026) still shows 4 runtime findings, 3 of them high: `joi` (<= 17.13.8), `@azure/identity` / `@azure/msal-node`, and `fast-xml-parser` (<= 5.11.2). They are present without the new PAP libraries (`pdfmake`, `@zip.js/zip.js`), which add none. Fixing them is open item O-12 and should happen before those libraries are added to `api/`.
