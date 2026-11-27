@@ -500,6 +500,22 @@ For an FT twins exam, the same blob also carries `twin2_ft_biometry`, `twin2_ft_
   - The ZIP password format `DDMMYYYY` (8 digits) is accepted although short, and the doctor may send an unencrypted ZIP (Windows Explorer cannot open AES ZIPs).
 - **Reason for deferral:** Product-owner decisions (O-2, O-8, O-10/O-11).
 - **Suggested iteration:** Revisit with KI-020 (purging) or if retention must become a hard serving cutoff.
-- **Related context / dependencies:** Verification still open: real storage account check ([`infra/pap-pdf-storage/verify-storage-account.ps1`](../infra/pap-pdf-storage/verify-storage-account.ps1), O-14) and manual client checks of the ZIPs in Windows Explorer and WinRAR (O-15). The existing `email-report` endpoint is intentionally unchanged (KI-013 limitations KL-02, KL-06 still apply to non-PAP exam types).
+- **Related context / dependencies:** Verification still open: manual client checks of the ZIPs in Windows Explorer and WinRAR (O-15); the real storage account check ([`infra/pap-pdf-storage/verify-storage-account.ps1`](../infra/pap-pdf-storage/verify-storage-account.ps1), O-14) is done. The compliance check of the retention value is tracked in KI-022. The existing `email-report` endpoint is intentionally unchanged (KI-013 limitations KL-02, KL-06 still apply to non-PAP exam types).
 - **Priority:** P3 · Low
 - **Status:** Accepted / deferred.
+
+---
+
+## KI-022 · PAP Test: blob retention policy is not checked against PHI compliance rules
+
+- **Source:** [`PAP-TEST-USER-STORIES.md`](PAP-TEST-USER-STORIES.md) Story 12 (lifecycle retention); [`infra/pap-pdf-storage/`](../infra/pap-pdf-storage/README.md).
+- **Description:** The lifecycle policy applied to the storage account (delete signed PAP PDFs 90 days after creation; orphan `pending` blobs after 1 day) uses a retention value (default 90 days) chosen as a technical default. It has **not** been checked against the compliance rules that apply to protected health information (PHI) / medical records (legal minimum and maximum retention, deletion and audit requirements, GDPR). Signed PAP PDFs are medical documents containing patient data, so the real retention requirement may differ from 90 days. The PDFs are also kept in a single storage tier (no tiering), and nothing but the lifecycle policy governs their lifetime.
+- **TODO:**
+  - Check the retention period and the deletion behaviour against the applicable compliance rules (PHI / medical-record retention, GDPR, any customer or national requirements) and record the result.
+  - Implement retention properly with Azure Storage access tiers (for example hot → cool → cold/archive for long-term retention, and a deletion rule only where the rules allow it), instead of only deleting after N days.
+  - Re-check what this brings at blob level: archive-tier blobs cannot be read without rehydration (the app serves PDFs on request); lifecycle policy limits (one policy per account, runs about once a day, blob index tag filters); and whether immutability (WORM), soft delete or versioning is required, since the current design needs soft delete and versioning to be disabled (see KI-021).
+- **Reason for deferral:** The compliance requirements have not been collected yet; 90 days is a placeholder that is easy to change (`verify-storage-account.ps1 -Apply -RetentionDays <n>`).
+- **Suggested iteration:** Before the PAP test feature is used with real patient data in production; together with KI-020 (purging of soft-deleted records) and the GDPR work (KI-006, KI-013 KL-01).
+- **Related context / dependencies:** KI-020, KI-021, [`lifecycle-policy.template.json`](../infra/pap-pdf-storage/lifecycle-policy.template.json), [`verify-storage-account.ps1`](../infra/pap-pdf-storage/verify-storage-account.ps1). The retention value exists only in the lifecycle policy (no application setting), so changing it needs no code change.
+- **Priority:** P2 · Medium (P1 if production use with real patient data is planned before the check)
+- **Status:** Open.
