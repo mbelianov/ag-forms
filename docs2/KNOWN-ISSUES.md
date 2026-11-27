@@ -403,3 +403,98 @@ For an FT twins exam, the same blob also carries `twin2_ft_biometry`, `twin2_ft_
 - **Priority:** P2 · Required by the security policy (critical within 24 h, high within 30 days) — schedule a dedicated dependency-update task; not part of the email feature.
 - **Status:** Open — not addressed by the email feature.
 - **Update (PAP spike O-4):** an audit of `api/package-lock.json` with `--omit=dev` (22 Nov 2026) still shows 4 runtime findings, 3 of them high: `joi` (<= 17.13.8), `@azure/identity` / `@azure/msal-node`, and `fast-xml-parser` (<= 5.11.2). They are present without the new PAP libraries (`pdfmake`, `@zip.js/zip.js`), which add none. Fixing them is open item O-12 and should happen before those libraries are added to `api/`.
+
+---
+
+## KI-015 · PAP Test: real QES integration (B-Trust / Evrotrust) is mocked
+
+- **Source:** [`PAP-TEST-USER-STORIES.md`](PAP-TEST-USER-STORIES.md) Section 0 item 8, Story 10, Story 14 (DEFERRED); [`PAP-TEST-ImplementationGuideLines.txt`](PAP-TEST-ImplementationGuideLines.txt) II.3.
+- **Description:** All QES signing runs against a mock provider (`QES_PROVIDER=mock`). Real provider REST client, PIN/OTP or provider-hosted authorisation, secrets/configuration, signer certificate validation (trust chain, revocation) and error mapping (wrong credentials, provider offline, lockout) are not implemented. Mock output carries a visible "TEST SIGNATURE – NOT LEGALLY VALID" marker.
+- **Reason for deferral:** Stated: "actual implementation will be next iteration".
+- **Suggested iteration:** Next iteration, after a time-boxed technical spike that confirms: supported authorisation flow, whether one authorisation can cover a **bulk** of documents, certificate/identity binding, signature format (PAdES level), request time limits on SWA, sandbox availability.
+- **Related context / dependencies:**
+  - Plug in behind the QES provider interface built in the PAP plan (task T4); callers must not change.
+  - QES onboarding (certificate/identity enrolment) is system-wide and one-time, not per user.
+  - **Performance acceptance:** `POST /v1/examinations/{id}/sign` must meet **< 3 s** (Story 11) with the real provider at the agreed concurrency; otherwise escalate and adjust concurrency/target. Open item O-16 (end-to-end measurement on a deployed instance) is combined with this.
+  - Provider secrets come from environment variables/vault and are never logged.
+- **Priority:** P1 · High (the legal validity of the signed PDF depends on it)
+- **Status:** Deferred — next iteration.
+
+---
+
+## KI-016 · PAP Test: signature verification and integrity control
+
+- **Source:** [`PAP-TEST-USER-STORIES.md`](PAP-TEST-USER-STORIES.md) Story 15 (DEFERRED, separate design discussion); [`PAP-TEST-ImplementationGuideLines.txt`](PAP-TEST-ImplementationGuideLines.txt) II.4 (Story 9 "separate design discussions").
+- **Description:** No verification of stored signed PDFs. Acceptance criteria are open: authoritative integrity control, canonical hashing, pepper handling, mismatch behaviour, measurable verification checks instead of a generic eIDAS statement. Currently only `pdfSha256` is stored at signing time and is not re-checked on read.
+- **Reason for deferral:** Criteria are subject to a separate design discussion.
+- **Suggested iteration:** After or together with KI-015 (verification makes sense only with a real signature).
+- **Related context / dependencies:** Must also address the gap between `completed` and signing and edits after signing (see KI-017). Depends on the signature envelope format chosen in KI-015.
+- **Priority:** P2 · Medium
+- **Status:** Deferred — needs design discussion first.
+
+---
+
+## KI-017 · Completed / signed examinations are not read-only; signature state is not reset on later edits
+
+- **Source:** [`PAP-TEST-USER-STORIES.md`](PAP-TEST-USER-STORIES.md) Section 0 item 7, Story 4 edge cases, Section 5 "Other items deferred".
+- **Description:** Read-only locking of `completed` (and signed) examinations is not implemented for **any** examination type. Consequences for `pap_test` in this iteration (accepted risk):
+  - a test can be modified between `completed` and PDF creation; the PDF reflects the Table data at signing time;
+  - a later edit, or setting a signed test back to `draft`, does **not** reset `isSigned`, signer fields, `pdfBlobName` or `pdfSha256`, and does not update an already stored PDF.
+- **Reason for deferral:** Stated as an accepted risk; the locking is to be introduced for **all** exam types at a later stage.
+- **Suggested iteration:** Dedicated cross-exam-type iteration, designed together with KI-016.
+- **Related context / dependencies:** Touches [`UpdateExamination.ts`](../api/src/functions/examinations/UpdateExamination.ts), `DeleteExamination` rules and all exam forms. Existing `reviewed`/`completed` transitions have no restrictions today (Story 8 AC8). "Recreate PDF" (Story 7) is the only supported way to refresh a stored PDF.
+- **Priority:** P2 · Medium (clinical-record integrity)
+- **Status:** Deferred — accepted risk.
+
+---
+
+## KI-018 · PAP Test: Bethesda vocabulary is incomplete
+
+- **Source:** [`PAP-TEST-USER-STORIES.md`](PAP-TEST-USER-STORIES.md) Story 3 AC3, Section 5; [`PAP-TEST-ImplementationGuideLines.txt`](PAP-TEST-ImplementationGuideLines.txt) II.5.
+- **Description:** Only these values are in scope: Specimen Adequacy (*Satisfactory / Unsatisfactory*), General Categorization (*Negative for Intraepithelial Lesion / Epithelial Cell Abnormalities*), Interpretation (*NILM, ASC-US, LSIL, HSIL, Squamous Cell Carcinoma*). Not covered: ASC-H, AGC, AIS, adenocarcinoma, organisms and other Bethesda categories.
+- **Reason for deferral:** Stated: "will be completed at subsequent iteration, proceed implementation with as specified coverage".
+- **Suggested iteration:** Next iteration or next clinical content release.
+- **Related context / dependencies:** Option lists live in one central constants location (frontend and backend allowlists must change together, as for exam types); completion validation rules (Story 4 AC2) may need extension; existing stored values stay valid because the lists are only extended.
+- **Priority:** P2 · Medium
+- **Status:** Deferred.
+
+---
+
+## KI-019 · PAP Test PWA: no offline editing, local storage or background sync
+
+- **Source:** [`PAP-TEST-USER-STORIES.md`](PAP-TEST-USER-STORIES.md) Story 11 AC4, Section 5, open item O-6 (resolved as deferred); [`PAP-TEST-ImplementationGuideLines.txt`](PAP-TEST-ImplementationGuideLines.txt) II.6.
+- **Description:** The PWA loads the app shell offline, shows an offline indicator and fails API calls with a friendly message. Offline queued editing, a local encrypted database and background sync are not implemented. Completing a test and signing are online-only. The service worker does not cache API responses or PHI.
+- **Reason for deferral:** Product-owner decision (O-6).
+- **Suggested iteration:** Later iteration, only if bench connectivity proves unreliable.
+- **Related context / dependencies:** Requires a PHI-at-rest design (encrypted local DB, key handling, wipe on logout/session expiry), conflict resolution on top of the existing ETag-in-body concurrency, and an interaction design with the bulk sign process (KI-015). Cookie-first auth with a 24 h TTL and no refresh must be revisited.
+- **Priority:** P3 · Low
+- **Status:** Deferred.
+
+---
+
+## KI-020 · Soft-deleted records are never purged
+
+- **Source:** [`PAP-TEST-USER-STORIES.md`](PAP-TEST-USER-STORIES.md) Section 2 item 4, Story 12 AC9, Section 5; [`PAP-TEST-ImplementationGuideLines.txt`](PAP-TEST-ImplementationGuideLines.txt) II.2.
+- **Description:** Deleting an examination or patient is a soft delete (`isDeleted` + timestamps); only PAP **PDF blobs** are permanently deleted. Purging soft-deleted Table rows (patients, examinations, search rows, MRN lookup rows) is not implemented.
+- **Reason for deferral:** Stated as future work ("purging soft-deleted objects is for further development").
+- **Suggested iteration:** Later iteration, together with a retention/GDPR policy decision.
+- **Related context / dependencies:** Must remove all row variants per entity (`PATIENT`, `PATIENT_SEARCH_*`, `PATIENT_{id}`, `EXAM`, `MRN`), decrement-safe counters (`PATIENT_TOTAL`, `EXAM_TOTAL` are already decremented on soft delete — see KI-005), and must not break MRN uniqueness. Related compliance gaps: KI-006, KI-013 (KL-01).
+- **Priority:** P3 · Low (P2 if required by a GDPR review)
+- **Status:** Deferred.
+
+---
+
+## KI-021 · PAP Test: PDF blob deletion failures are not shown to the user; lifecycle retention is approximate
+
+- **Source:** [`PAP-TEST-USER-STORIES.md`](PAP-TEST-USER-STORIES.md) Story 12 AC10 and "Known limits of the lifecycle approach", open items O-8, O-14, O-15; Story 6 (unencrypted ZIP option).
+- **Description (accepted limitations):**
+  - If a blob delete fails during examination/patient delete, the soft delete still succeeds, the failure is logged and audited, and the user is **not** informed (O-8). The orphan is removed by the lifecycle rule at the latest.
+  - Retention is enforced by an Azure Storage lifecycle policy only. It runs about once a day, so physical deletion can lag the nominal retention end by about a day, and a new/edited policy can take up to 24 h to apply. No expiry date is stored on the record; blob existence is the only authority.
+  - Storage account must be general-purpose v2, without hierarchical namespace and without blob soft delete/versioning. Only **one** lifecycle policy per account (PAP rules must be merged with existing ones).
+  - The retention period exists only in the lifecycle policy (no application setting); changing it means re-running `verify-storage-account.ps1 -Apply` with the new `-RetentionDays`.
+  - The ZIP password format `DDMMYYYY` (8 digits) is accepted although short, and the doctor may send an unencrypted ZIP (Windows Explorer cannot open AES ZIPs).
+- **Reason for deferral:** Product-owner decisions (O-2, O-8, O-10/O-11).
+- **Suggested iteration:** Revisit with KI-020 (purging) or if retention must become a hard serving cutoff.
+- **Related context / dependencies:** Verification still open: real storage account check ([`infra/pap-pdf-storage/verify-storage-account.ps1`](../infra/pap-pdf-storage/verify-storage-account.ps1), O-14) and manual client checks of the ZIPs in Windows Explorer and WinRAR (O-15). The existing `email-report` endpoint is intentionally unchanged (KI-013 limitations KL-02, KL-06 still apply to non-PAP exam types).
+- **Priority:** P3 · Low
+- **Status:** Accepted / deferred.

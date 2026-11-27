@@ -18,7 +18,7 @@ az login
 ./verify-storage-account.ps1 -ResourceGroup <rg> -AccountName <storage-account> -RetentionDays 90 -Apply
 ```
 
-Then set `PAP_PDF_RETENTION_DAYS` in the Static Web App application settings to the **same** number.
+`-RetentionDays` is the only place the retention period is set. The application has no retention setting; it relies on blob existence only.
 
 ## Rules to keep in mind
 

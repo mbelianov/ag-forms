@@ -215,10 +215,9 @@ Account requirements (all checked by `verify-storage-account.ps1`):
 Steps (needs `az login` with rights on the storage account):
 1. Read-only check: `./infra/pap-pdf-storage/verify-storage-account.ps1 -ResourceGroup <rg> -AccountName <account> -RetentionDays 90`
 2. If it passes, apply the policy with `-Apply`. A storage account has **one** lifecycle policy; the script stops if other rules exist (merge them into the template, or use `-Force` only to replace them on purpose).
-3. Set `PAP_PDF_RETENTION_DAYS` in the SWA application settings to the **same** number as `-RetentionDays`.
-4. Record the result of the check in the release notes.
+3. Record the result of the check in the release notes. (`-RetentionDays` is the only place the retention value is set; the application has no retention setting.)
 
-Behaviour to expect: a new or edited policy can take up to 24 hours to take effect, and deletion can lag the nominal retention end by about a day. If the retention value is changed later, re-run the script with `-Apply` and update `PAP_PDF_RETENTION_DAYS` together.
+Behaviour to expect: a new or edited policy can take up to 24 hours to take effect, and deletion can lag the nominal retention end by about a day. If the retention value is changed later, re-run the script with `-Apply` and the new `-RetentionDays`; nothing else needs updating.
 
 ### Initial Data Setup
 
@@ -268,8 +267,6 @@ EMAIL_CREDENTIALS_ENCRYPTION_KEY=<64-hex-chars-generate-with-node-crypto-randomB
 # Optional, only during key rotation:
 # EMAIL_CREDENTIALS_ENCRYPTION_KEY_PREVIOUS=<old-64-hex-key>
 
-# PAP test (Story 12). Must equal -RetentionDays used for the storage lifecycle policy. Default 90.
-PAP_PDF_RETENTION_DAYS=90
 # QES provider for PAP signing. Only 'mock' is supported in this iteration (default).
 QES_PROVIDER=mock
 
@@ -520,7 +517,7 @@ The operations team should maintain procedures for:
 - [ ] SWA application settings configured, including `JWT_SECRET`, `AZURE_STORAGE_CONNECTION_STRING`, `ALLOWED_ORIGIN` and `EMAIL_CREDENTIALS_ENCRYPTION_KEY` (64 hex chars, set **before** release)
 - [ ] Managed identity permissions assigned
 - [ ] Storage tables created
-- [ ] PAP PDF storage verified with `infra/pap-pdf-storage/verify-storage-account.ps1` and the lifecycle policy applied; `PAP_PDF_RETENTION_DAYS` set to the same value
+- [ ] PAP PDF storage verified with `infra/pap-pdf-storage/verify-storage-account.ps1` and the lifecycle policy applied (retention is set only via `-RetentionDays`)
 - [ ] Preview deployment with `pdfmake` and `@zip.js/zip.js` accepted by SWA (API size limit confirmed, PAP open item O-13)
 - [ ] Backup and retention strategy configured
 - [ ] DNS and custom domains configured

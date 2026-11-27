@@ -126,7 +126,7 @@ Platform side, from Microsoft Learn (not verified on an actual account):
 
 Lifecycle execution itself cannot be tested locally because Azurite does not run lifecycle policies. The delivered artefacts are:
 
-- [`infra/pap-pdf-storage/lifecycle-policy.template.json`](../infra/pap-pdf-storage/lifecycle-policy.template.json), which has two rules: retention (`daysAfterCreationGreaterThan: __RETENTION_DAYS__`) and orphan cleanup (`state=pending`, 1 day). The retention number is a single placeholder, so it can be fed from the same parameter as `PAP_PDF_RETENTION_DAYS`.
+- [`infra/pap-pdf-storage/lifecycle-policy.template.json`](../infra/pap-pdf-storage/lifecycle-policy.template.json), which has two rules: retention (`daysAfterCreationGreaterThan: __RETENTION_DAYS__`) and orphan cleanup (`state=pending`, 1 day). The retention number is a single placeholder (`-RetentionDays` of the script) and exists only in the lifecycle policy; the application has no retention setting.
 - [`infra/pap-pdf-storage/verify-storage-account.ps1`](../infra/pap-pdf-storage/verify-storage-account.ps1), a read-only check (unless `-Apply` is passed) of account kind, HNS, blob and container soft delete, versioning, public access and TLS. It parses without errors but **has not been run against a real account**.
 
 ## 4. Technical decisions
@@ -155,7 +155,7 @@ Lifecycle execution itself cannot be tested locally because Azurite does not run
 1. **Adopt** `pdfmake@^0.3.15` and `@zip.js/zip.js@^2.25.0` in `api/` as part of Story 9. Update the lock file, re-run `npm audit` and call `pdfmake.setUrlAccessPolicy(() => false)` before use.
 2. **Fix the existing API audit findings first** (`npm audit fix` for `joi`, `@azure/identity` and `fast-xml-parser`), so the new feature starts from a clean baseline.
 3. **Confirm the SWA API size limit** with a real preview deployment (the repository already has a `deploy-preview.yml` workflow) that includes the two new dependencies. If it is too tight, check whether `@zip.js/zip.js` (about 8 MB on disk) can be trimmed, or switch to `pdfkit` (about 12 MB smaller).
-4. **Run `verify-storage-account.ps1`** against the real account (read-only), then with `-Apply`. Record the result in the deployment runbook. Wire `-RetentionDays` and `PAP_PDF_RETENTION_DAYS` to one pipeline variable.
+4. **Run `verify-storage-account.ps1`** against the real account (read-only), then with `-Apply`. Record the result in the deployment runbook. `-RetentionDays` is the only place the retention value is set.
 5. **Manually confirm** the plain ZIP opens in Windows Explorer (Windows 10 and 11), and that the AES ZIP opens in WinRAR. Both take a minute and close the two remaining gaps in check 3.
 6. **Measure the end-to-end sign time** (render + mock QES + blob upload + table write) on a deployed SWA instance. This spike measured only the render and ZIP parts. The < 3 s target still has to be proven with the real QES provider (Story 14).
 7. **Keep the spike folder** as a regression harness until Story 9 has its own tests. It can then be removed.

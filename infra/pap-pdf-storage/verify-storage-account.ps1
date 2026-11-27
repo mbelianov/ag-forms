@@ -15,7 +15,7 @@
   If the account already has rules other than the two PAP rules, -Apply refuses unless -Force is given.
   Container name and blob prefix in the template (pap-pdfs / pap/) must match the application.
 
-  Use the SAME value for -RetentionDays and for the app setting PAP_PDF_RETENTION_DAYS.
+  -RetentionDays is the only place the retention period is set; the application has no retention setting.
   A policy change can take up to 24 h to take effect.
 
 .EXAMPLE
@@ -73,7 +73,6 @@ if ($Apply) {
     az storage account management-policy create -g $ResourceGroup --account-name $AccountName --policy "@$tmp" -o none
     if ($LASTEXITCODE -ne 0) { throw 'az management-policy create failed' }
     Write-Host "Lifecycle policy applied (retention = $RetentionDays days). It can take up to 24 h to take effect." -ForegroundColor Green
-    Write-Host "Set PAP_PDF_RETENTION_DAYS=$RetentionDays in the SWA application settings." -ForegroundColor Green
   } finally { Remove-Item $tmp -ErrorAction SilentlyContinue }
 } else {
   Write-Host 'Policy JSON is well-formed (not applied; re-run with -Apply).' -ForegroundColor Yellow
