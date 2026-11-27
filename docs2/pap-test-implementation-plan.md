@@ -149,15 +149,15 @@ Each sub-task is independent enough to be implemented and reviewed on its own. C
   - SWA API size limit confirmed on a preview deployment (fallback `pdfkit` decided if not).
   - Real storage account verified/applied via `verify-storage-account.ps1`; the retention period (`-RetentionDays`, default 90) lives only in the lifecycle policy — there is no application setting for it.
 - **Todo List:**
-  1. Confirm T0A is done: `cd api && npm audit --omit=dev` shows 0 high/critical findings and `npm test` is green.
-  2. Add `pdfmake` and `@zip.js/zip.js` (latest stable, licence check) and re-run audit.
-  3. Deploy a preview (`deploy-preview.yml`) containing both libs; record the API size result.
-  4. Run the verify script read-only, then `-Apply` if the account has no other lifecycle rules; record in [`05-deployment-guide.md`](05-deployment-guide.md).
-  5. Add env settings docs: `QES_PROVIDER`, blob container config.
+  1. `[x]` Confirm T0A is done: `cd api && npm audit --omit=dev` shows 0 high/critical findings and `npm test` is green.
+  2. `[x]` Add `pdfmake` and `@zip.js/zip.js` (latest stable, licence check) and re-run audit. Done 27 Nov 2026: `pdfmake` 0.3.15 (MIT) and `@zip.js/zip.js` 2.25.0 (BSD-3-Clause) plus 16 transitive packages (all MIT, except `sax` BlueOak-1.0.0); `npm audit` 0 / 0; `tsc` build OK; 455/455 tests; `npm ci` OK. About 25 MB added on disk (`pdfmake` 11.4 MB, `@zip.js/zip.js` 8.3 MB, `pdfkit` 4.6 MB).
+  3. `[ ]` Deploy a preview (`deploy-preview.yml`) containing both libs; record the API size result. Needs a pull request to `master` (the workflow runs only on `pull_request`) and the SWA token secret.
+  4. `[x]` Run the verify script read-only, then `-Apply` if the account has no other lifecycle rules (the result is recorded here, not in the guide, which only describes the procedure). Done 27 Nov 2026 on `agformssa` (resource group `ag-forms`), retention 90 days: all 7 prerequisite checks passed and the account had no lifecycle policy before. Policy applied and read back from Azure: `pap-pdf-retention` (delete 90 days after creation, prefix `pap-pdfs/pap/`) and `pap-pdf-orphan-pending` (delete after 1 day, prefix `pap-pdfs/pap/`, tag `state==pending`). Takes effect within 24 h. The script needed a fix: `-Apply` crashed in Windows PowerShell 5.1 when no policy existed yet.
+  5. `[x]` Add env settings docs: `QES_PROVIDER` (already in the guide) and the blob settings (same connection string; container `pap-pdfs` and prefix `pap/` are fixed constants), documented in the PAP storage section of [`05-deployment-guide.md`](05-deployment-guide.md).
 - **Relevant Context:** [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md) KI-014, [`api/package.json`](../api/package.json), [`infra/pap-pdf-storage/`](../infra/pap-pdf-storage/README.md).
 - **Acceptance Criteria:** audit clean for new packages; preview deploy succeeds; storage check passes (StorageV2, no HNS, no soft delete/versioning); runbook updated.
 - **Risks:** SWA size limit unknown (+~30 MB); `npm audit fix --force` must not be used blindly; one lifecycle policy per account (merge with existing rules).
-- **Status:** `[ ] pending`
+- **Status:** `[-] in progress` — steps 1, 2, 4, 5 done on 27 Nov 2026; step 3 (preview deployment, API size limit, O-13) is open and needs a pull request to `master`.
 
 ---
 

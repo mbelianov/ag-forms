@@ -18,11 +18,13 @@
     "@azure/functions": "^4.0.0",
     "@azure/identity": "^4.14.1",
     "@azure/storage-blob": "^12.32.0",
+    "@zip.js/zip.js": "^2.25.0",
     "bcryptjs": "^3.0.2",
     "dotenv": "^17.4.2",
     "joi": "^17.13.9",
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^10.3.1",
+    "pdfmake": "^0.3.15",
     "uuid": "^11.0.3"
   },
   "devDependencies": {

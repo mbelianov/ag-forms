@@ -59,8 +59,13 @@ if ($Apply) {
     exit 1
   }
   # One policy per account: do not silently wipe rules that belong to something else.
+  # 'show' fails with ManagementPolicyNotFound when no policy exists yet. That is expected, so
+  # relax $ErrorActionPreference for this call only (Windows PowerShell 5.1 turns native stderr into a terminating error).
+  $ErrorActionPreference = 'Continue'
   $existingJson = az storage account management-policy show -g $ResourceGroup --account-name $AccountName -o json 2>$null
-  if ($LASTEXITCODE -eq 0 -and $existingJson) {
+  $showExit = $LASTEXITCODE
+  $ErrorActionPreference = 'Stop'
+  if ($showExit -eq 0 -and $existingJson) {
     $others = @(($existingJson | ConvertFrom-Json).policy.rules | Where-Object { $PapRuleNames -notcontains $_.name })
     if ($others.Count -gt 0 -and -not $Force) {
       Write-Host "Account already has $($others.Count) other lifecycle rule(s): $($others.name -join ', '). Merge them into the template or pass -Force to replace them." -ForegroundColor Red

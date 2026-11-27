@@ -217,6 +217,8 @@ Steps (needs `az login` with rights on the storage account):
 2. If it passes, apply the policy with `-Apply`. A storage account has **one** lifecycle policy; the script stops if other rules exist (merge them into the template, or use `-Force` only to replace them on purpose).
 3. Record the result of the check in the release notes. (`-RetentionDays` is the only place the retention value is set; the application has no retention setting.)
 
+The PDFs use the same `AZURE_STORAGE_CONNECTION_STRING` as the tables (no separate blob setting). The container name `pap-pdfs` and the `pap/` blob prefix are fixed in the application, not configurable, because the lifecycle policy filters on them; if either ever changes, change `lifecycle-policy.template.json` and re-run the script with `-Apply`.
+
 Behaviour to expect: a new or edited policy can take up to 24 hours to take effect, and deletion can lag the nominal retention end by about a day. If the retention value is changed later, re-run the script with `-Apply` and the new `-RetentionDays`; nothing else needs updating.
 
 ### Initial Data Setup
