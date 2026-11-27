@@ -135,7 +135,7 @@ Each sub-task is independent enough to be implemented and reviewed on its own. C
   - Frontend tooling majors (Vite/Vitest/ESLint) may require config migration → keep each upgrade a separate step and re-run lint/build.
   - Transitive findings without an upstream fix → use `overrides` sparingly, document each one, remove when the parent is updated.
   - SWA managed-function size/limits are not affected by this task (no new packages), but the lock-file diff must be reviewed for unexpected new transitive dependencies.
-- **Status:** `[ ] pending`
+- **Status:** `[x] done` — 27 Nov 2026. `npm audit` is 0 / 0 (all findings and `--omit=dev`) in `api/` and `frontend/`; api tests 455/455 and `tsc` build OK; frontend lint, build and tests (125/125) OK; `npm ci` OK in both; manual `swa start` smoke check confirmed OK by the product owner. Details in KI-014.
 
 ---
 

@@ -401,7 +401,12 @@ For an FT twins exam, the same blob also carries `twin2_ft_biometry`, `twin2_ft_
 - **Risk:** The runtime findings (`joi`, `@azure/identity`) are relevant to the deployed API; the dev-tooling findings do not ship to production.
 - **Fix:** Upgrade the runtime packages to the patched versions and re-run the full backend suite; upgrade or replace dev tooling as part of normal maintenance. Do not use `npm audit fix --force` blindly.
 - **Priority:** P2 · Required by the security policy (critical within 24 h, high within 30 days) — schedule a dedicated dependency-update task; not part of the email feature.
-- **Status:** Open — not addressed by the email feature.
+- **Status:** **Resolved** on 27 Nov 2026 (plan task T0A); the manual `swa start` smoke check was confirmed OK.
+- **Resolution (T0A, 27 Nov 2026):** `npm audit` before → after (all findings / `--omit=dev`):
+  - `api/`: 12 / 4 → **0 / 0** (before: 1 critical, 6 high, 4 moderate, 1 low). Fixed by `npm audit fix` (lock file only: `handlebars`, `brace-expansion`, `browserslist`, `js-yaml`, `baseline-browser-mapping`, `fast-xml-parser`, `@azure/msal-node`) plus direct bumps `joi` ^17.13.9, `@azure/identity` ^4.14.1 and `rimraf` ^5 → ^6.1.4 (the only major bump; clears `glob` / `minimatch`).
+  - `frontend/`: 25 / 7 → **0 / 0** (before: 11 high, 14 moderate). Bumps within existing semver ranges: `axios` ^1.21.1, `react-router-dom` ^7.18.7, `vite` ^8.4.0, `vitest` ^4.1.12, `eslint` ^10.15.0, `typescript-eslint` ^8.74.0; transitive `dompurify`, `immutable`, `source-map-js`, `browserslist`, `baseline-browser-mapping`, `zod`, `@vitest/mocker` updated in the lock file.
+  - No `--force`, no `overrides`, no accepted remaining findings. Test counts unchanged (api 455 in 23 suites, frontend 125 in 11 files); `npm ci` succeeds in both projects.
+  - Tooling note: npm 10.9.8 crashes (`Cannot read properties of null (reading 'edgesOut')`) in `npm audit fix` and when installing `vitest` in `frontend/`. The frontend fix was done package by package; the `vitest` step ran with `npx npm@11`. The lock file stays at the existing lockfile version and `npm ci` works under npm 10.
 - **Update (PAP spike O-4):** an audit of `api/package-lock.json` with `--omit=dev` (22 Nov 2026) still shows 4 runtime findings, 3 of them high: `joi` (<= 17.13.8), `@azure/identity` / `@azure/msal-node`, and `fast-xml-parser` (<= 5.11.2). They are present without the new PAP libraries (`pdfmake`, `@zip.js/zip.js`), which add none. Fixing them is open item O-12 and should happen before those libraries are added to `api/`.
 
 ---
