@@ -381,7 +381,6 @@ Notes:
 - `api_location: api` makes SWA host the compiled Azure Functions (Node 22) behind `/api/*`. `host.json` must keep `routePrefix: "api"`.
 - Application settings (`JWT_SECRET`, `AZURE_STORAGE_CONNECTION_STRING`, `ALLOWED_ORIGIN`, `EMAIL_CREDENTIALS_ENCRYPTION_KEY`, ...) are **not** set by the workflow. They live in the Azure portal: Static Web App > Settings > Environment variables / Application settings.
 - **Preview environments share the production application settings and the production storage account.** A PR preview therefore uses the same email key and can read and write the same stored provider rows. Test accordingly.
-- A dependency audit (`npm audit`) is not part of the workflow; see `KNOWN-ISSUES.md` KI-014.
 
 ### Infrastructure as Code
 
@@ -520,7 +519,6 @@ The operations team should maintain procedures for:
 - [ ] Managed identity permissions assigned
 - [ ] Storage tables created
 - [ ] PAP PDF storage verified with `infra/pap-pdf-storage/verify-storage-account.ps1` and the lifecycle policy applied (retention is set only via `-RetentionDays`)
-- [ ] Preview deployment with `pdfmake` and `@zip.js/zip.js` accepted by SWA (API size limit confirmed, PAP open item O-13)
 - [ ] Backup and retention strategy configured
 - [ ] DNS and custom domains configured
 - [ ] TLS certificates validated
