@@ -184,6 +184,7 @@ For production, consider Azure Front Door with WAF for:
 
 The storage account hosts:
 - Azure Table Storage for operational entities
+- Azure Blob Storage for signed PAP test PDFs (container `pap-pdfs`; see [PAP signed-PDF storage](#pap-signed-pdf-storage))
 
 Recommended tables:
 
@@ -201,6 +202,24 @@ Required controls:
 - Use RBAC and a protected connection string (managed identity applies only to a standalone Function App; the current deployment reads the connection string from SWA application settings)
 - Restrict access using RBAC
 - Enable encryption at rest
+
+### PAP signed-PDF storage
+
+Signed PAP test PDFs are stored in Blob Storage and removed by a **storage lifecycle policy**, not by the application (PAP user stories, Story 12). Assets and background: [`infra/pap-pdf-storage/`](../infra/pap-pdf-storage/README.md) and [`O-4-TECHNICAL-SPIKE-REPORT.md`](O-4-TECHNICAL-SPIKE-REPORT.md).
+
+Account requirements (all checked by `verify-storage-account.ps1`):
+- General-purpose v2, **hierarchical namespace disabled** (blob index tags do not work with lifecycle management on HNS accounts)
+- **Blob soft delete, container soft delete and versioning disabled**, otherwise deleted PDFs outlive the retention period
+- Public blob access disabled, TLS 1.2 or higher
+
+Steps (needs `az login` with rights on the storage account):
+1. Read-only check: `./infra/pap-pdf-storage/verify-storage-account.ps1 -ResourceGroup <rg> -AccountName <account> -RetentionDays 90`
+2. If it passes, apply the policy with `-Apply`. A storage account has **one** lifecycle policy; the script stops if other rules exist (merge them into the template, or use `-Force` only to replace them on purpose).
+3. Record the result of the check in the release notes. (`-RetentionDays` is the only place the retention value is set; the application has no retention setting.)
+
+The PDFs use the same `AZURE_STORAGE_CONNECTION_STRING` as the tables (no separate blob setting). The container name `pap-pdfs` and the `pap/` blob prefix are fixed in the application, not configurable, because the lifecycle policy filters on them; if either ever changes, change `lifecycle-policy.template.json` and re-run the script with `-Apply`.
+
+Behaviour to expect: a new or edited policy can take up to 24 hours to take effect, and deletion can lag the nominal retention end by about a day. If the retention value is changed later, re-run the script with `-Apply` and the new `-RetentionDays`; nothing else needs updating.
 
 ### Initial Data Setup
 
@@ -249,6 +268,9 @@ ALLOWED_ORIGIN=https://<your-swa-hostname>
 EMAIL_CREDENTIALS_ENCRYPTION_KEY=<64-hex-chars-generate-with-node-crypto-randomBytes-32>
 # Optional, only during key rotation:
 # EMAIL_CREDENTIALS_ENCRYPTION_KEY_PREVIOUS=<old-64-hex-key>
+
+# QES provider for PAP signing. Only 'mock' is supported in this iteration (default).
+QES_PROVIDER=mock
 
 TOKEN_EXPIRATION_HOURS=8
 PASSWORD_HASH_ALGORITHM=argon2id
@@ -359,7 +381,6 @@ Notes:
 - `api_location: api` makes SWA host the compiled Azure Functions (Node 22) behind `/api/*`. `host.json` must keep `routePrefix: "api"`.
 - Application settings (`JWT_SECRET`, `AZURE_STORAGE_CONNECTION_STRING`, `ALLOWED_ORIGIN`, `EMAIL_CREDENTIALS_ENCRYPTION_KEY`, ...) are **not** set by the workflow. They live in the Azure portal: Static Web App > Settings > Environment variables / Application settings.
 - **Preview environments share the production application settings and the production storage account.** A PR preview therefore uses the same email key and can read and write the same stored provider rows. Test accordingly.
-- A dependency audit (`npm audit`) is not part of the workflow; see `KNOWN-ISSUES.md` KI-014.
 
 ### Infrastructure as Code
 
@@ -497,6 +518,7 @@ The operations team should maintain procedures for:
 - [ ] SWA application settings configured, including `JWT_SECRET`, `AZURE_STORAGE_CONNECTION_STRING`, `ALLOWED_ORIGIN` and `EMAIL_CREDENTIALS_ENCRYPTION_KEY` (64 hex chars, set **before** release)
 - [ ] Managed identity permissions assigned
 - [ ] Storage tables created
+- [ ] PAP PDF storage verified with `infra/pap-pdf-storage/verify-storage-account.ps1` and the lifecycle policy applied (retention is set only via `-RetentionDays`)
 - [ ] Backup and retention strategy configured
 - [ ] DNS and custom domains configured
 - [ ] TLS certificates validated

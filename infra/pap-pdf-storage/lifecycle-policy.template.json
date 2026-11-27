@@ -1,0 +1,37 @@
+{
+  "rules": [
+    {
+      "enabled": true,
+      "name": "pap-pdf-retention",
+      "type": "Lifecycle",
+      "definition": {
+        "filters": {
+          "blobTypes": ["blockBlob"],
+          "prefixMatch": ["pap-pdfs/pap/"]
+        },
+        "actions": {
+          "baseBlob": {
+            "delete": { "daysAfterCreationGreaterThan": __RETENTION_DAYS__ }
+          }
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "name": "pap-pdf-orphan-pending",
+      "type": "Lifecycle",
+      "definition": {
+        "filters": {
+          "blobTypes": ["blockBlob"],
+          "prefixMatch": ["pap-pdfs/pap/"],
+          "blobIndexMatch": [{ "name": "state", "op": "==", "value": "pending" }]
+        },
+        "actions": {
+          "baseBlob": {
+            "delete": { "daysAfterCreationGreaterThan": 1 }
+          }
+        }
+      }
+    }
+  ]
+}

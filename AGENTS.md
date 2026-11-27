@@ -2,6 +2,8 @@
 
 This file provides guidance to agents when working with code in this repository.
 
+- **Documentation roles (`docs2/`):** files named `0?-*.md` (`01-architecture-overview.md` … `06-local-dev-setup.md`) are **persistent product documentation** that must survive intermediate modifications. Describe only how the system *is* and how to operate it (architecture, design, security, API, deployment procedure, local setup). Never put progress, status, task results, dates of work done, "applied so far" tables, audit/run outcomes or open-item/task IDs (T*, O-*, KI-* as status) in them. Update them only when an application-specific fact or procedure changes, and only after the change is real.
+- **Tracking documentation:** progress, status, results of executed steps and open items go to the implementation plan ([`docs2/pap-test-implementation-plan.md`](docs2/pap-test-implementation-plan.md), task `Status` and todo lines), and, where they apply, to [`docs2/KNOWN-ISSUES.md`](docs2/KNOWN-ISSUES.md) and the open-items table in [`docs2/PAP-TEST-USER-STORIES.md`](docs2/PAP-TEST-USER-STORIES.md). Do not record such information in `0?-*.md` files.
 - Backend/frontend are part are developed as separate projects but intended to be deployed on Azure SWA free tier.
 - Backend single-test command is `cd api && npm test -- src/tests/utils/validation.test.ts`; Jest roots are [`api/src`](api/src), but coverage explicitly excludes [`api/src/tests/**`](api/src/tests).
 - [`api/package.json`](api/package.json) `start` is not a plain runtime start: it runs `prestart` (`clean && build`) before `func start`.
